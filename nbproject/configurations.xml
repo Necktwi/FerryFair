@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configurationDescriptor version="90">
+  <logicalFolder name="root" displayName="root" projectFiles="true" kind="ROOT">
+    <logicalFolder name="HeaderFiles"
+                   displayName="Header Files"
+                   projectFiles="true">
+      <itemPath>FFJSON.cpp</itemPath>
+      <itemPath>FFJSON.h</itemPath>
+      <itemPath>ServerSocket.h</itemPath>
+      <itemPath>Socket.h</itemPath>
+      <itemPath>SocketException.h</itemPath>
+      <itemPath>debug.h</itemPath>
+      <itemPath>myconverters.h</itemPath>
+      <itemPath>mystdlib.h</itemPath>
+    </logicalFolder>
+    <logicalFolder name="ResourceFiles"
+                   displayName="Resource Files"
+                   projectFiles="true">
+      <itemPath>ServerSocket.cpp</itemPath>
+      <itemPath>Socket.cpp</itemPath>
+      <itemPath>debug.cpp</itemPath>
+      <itemPath>myconverters.cpp</itemPath>
+      <itemPath>mystdlib.cpp</itemPath>
+    </logicalFolder>
+    <logicalFolder name="SourceFiles"
+                   displayName="Source Files"
+                   projectFiles="true">
+      <itemPath>main.cpp</itemPath>
+    </logicalFolder>
+    <logicalFolder name="TestFiles"
+                   displayName="Test Files"
+                   projectFiles="false"
+                   kind="TEST_LOGICAL_FOLDER">
+    </logicalFolder>
+    <logicalFolder name="ExternalFiles"
+                   displayName="Important Files"
+                   projectFiles="false"
+                   kind="IMPORTANT_FILES_FOLDER">
+      <itemPath>Makefile</itemPath>
+    </logicalFolder>
+  </logicalFolder>
+  <projectmakefile>Makefile</projectmakefile>
+  <confs>
+    <conf name="Debug" type="1">
+      <toolsSet>
+        <compilerSet>default</compilerSet>
+        <dependencyChecking>true</dependencyChecking>
+        <rebuildPropChanged>false</rebuildPropChanged>
+      </toolsSet>
+      <compileType>
+        <ccTool>
+          <standard>8</standard>
+        </ccTool>
+        <linkerTool>
+          <linkerAddLib>
+            <pElem>/usr/lib/i386-linux-gnu</pElem>
+          </linkerAddLib>
+          <linkerLibItems>
+            <linkerOptionItem>-lssl</linkerOptionItem>
+            <linkerOptionItem>-lpthread</linkerOptionItem>
+            <linkerOptionItem>-lcrypto</linkerOptionItem>
+          </linkerLibItems>
+        </linkerTool>
+      </compileType>
+      <item path="FFJSON.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="FFJSON.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="ServerSocket.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ServerSocket.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="Socket.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="Socket.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="SocketException.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="debug.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="debug.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="main.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="myconverters.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="myconverters.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="mystdlib.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="mystdlib.h" ex="false" tool="3" flavor2="0">
+      </item>
+    </conf>
+    <conf name="Release" type="1">
+      <toolsSet>
+        <compilerSet>default</compilerSet>
+        <dependencyChecking>true</dependencyChecking>
+        <rebuildPropChanged>false</rebuildPropChanged>
+      </toolsSet>
+      <compileType>
+        <cTool>
+          <developmentMode>5</developmentMode>
+        </cTool>
+        <ccTool>
+          <developmentMode>5</developmentMode>
+        </ccTool>
+        <fortranCompilerTool>
+          <developmentMode>5</developmentMode>
+        </fortranCompilerTool>
+        <asmTool>
+          <developmentMode>5</developmentMode>
+        </asmTool>
+      </compileType>
+      <item path="FFJSON.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="FFJSON.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="ServerSocket.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="ServerSocket.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="Socket.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="Socket.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="SocketException.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="debug.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="debug.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="main.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="myconverters.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="myconverters.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="mystdlib.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="mystdlib.h" ex="false" tool="3" flavor2="0">
+      </item>
+    </conf>
+  </confs>
+</configurationDescriptor>
