@@ -6,10 +6,14 @@
                    projectFiles="true">
       <itemPath>FFJSON.cpp</itemPath>
       <itemPath>FFJSON.h</itemPath>
+      <itemPath>FerryStream.hpp</itemPath>
       <itemPath>ServerSocket.h</itemPath>
       <itemPath>Socket.h</itemPath>
       <itemPath>SocketException.h</itemPath>
+      <itemPath>WSServer.cpp</itemPath>
+      <itemPath>WSServer.h</itemPath>
       <itemPath>debug.h</itemPath>
+      <itemPath>global.h</itemPath>
       <itemPath>myconverters.h</itemPath>
       <itemPath>mystdlib.h</itemPath>
     </logicalFolder>
@@ -19,6 +23,7 @@
       <itemPath>ServerSocket.cpp</itemPath>
       <itemPath>Socket.cpp</itemPath>
       <itemPath>debug.cpp</itemPath>
+      <itemPath>global.cpp</itemPath>
       <itemPath>myconverters.cpp</itemPath>
       <itemPath>mystdlib.cpp</itemPath>
     </logicalFolder>
@@ -31,6 +36,12 @@
                    displayName="Test Files"
                    projectFiles="false"
                    kind="TEST_LOGICAL_FOLDER">
+      <logicalFolder name="f1"
+                     displayName="WSServerTest"
+                     projectFiles="true"
+                     kind="TEST">
+        <itemPath>tests/WSServerTest.c</itemPath>
+      </logicalFolder>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"
@@ -39,6 +50,9 @@
       <itemPath>Makefile</itemPath>
     </logicalFolder>
   </logicalFolder>
+  <sourceRootList>
+    <Elem>../libwebsockets</Elem>
+  </sourceRootList>
   <projectmakefile>Makefile</projectmakefile>
   <confs>
     <conf name="Debug" type="1">
@@ -50,6 +64,9 @@
       <compileType>
         <ccTool>
           <standard>8</standard>
+          <incDir>
+            <pElem>..</pElem>
+          </incDir>
         </ccTool>
         <linkerTool>
           <linkerAddLib>
@@ -59,12 +76,16 @@
             <linkerOptionItem>-lssl</linkerOptionItem>
             <linkerOptionItem>-lpthread</linkerOptionItem>
             <linkerOptionItem>-lcrypto</linkerOptionItem>
+            <linkerLibFileItem>../libwebsockets/build/lib/libwebsockets.a</linkerLibFileItem>
+            <linkerOptionItem>-lz</linkerOptionItem>
           </linkerLibItems>
         </linkerTool>
       </compileType>
       <item path="FFJSON.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="FFJSON.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="FerryStream.hpp" ex="false" tool="3" flavor2="0">
       </item>
       <item path="ServerSocket.cpp" ex="false" tool="1" flavor2="0">
       </item>
@@ -76,9 +97,32 @@
       </item>
       <item path="SocketException.h" ex="false" tool="3" flavor2="0">
       </item>
+      <item path="WSServer.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="WSServer.h" ex="false" tool="3" flavor2="0">
+      </item>
       <item path="debug.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="debug.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <folder path="TestFiles/f1">
+        <cTool>
+          <incDir>
+            <pElem>.</pElem>
+          </incDir>
+        </cTool>
+        <ccTool>
+          <incDir>
+            <pElem>.</pElem>
+          </incDir>
+        </ccTool>
+        <linkerTool>
+          <output>${TESTDIR}/TestFiles/f1</output>
+        </linkerTool>
+      </folder>
+      <item path="global.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="global.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="main.cpp" ex="false" tool="1" flavor2="0">
       </item>
@@ -89,6 +133,8 @@
       <item path="mystdlib.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="mystdlib.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="tests/WSServerTest.c" ex="false" tool="0" flavor2="0">
       </item>
     </conf>
     <conf name="Release" type="1">
@@ -115,6 +161,8 @@
       </item>
       <item path="FFJSON.h" ex="false" tool="3" flavor2="0">
       </item>
+      <item path="FerryStream.hpp" ex="false" tool="3" flavor2="0">
+      </item>
       <item path="ServerSocket.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="ServerSocket.h" ex="false" tool="3" flavor2="0">
@@ -125,9 +173,32 @@
       </item>
       <item path="SocketException.h" ex="false" tool="3" flavor2="0">
       </item>
+      <item path="WSServer.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="WSServer.h" ex="false" tool="3" flavor2="0">
+      </item>
       <item path="debug.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="debug.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <folder path="TestFiles/f1">
+        <cTool>
+          <incDir>
+            <pElem>.</pElem>
+          </incDir>
+        </cTool>
+        <ccTool>
+          <incDir>
+            <pElem>.</pElem>
+          </incDir>
+        </ccTool>
+        <linkerTool>
+          <output>${TESTDIR}/TestFiles/f1</output>
+        </linkerTool>
+      </folder>
+      <item path="global.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="global.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="main.cpp" ex="false" tool="1" flavor2="0">
       </item>
@@ -138,6 +209,8 @@
       <item path="mystdlib.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="mystdlib.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="tests/WSServerTest.c" ex="false" tool="0" flavor2="0">
       </item>
     </conf>
   </confs>

@@ -9,6 +9,8 @@
 #include <malloc.h>
 #include <math.h>
 #include <string.h>
+#include <openssl/bio.h>
+#include <openssl/evp.h>
 
 #include "FFJSON.h"
 #include "mystdlib.h"
@@ -17,7 +19,7 @@
 FFJSON::FFJSON() {
 }
 
-FFJSON::FFJSON(std::string ffjson) {
+FFJSON::FFJSON(std::string& ffjson) {
     trimWhites(ffjson);
     this->ffjson = ffjson;
     this->type = objectType(ffjson);
@@ -39,10 +41,12 @@ FFJSON::FFJSON(std::string ffjson) {
         int recursiveArrayCount = 0;
         this->val.pairs = new std::map<std::string, FFJSON*>();
         while (i < l) {
+oloopbegining:
             if (!propset) {
                 if (ffjson[i] == ':') {
                     property = ffjson.substr(j, i - j);
                     trimWhites(property);
+                    trimQuotes(property);
                     propset = true;
                     j = i;
                 } else if (ffjson[i] == ',' || ffjson[i] == '\\' || ffjson[i] == '.') {
@@ -74,7 +78,7 @@ FFJSON::FFJSON(std::string ffjson) {
                     if (ffjson[i] == '}')success = true;
                     value = "";
                     valset = true;
-                } else if (!array && ffjson[i] == 'F') {
+                } else if (ffjson[i] == 'F') {
                     if (ffjson[i + 1] == 'F') {
                         if (ffjson[i + 2] == 'E') {
                             if (ffjson[i + 3] == 'S') {
@@ -83,7 +87,9 @@ FFJSON::FFJSON(std::string ffjson) {
                                         if (ffjson[i + 6] == 'T') {
                                             if (ffjson[i + 7] == 'R') {
                                                 ffescstr = !ffescstr;
-                                                i += 7;
+                                                i += 8;
+                                                value.append("FFESCSTR");
+                                                goto oloopbegining;
                                             }
                                         }
                                     }
@@ -123,6 +129,7 @@ FFJSON::FFJSON(std::string ffjson) {
         this->val.array = new std::vector<FFJSON*>();
         bool success = false;
         while (i < l) {
+aloopbegining:
             if (ffjson[i] == '\\' && !ffescstr) {
                 i++;
             } else if (ffjson[i] == '{' && !array&& !ffescstr) {
@@ -144,12 +151,12 @@ FFJSON::FFJSON(std::string ffjson) {
                 FFJSON* f = new FFJSON(value);
                 propset = false;
                 j = i + 1;
-                (*this->val.array)[elementCount] = f;
+                (*this->val.array).push_back(f);
                 elementCount++;
                 if (ffjson[i] == ']')success = true;
                 value = "";
                 valset = true;
-            } else if (!array && ffjson[i] == 'F') {
+            } else if (ffjson[i] == 'F') {
                 if (ffjson[i + 1] == 'F') {
                     if (ffjson[i + 2] == 'E') {
                         if (ffjson[i + 3] == 'S') {
@@ -158,7 +165,9 @@ FFJSON::FFJSON(std::string ffjson) {
                                     if (ffjson[i + 6] == 'T') {
                                         if (ffjson[i + 7] == 'R') {
                                             ffescstr = !ffescstr;
-                                            i += 7;
+                                            i += 8;
+                                            value.append("FFESCSTR");
+                                            goto aloopbegining;
                                         }
                                     }
                                 }
@@ -174,6 +183,7 @@ FFJSON::FFJSON(std::string ffjson) {
                 valset = false;
                 k = 0;
             }
+            i++;
         }
         if (!success) {
             throw Exception("Terminating character not found.");
@@ -187,14 +197,20 @@ FFJSON::FFJSON(std::string ffjson) {
         this->val.boolean = ((int) ffjson.find("true", 0)) != -1 ? true : false;
     } else if (this->type == FFJSON_OBJ_TYPE::UNRECOGNIZED) {
         if (ffjson.length() > 20) {
-            if ((int) ffjson.find("FFESCSTR", 0) == 0) {
-                if ((int) ffjson.find("FFESCSTR", 8) == ffjson.length() - 8) {
-                    this->val.string = (char*) malloc(ffjson.length() - 15);
-                    memcpy(this->val.string, ffjson.c_str() + 8, ffjson.length() - 16);
-                    this->val.string[ffjson.length() - 16] = '\0';
-                    this->length = ffjson.length() - 16;
-                    this->type = FFJSON_OBJ_TYPE::STRING;
-                }
+            int startIndex = 0;
+            int endIndex = ffjson.length();
+            this->length = 0;
+            this->val.string = (char*) malloc(ffjson.length());
+            char * destination;
+            while ((endIndex = ffjson.find("FFESCSTR", startIndex)) >= 0) {
+                destination = this->val.string + this->length;
+                memcpy(destination, ffjson.c_str() + startIndex, this->length += (endIndex - startIndex));
+                startIndex = endIndex + 8;
+            }
+            endIndex = ffjson.length();
+            destination = this->val.string + this->length;
+            if (endIndex - startIndex > 0) {
+                memcpy(destination, ffjson.c_str() + startIndex, this->length += (endIndex - startIndex));
             }
         } else {
             this->val.number = atof(ffjson.c_str());
@@ -214,6 +230,11 @@ FFJSON::~FFJSON() {
         val.pairs->clear();
         delete this->val.pairs;
     } else if (this->type == FFJSON_OBJ_TYPE::ARRAY) {
+        int i = this->val.array->size() - 1;
+        while (i > 0) {
+            delete (*this->val.array)[i];
+            i--;
+        }
         delete this->val.array;
     } else if (this->type == FFJSON_OBJ_TYPE::STRING || this->type == FFJSON_OBJ_TYPE::UNRECOGNIZED) {
         free(this->val.string);
@@ -231,6 +252,18 @@ void FFJSON::trimWhites(std::string& s) {
     }
     j++;
     s = s.substr(i, j - i);
+}
+
+void FFJSON::trimQuotes(std::string& s) {
+    int i = 0;
+    int j = s.length();
+    if (s[0] == '"') {
+        i = 1;
+    }
+    if (s[s.length() - 1] == '"') {
+        j--;
+    }
+    s = s.substr(i, j);
 }
 
 FFJSON::FFJSON_OBJ_TYPE FFJSON::objectType(std::string ffjson) {
@@ -268,3 +301,57 @@ FFJSON& FFJSON::operator[](int index) {
         throw Exception("NON ARRAY TYPE");
     }
 };
+
+std::string FFJSON::stringify(bool encode_to_base64) {
+    if (this->type == FFJSON_OBJ_TYPE::STRING) {
+        this->ffjson = "\"" + std::string(this->val.string, this->length) + "\"";
+        return this->ffjson;
+    } else if (this->type == FFJSON_OBJ_TYPE::NUMBER) {
+        return (this->ffjson = std::string(std::to_string(this->val.number)));
+    } else if (this->type == FFJSON_OBJ_TYPE::UNRECOGNIZED) {
+        if (encode_to_base64) {
+            int output_length = 0;
+            char * b64_char = base64_encode((const unsigned char*) this->val.string, this->length, (size_t*) & output_length);
+            std::string b64_str(b64_char, output_length);
+            return (this->ffjson = "\"" + b64_str + "\"");
+        } else {
+            return (this->ffjson = "\"" + std::string(this->val.string) + "\"");
+        }
+    } else if (this->type == FFJSON_OBJ_TYPE::BOOL) {
+        if (this->val.boolean) {
+            return (this->ffjson = "true");
+        } else {
+            return (this->ffjson = "false");
+        }
+    } else if (this->type == FFJSON_OBJ_TYPE::OBJECT) {
+        std::map<std::string, FFJSON*>& objmap = *(this->val.pairs);
+        this->ffjson = "{";
+        std::map<std::string, FFJSON*>::iterator i;
+        i = objmap.begin();
+        while (i != objmap.end()) {
+            this->ffjson.append("\"" + i->first + "\":");
+            this->ffjson.append(i->second->stringify(encode_to_base64));
+            this->ffjson.append(",");
+            i++;
+        }
+        if (objmap.size() == 0) {
+            this->ffjson += ',';
+        }
+        this->ffjson[this->ffjson.length() - 1] = '}';
+        return this->ffjson;
+    } else if (this->type == FFJSON_OBJ_TYPE::ARRAY) {
+        std::vector<FFJSON*>& objarr = *(this->val.array);
+        this->ffjson = "[";
+        int i = 0;
+        while (i < objarr.size()) {
+            this->ffjson.append(objarr[i]->stringify(encode_to_base64));
+            this->ffjson.append(",");
+            i++;
+        }
+        if (objarr.size() == 0) {
+            this->ffjson += ',';
+        }
+        this->ffjson[this->ffjson.length() - 1] = ']';
+        return this->ffjson;
+    }
+}

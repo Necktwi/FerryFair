@@ -1,5 +1,1 @@
-// Implementation of the ServerSocket class
-
-#include "ServerSocket.h"
-#include "SocketException.h"
-
+/home/gowtham/NetBeansProjects/remotedevicecontroller/ServerSocket.cpp
