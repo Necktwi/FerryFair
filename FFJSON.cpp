@@ -302,6 +302,11 @@ FFJSON& FFJSON::operator[](int index) {
     }
 };
 
+/**
+ * converts FFJSON object to json string
+ * @param encode_to_base64 if true then the binary data is base64 encoded
+ * @return json string of this FFJSON object
+ */
 std::string FFJSON::stringify(bool encode_to_base64) {
     if (this->type == FFJSON_OBJ_TYPE::STRING) {
         this->ffjson = "\"" + std::string(this->val.string, this->length) + "\"";
