@@ -192,6 +192,7 @@ int WSServer::callback_echo(struct libwebsocket_context *context, struct libwebs
                 FFJSON ffjson(str_in);
                 std::string path = std::string((char*) (ffjson[std::string("path")].val.string), ffjson[std::string("path")].length);
                 std::string initPack;
+                int bufferSize = (int) ffjson["bufferSize"].val.number;
                 if (validate_path_l(path)) {
                     if ((*wsi_path_map_l)[wsi].length() != 0) {
                         if ((*wsi_path_map_l)[wsi].compare(path) == 0) {

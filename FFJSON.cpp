@@ -307,14 +307,14 @@ FFJSON& FFJSON::operator[](int index) {
  * @param encode_to_base64 if true then the binary data is base64 encoded
  * @return json string of this FFJSON object
  */
-std::string FFJSON::stringify(bool encode_to_base64) {
+std::string FFJSON::stringify() {
     if (this->type == FFJSON_OBJ_TYPE::STRING) {
         this->ffjson = "\"" + std::string(this->val.string, this->length) + "\"";
         return this->ffjson;
     } else if (this->type == FFJSON_OBJ_TYPE::NUMBER) {
         return (this->ffjson = std::string(std::to_string(this->val.number)));
     } else if (this->type == FFJSON_OBJ_TYPE::UNRECOGNIZED) {
-        if (encode_to_base64) {
+        if (this->base64encode) {
             int output_length = 0;
             char * b64_char = base64_encode((const unsigned char*) this->val.string, this->length, (size_t*) & output_length);
             std::string b64_str(b64_char, output_length);
@@ -334,8 +334,10 @@ std::string FFJSON::stringify(bool encode_to_base64) {
         std::map<std::string, FFJSON*>::iterator i;
         i = objmap.begin();
         while (i != objmap.end()) {
+            if (this->base64encode)i->second->base64encode = true;
+            if (this->base64encodeChildren&&!this->base64encodeStopChain)i->second->base64encodeChildren = true;
             this->ffjson.append("\"" + i->first + "\":");
-            this->ffjson.append(i->second->stringify(encode_to_base64));
+            this->ffjson.append(i->second->stringify());
             this->ffjson.append(",");
             i++;
         }
@@ -349,7 +351,9 @@ std::string FFJSON::stringify(bool encode_to_base64) {
         this->ffjson = "[";
         int i = 0;
         while (i < objarr.size()) {
-            this->ffjson.append(objarr[i]->stringify(encode_to_base64));
+            if (this->base64encode)objarr[i]->base64encode = true;
+            if (this->base64encodeChildren&&!this->base64encodeStopChain)objarr[i]->base64encodeChildren = true;
+            this->ffjson.append(objarr[i]->stringify());
             this->ffjson.append(",");
             i++;
         }

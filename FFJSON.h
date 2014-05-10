@@ -39,7 +39,22 @@ public:
     enum FFJSON_OBJ_TYPE {
         STRING, NUMBER, OBJECT, ARRAY, BOOL, UNRECOGNIZED
     };
-
+    
+    /**
+     * when set the FFJSON object is base64 encoded during stringification.
+     */
+    bool base64encode = false;
+    
+    /**
+     * when set the FFJSON object's children inherit base64encode and base64encodeChildren properties
+     */
+    bool base64encodeChildren=false;
+    
+    /**
+     * when set the FFJSON object don't inherit base64encode or base54encodeChildren properties
+     */
+    bool base64encodeStopChain=false;
+    
     FFJSON_OBJ_TYPE type;
     std::string ffjson;
     int length = 0;
@@ -49,7 +64,8 @@ public:
     FFJSON_OBJ_TYPE objectType(std::string ffjson);
     FFJSON& operator[](std::string prop);
     FFJSON& operator[](int index);
-    std::string stringify(bool encode_to_base64);
+    std::string stringify();
+
     union FFValue {
         char * string;
         std::vector<FFJSON*>* array;

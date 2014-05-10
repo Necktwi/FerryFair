@@ -235,12 +235,14 @@ private:
                         ofstream mp3segment(fn_b + ".mp3", std::ios_base::out | std::ios_base::binary);
                         mp3segment.write(ferrymp3, (*media_pack)["ferrymp3"].length);
                         mp3segment.close();
-//                        if ((debug & 8) == 8) {
-//                            ofstream pktdump(fn_b + ".pktdump", std::ios_base::out | std::ios_base::binary);
-//                            pktdump.write(truebuffer.c_str(), truebuffer.length());
-//                            pktdump.close();
-//                        }
-                        media_pack->stringify(true);
+                        //                        if ((debug & 8) == 8) {
+                        //                            ofstream pktdump(fn_b + ".pktdump", std::ios_base::out | std::ios_base::binary);
+                        //                            pktdump.write(truebuffer.c_str(), truebuffer.length());
+                        //                            pktdump.close();
+                        //                        }
+                        (*media_pack)["ferryframes"].base64encode = true;
+                        (*media_pack)["ferrymp3"].base64encode = true;
+                        media_pack->stringify();
                         packs_to_send[fs->path] = true;
                         new_pck_chk = true;
                         if (fs->packetBuffer.size() >= fs->packetBufferSize) {
