@@ -48,7 +48,7 @@ void ferryStreamFuneral(string stream_path) {
 int main(int argc, char** argv) {
     port = 92711;
     ServerSocket* ss;
-    debug = 3;
+    debug = 1;
 
     WSServer::WSServerArgs ws_server_args;
     memset(&ws_server_args, 0, sizeof (WSServer::WSServerArgs));

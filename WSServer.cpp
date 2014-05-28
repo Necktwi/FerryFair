@@ -192,7 +192,8 @@ int WSServer::callback_echo(struct libwebsocket_context *context, struct libwebs
                 FFJSON ffjson(str_in);
                 std::string path = std::string((char*) (ffjson[std::string("path")].val.string), ffjson[std::string("path")].length);
                 std::string initPack;
-                int bufferSize = (int) ffjson["bufferSize"].val.number;
+                int bufferSize;
+                lwsl_notice("client has buffer size %d", bufferSize);
                 if (validate_path_l(path)) {
                     if ((*wsi_path_map_l)[wsi].length() != 0) {
                         if ((*wsi_path_map_l)[wsi].compare(path) == 0) {
@@ -205,8 +206,12 @@ int WSServer::callback_echo(struct libwebsocket_context *context, struct libwebs
                         }
                         FerryStream* fs = (*ferryStreams_l)[path];
                         if (fs != NULL) {
-                            pss->i = fs->packetBuffer.begin();
                             pss->fs = fs;
+                            bufferSize = (int) ffjson["bufferSize"].val.number;
+                            bufferSize = (bufferSize > 0)&&(pss->fs->packetBufferSize >= bufferSize) ? bufferSize : pss->fs->packetBufferSize; //validate input data
+                            int initpck = (initpck = (fs->packetBuffer.size() - bufferSize)) > 0 ? initpck : 0;
+                            pss->i = fs->packetBuffer.begin();
+                            std::advance(pss->i, initpck);
                             //                            initPack = "{\"initialPacks\":" + std::to_string(fs->packetBuffer.size()) + "}";
                             //                            libwebsocket_write(wsi, (unsigned char*) initPack.c_str(), initPack.length(), LWS_WRITE_TEXT);
                             if (fs->packetBuffer.size() > 0) {
