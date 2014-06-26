@@ -60,15 +60,12 @@ int main(int argc, char** argv) {
     try {
         ss = new ServerSocket(92711);
     } catch (SocketException e) {
-        cout << "\n" << getTime() << " ferrymediaserver: Unable to create socket on port: " << port << ".\n";
+        ffl_err("Unable to create socket on port: %d", port);
         exit(1);
     }
     while (true && !force_exit) {
         try {
-            if ((debug & 1) == 1) {
-                cout << "\n" << getTime() << " ferrymediaserver: waiting for a connection.\n";
-                fflush(stdout);
-            }
+            ffl_notice("waiting for a connection...");
             FerryStream* fs = new FerryStream(ss->accept(), &ferryStreamFuneral);
             if (ferrystreams[fs->path] == NULL) {
                 ferrystreams[fs->path] = fs;
@@ -80,17 +77,11 @@ int main(int argc, char** argv) {
                     ferrystreams[fs->path] = fs;
                 }
             }
-            if ((debug & 1) == 1) {
-                cout << "\n" << getTime() << " ferrymediaserver: a connection accepted.\n";
-                fflush(stdout);
-            }
+            ffl_notice("a connection accepted.");
         } catch (SocketException e) {
-            if ((debug & 1) == 1) {
-                cout << "\n" << getTime() << " ferrymediaserver: Exception accepting incoming connection: " << e.description() << "\n";
-                fflush(stdout);
-            }
+            ffl_warn("Exception accepting incoming connection: %s", e.description().c_str());
         } catch (FerryStream::Exception e) {
-            cout << "\n" << getTime() << " ferrymediaserver: Exception creating a new FerrySteam: " << e.what() << "\n";
+            ffl_err("Exception creating a new FerryStream: %s", e.what());
             fflush(stdout);
         }
     }

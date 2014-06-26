@@ -4,32 +4,21 @@
     <logicalFolder name="HeaderFiles"
                    displayName="Header Files"
                    projectFiles="true">
-      <itemPath>FFJSON.cpp</itemPath>
-      <itemPath>FFJSON.h</itemPath>
       <itemPath>FerryStream.hpp</itemPath>
-      <itemPath>ServerSocket.h</itemPath>
-      <itemPath>Socket.h</itemPath>
-      <itemPath>SocketException.h</itemPath>
-      <itemPath>WSServer.cpp</itemPath>
       <itemPath>WSServer.h</itemPath>
       <itemPath>debug.h</itemPath>
       <itemPath>global.h</itemPath>
-      <itemPath>myconverters.h</itemPath>
-      <itemPath>mystdlib.h</itemPath>
     </logicalFolder>
     <logicalFolder name="ResourceFiles"
                    displayName="Resource Files"
                    projectFiles="true">
-      <itemPath>ServerSocket.cpp</itemPath>
-      <itemPath>Socket.cpp</itemPath>
-      <itemPath>debug.cpp</itemPath>
-      <itemPath>global.cpp</itemPath>
-      <itemPath>myconverters.cpp</itemPath>
-      <itemPath>mystdlib.cpp</itemPath>
     </logicalFolder>
     <logicalFolder name="SourceFiles"
                    displayName="Source Files"
                    projectFiles="true">
+      <itemPath>WSServer.cpp</itemPath>
+      <itemPath>debug.cpp</itemPath>
+      <itemPath>global.cpp</itemPath>
       <itemPath>main.cpp</itemPath>
     </logicalFolder>
     <logicalFolder name="TestFiles"
@@ -37,10 +26,16 @@
                    projectFiles="false"
                    kind="TEST_LOGICAL_FOLDER">
       <logicalFolder name="f1"
-                     displayName="WSServerTest"
+                     displayName="Base64Image"
                      projectFiles="true"
                      kind="TEST">
-        <itemPath>tests/WSServerTest.c</itemPath>
+        <itemPath>tests/Base64Image.cpp</itemPath>
+      </logicalFolder>
+      <logicalFolder name="f2"
+                     displayName="MJPEGHTadder"
+                     projectFiles="true"
+                     kind="TEST">
+        <itemPath>tests/MJPEGHTadder.cpp</itemPath>
       </logicalFolder>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
@@ -57,15 +52,22 @@
   <confs>
     <conf name="Debug" type="1">
       <toolsSet>
-        <compilerSet>default</compilerSet>
+        <compilerSet>GNU|GNU</compilerSet>
         <dependencyChecking>true</dependencyChecking>
         <rebuildPropChanged>false</rebuildPropChanged>
       </toolsSet>
       <compileType>
+        <cTool>
+          <incDir>
+            <pElem>.</pElem>
+          </incDir>
+        </cTool>
         <ccTool>
           <standard>8</standard>
           <incDir>
             <pElem>..</pElem>
+            <pElem>.</pElem>
+            <pElem>../base</pElem>
           </incDir>
         </ccTool>
         <linkerTool>
@@ -73,29 +75,16 @@
             <pElem>/usr/lib/i386-linux-gnu</pElem>
           </linkerAddLib>
           <linkerLibItems>
+            <linkerLibFileItem>../libwebsockets/build/lib/libwebsockets.a</linkerLibFileItem>
+            <linkerLibFileItem>../base/dist/Debug/GNU-Linux-x86/libbase.so</linkerLibFileItem>
             <linkerOptionItem>-lssl</linkerOptionItem>
             <linkerOptionItem>-lpthread</linkerOptionItem>
             <linkerOptionItem>-lcrypto</linkerOptionItem>
-            <linkerLibFileItem>../libwebsockets/build/lib/libwebsockets.a</linkerLibFileItem>
             <linkerOptionItem>-lz</linkerOptionItem>
           </linkerLibItems>
         </linkerTool>
       </compileType>
-      <item path="FFJSON.cpp" ex="false" tool="1" flavor2="0">
-      </item>
-      <item path="FFJSON.h" ex="false" tool="3" flavor2="0">
-      </item>
       <item path="FerryStream.hpp" ex="false" tool="3" flavor2="0">
-      </item>
-      <item path="ServerSocket.cpp" ex="false" tool="1" flavor2="0">
-      </item>
-      <item path="ServerSocket.h" ex="false" tool="3" flavor2="0">
-      </item>
-      <item path="Socket.cpp" ex="false" tool="1" flavor2="0">
-      </item>
-      <item path="Socket.h" ex="false" tool="3" flavor2="0">
-      </item>
-      <item path="SocketException.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="WSServer.cpp" ex="false" tool="1" flavor2="0">
       </item>
@@ -120,21 +109,30 @@
           <output>${TESTDIR}/TestFiles/f1</output>
         </linkerTool>
       </folder>
+      <folder path="TestFiles/f2">
+        <cTool>
+          <incDir>
+            <pElem>.</pElem>
+          </incDir>
+        </cTool>
+        <ccTool>
+          <incDir>
+            <pElem>.</pElem>
+          </incDir>
+        </ccTool>
+        <linkerTool>
+          <output>${TESTDIR}/TestFiles/f2</output>
+        </linkerTool>
+      </folder>
       <item path="global.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="global.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="main.cpp" ex="false" tool="1" flavor2="0">
       </item>
-      <item path="myconverters.cpp" ex="false" tool="1" flavor2="0">
+      <item path="tests/Base64Image.cpp" ex="false" tool="1" flavor2="0">
       </item>
-      <item path="myconverters.h" ex="false" tool="3" flavor2="0">
-      </item>
-      <item path="mystdlib.cpp" ex="false" tool="1" flavor2="0">
-      </item>
-      <item path="mystdlib.h" ex="false" tool="3" flavor2="0">
-      </item>
-      <item path="tests/WSServerTest.c" ex="false" tool="0" flavor2="0">
+      <item path="tests/MJPEGHTadder.cpp" ex="false" tool="1" flavor2="0">
       </item>
     </conf>
     <conf name="Release" type="1">
@@ -146,9 +144,15 @@
       <compileType>
         <cTool>
           <developmentMode>5</developmentMode>
+          <incDir>
+            <pElem>.</pElem>
+          </incDir>
         </cTool>
         <ccTool>
           <developmentMode>5</developmentMode>
+          <incDir>
+            <pElem>.</pElem>
+          </incDir>
         </ccTool>
         <fortranCompilerTool>
           <developmentMode>5</developmentMode>
@@ -156,22 +160,11 @@
         <asmTool>
           <developmentMode>5</developmentMode>
         </asmTool>
+        <linkerTool>
+          <output>${TESTDIR}/TestFiles/f1</output>
+        </linkerTool>
       </compileType>
-      <item path="FFJSON.cpp" ex="false" tool="1" flavor2="0">
-      </item>
-      <item path="FFJSON.h" ex="false" tool="3" flavor2="0">
-      </item>
       <item path="FerryStream.hpp" ex="false" tool="3" flavor2="0">
-      </item>
-      <item path="ServerSocket.cpp" ex="false" tool="1" flavor2="0">
-      </item>
-      <item path="ServerSocket.h" ex="false" tool="3" flavor2="0">
-      </item>
-      <item path="Socket.cpp" ex="false" tool="1" flavor2="0">
-      </item>
-      <item path="Socket.h" ex="false" tool="3" flavor2="0">
-      </item>
-      <item path="SocketException.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="WSServer.cpp" ex="false" tool="1" flavor2="0">
       </item>
@@ -196,21 +189,30 @@
           <output>${TESTDIR}/TestFiles/f1</output>
         </linkerTool>
       </folder>
+      <folder path="TestFiles/f2">
+        <cTool>
+          <incDir>
+            <pElem>.</pElem>
+          </incDir>
+        </cTool>
+        <ccTool>
+          <incDir>
+            <pElem>.</pElem>
+          </incDir>
+        </ccTool>
+        <linkerTool>
+          <output>${TESTDIR}/TestFiles/f2</output>
+        </linkerTool>
+      </folder>
       <item path="global.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="global.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="main.cpp" ex="false" tool="1" flavor2="0">
       </item>
-      <item path="myconverters.cpp" ex="false" tool="1" flavor2="0">
+      <item path="tests/Base64Image.cpp" ex="false" tool="1" flavor2="0">
       </item>
-      <item path="myconverters.h" ex="false" tool="3" flavor2="0">
-      </item>
-      <item path="mystdlib.cpp" ex="false" tool="1" flavor2="0">
-      </item>
-      <item path="mystdlib.h" ex="false" tool="3" flavor2="0">
-      </item>
-      <item path="tests/WSServerTest.c" ex="false" tool="0" flavor2="0">
+      <item path="tests/MJPEGHTadder.cpp" ex="false" tool="1" flavor2="0">
       </item>
     </conf>
   </confs>

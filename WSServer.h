@@ -8,6 +8,10 @@
 #ifndef WSSERVER_H
 #define	WSSERVER_H
 
+#define MAX_ECHO_PAYLOAD 8000
+#define LOCAL_RESOURCE_PATH "./WebsocketServer"
+
+
 #include "libwebsockets/lib/libwebsockets.h"
 #include "FerryStream.hpp"
 #include <string>
@@ -15,7 +19,18 @@
 
 class WSServer {
 public:
-    struct libwebsocket_protocols protocols[2];
+
+    enum FraggleStates {
+        FRAGSTATE_INIT_PCK,
+        FRAGSTATE_NEW_PCK,
+        FRAGSTATE_MORE_FRAGS,
+        FRAGSTATE_INCOMPREHENSIBLE_INIT_MSG,
+    };
+
+    enum Protocol {
+        PROTOCOL_HTTP = 0,
+        PROTOCOL_FFJSON
+    };
     bool daemonize;
     int client;
     int rate_us;
@@ -51,6 +66,42 @@ public:
         std::string identifier;
     };
 
+    struct per_session_data__http {
+        int fd;
+    };
+
+    struct per_session_data__fairplay {
+        unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING + MAX_ECHO_PAYLOAD + LWS_SEND_BUFFER_POST_PADDING];
+        unsigned int len;
+        unsigned int index;
+        bool initiated;
+        std::list<FFJSON>::iterator i;
+        FerryStream* fs;
+
+        /**
+         * It is set if the packet in the list pointed by i is the last packet in the list when the last packet was sent. when sending a packet if it is set 'i' is incremented before sending the packet.
+         */
+        bool endHit;
+        bool morechunks;
+
+        /**
+         * when there are more chunks to send the initByte is assigned with address pointing to next chunk.
+         */
+        unsigned char* initByte;
+        unsigned long sum;
+
+        /**
+         * To flag that its the fist packet to be sent to the client.
+         */
+        bool initpckflag;
+        std::string* initpck;
+
+        /**
+         * 
+         */
+        enum WSServer::FraggleStates state;
+    };
+
     struct WSServerArgs {
         bool daemonize;
         char client[20];
@@ -64,9 +115,33 @@ public:
         std::map<std::string, FerryStream*>* ferryStreams;
     };
     WSServer(WSServerArgs* args);
-    int static callback_echo(struct libwebsocket_context *context, struct libwebsocket *wsi, enum libwebsocket_callback_reasons reason, void *user, void *in, size_t len);
+    libwebsocket_protocols protocols[2] = {
+        /* first protocol must always be HTTP handler */
+        //        {
+        //            "http-only", /* name */
+        //            WSServer::callback_http, /* callback */
+        //            sizeof (struct per_session_data__http), /* per_session_data_size */
+        //            0, /* max frame size / rx buffer */
+        //        },
+        {
+            "fairplay",
+            WSServer::callbackFairPlayWS,
+            sizeof (struct per_session_data__fairplay),
+            10,
+        },
+        { NULL, NULL, 0, 0} /* terminator */
+    };
+
 private:
     static int heart(WSServer* wss);
+    int static callbackFairPlayWS(struct libwebsocket_context *context,
+            struct libwebsocket *wsi,
+            enum libwebsocket_callback_reasons reason,
+            void *user, void *in, size_t len);
+    static int callback_http(struct libwebsocket_context *context,
+            struct libwebsocket *wsi,
+            enum libwebsocket_callback_reasons reason, void *user,
+            void *in, size_t len);
     thread* heartThread;
 };
 #endif	/* WSSERVER_H */

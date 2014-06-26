@@ -7,7 +7,24 @@
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
         <group>
-            <file>file:/home/gowtham/NetBeansProjects/ferrymediaserver/main.cpp</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/libwebsockets/include/config.h</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/ferrymediaserver/global.cpp</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/libwebsockets/logger.cpp</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/ferrymediaserver/logger.h</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/libwebsockets/lib/libwebsockets.h</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/ferrymediaserver/JPEGImage.h</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/libwebsockets/lib/private-libwebsockets.h</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/ferrymediaserver/JPEGImage.cpp</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/ferrymediaserver/main.cpp</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/ferrymediaserver/WSServer.cpp</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/libwebsockets/test-server/test-server.c</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/libwebsockets/lib/context.c</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/libwebsockets/test-server/test-fraggle.c</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/ferrymediaserver/FerryStream.hpp</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/ferrymediaserver/WSServer.h</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/ferrymediaserver/global.h</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/ferrymediaserver/FFJSON.cpp</file>
+            <file>rfs://gowtham@newmek7.newmeksolutions.com:22/home/gowtham/NetBeansProjects/libwebsockets/lib/base64-decode.c</file>
         </group>
     </open-files>
 </project-private>
