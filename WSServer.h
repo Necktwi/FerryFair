@@ -25,6 +25,7 @@ public:
         FRAGSTATE_NEW_PCK,
         FRAGSTATE_MORE_FRAGS,
         FRAGSTATE_INCOMPREHENSIBLE_INIT_MSG,
+        FRAGSTATE_SEND_ERRMSG
     };
 
     enum Protocol {
@@ -89,17 +90,15 @@ public:
          */
         unsigned char* initByte;
         unsigned long sum;
-
-        /**
-         * To flag that its the fist packet to be sent to the client.
-         */
-        bool initpckflag;
-        std::string* initpck;
-
+        bool deletePayload = false;
         /**
          * 
          */
         enum WSServer::FraggleStates state;
+
+        /**
+         */
+        std::string* payload;
     };
 
     struct WSServerArgs {

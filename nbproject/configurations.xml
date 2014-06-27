@@ -45,9 +45,6 @@
       <itemPath>Makefile</itemPath>
     </logicalFolder>
   </logicalFolder>
-  <sourceRootList>
-    <Elem>../libwebsockets</Elem>
-  </sourceRootList>
   <projectmakefile>Makefile</projectmakefile>
   <confs>
     <conf name="Debug" type="1">
@@ -68,7 +65,11 @@
             <pElem>..</pElem>
             <pElem>.</pElem>
             <pElem>../base</pElem>
+            <pElem>../libwebsockets/include</pElem>
           </incDir>
+          <preprocessorList>
+            <Elem>_DEBUG</Elem>
+          </preprocessorList>
         </ccTool>
         <linkerTool>
           <linkerAddLib>

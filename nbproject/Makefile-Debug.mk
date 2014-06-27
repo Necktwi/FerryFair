@@ -79,22 +79,22 @@ ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ferrymediaserver: ${OBJECTFILES}
 ${OBJECTDIR}/WSServer.o: WSServer.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -I.. -I. -I../base -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/WSServer.o WSServer.cpp
+	$(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/WSServer.o WSServer.cpp
 
 ${OBJECTDIR}/debug.o: debug.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -I.. -I. -I../base -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/debug.o debug.cpp
+	$(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/debug.o debug.cpp
 
 ${OBJECTDIR}/global.o: global.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -I.. -I. -I../base -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/global.o global.cpp
+	$(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/global.o global.cpp
 
 ${OBJECTDIR}/main.o: main.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -I.. -I. -I../base -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/main.o main.cpp
+	$(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/main.o main.cpp
 
 # Subprojects
 .build-subprojects:
@@ -113,13 +113,13 @@ ${TESTDIR}/TestFiles/f2: ${TESTDIR}/tests/MJPEGHTadder.o ${OBJECTFILES:%.o=%_nom
 ${TESTDIR}/tests/Base64Image.o: tests/Base64Image.cpp 
 	${MKDIR} -p ${TESTDIR}/tests
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -I.. -I. -I../base -I. -std=c++11 -MMD -MP -MF "$@.d" -o ${TESTDIR}/tests/Base64Image.o tests/Base64Image.cpp
+	$(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -I. -std=c++11 -MMD -MP -MF "$@.d" -o ${TESTDIR}/tests/Base64Image.o tests/Base64Image.cpp
 
 
 ${TESTDIR}/tests/MJPEGHTadder.o: tests/MJPEGHTadder.cpp 
 	${MKDIR} -p ${TESTDIR}/tests
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -I.. -I. -I../base -I. -std=c++11 -MMD -MP -MF "$@.d" -o ${TESTDIR}/tests/MJPEGHTadder.o tests/MJPEGHTadder.cpp
+	$(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -I. -std=c++11 -MMD -MP -MF "$@.d" -o ${TESTDIR}/tests/MJPEGHTadder.o tests/MJPEGHTadder.cpp
 
 
 ${OBJECTDIR}/WSServer_nomain.o: ${OBJECTDIR}/WSServer.o WSServer.cpp 
@@ -130,7 +130,7 @@ ${OBJECTDIR}/WSServer_nomain.o: ${OBJECTDIR}/WSServer.o WSServer.cpp
 	   (echo "$$NMOUTPUT" | ${GREP} 'T _main$$'); \
 	then  \
 	    ${RM} "$@.d";\
-	    $(COMPILE.cc) -g -I.. -I. -I../base -std=c++11 -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/WSServer_nomain.o WSServer.cpp;\
+	    $(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -std=c++11 -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/WSServer_nomain.o WSServer.cpp;\
 	else  \
 	    ${CP} ${OBJECTDIR}/WSServer.o ${OBJECTDIR}/WSServer_nomain.o;\
 	fi
@@ -143,7 +143,7 @@ ${OBJECTDIR}/debug_nomain.o: ${OBJECTDIR}/debug.o debug.cpp
 	   (echo "$$NMOUTPUT" | ${GREP} 'T _main$$'); \
 	then  \
 	    ${RM} "$@.d";\
-	    $(COMPILE.cc) -g -I.. -I. -I../base -std=c++11 -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/debug_nomain.o debug.cpp;\
+	    $(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -std=c++11 -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/debug_nomain.o debug.cpp;\
 	else  \
 	    ${CP} ${OBJECTDIR}/debug.o ${OBJECTDIR}/debug_nomain.o;\
 	fi
@@ -156,7 +156,7 @@ ${OBJECTDIR}/global_nomain.o: ${OBJECTDIR}/global.o global.cpp
 	   (echo "$$NMOUTPUT" | ${GREP} 'T _main$$'); \
 	then  \
 	    ${RM} "$@.d";\
-	    $(COMPILE.cc) -g -I.. -I. -I../base -std=c++11 -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/global_nomain.o global.cpp;\
+	    $(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -std=c++11 -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/global_nomain.o global.cpp;\
 	else  \
 	    ${CP} ${OBJECTDIR}/global.o ${OBJECTDIR}/global_nomain.o;\
 	fi
@@ -169,7 +169,7 @@ ${OBJECTDIR}/main_nomain.o: ${OBJECTDIR}/main.o main.cpp
 	   (echo "$$NMOUTPUT" | ${GREP} 'T _main$$'); \
 	then  \
 	    ${RM} "$@.d";\
-	    $(COMPILE.cc) -g -I.. -I. -I../base -std=c++11 -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/main_nomain.o main.cpp;\
+	    $(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -std=c++11 -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/main_nomain.o main.cpp;\
 	else  \
 	    ${CP} ${OBJECTDIR}/main.o ${OBJECTDIR}/main_nomain.o;\
 	fi
