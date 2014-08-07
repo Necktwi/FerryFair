@@ -20,5 +20,5 @@ char resource_path[50] = "/home/gowtham/FairPlay/";
  * enabled log level
  */
 
-int ff_log_type = FFL_ERR | FFL_WARN | FFL_NOTICE | FFL_DEBUG;
-int ff_log_level = FPL_FPORT | FPL_WSSERV | FPL_HTTPSERV;
+int ff_log_type = FFL_ERR | FFL_WARN | FFL_NOTICE;
+unsigned int ff_log_level = FPL_FPORT | FPL_WSSERV | FPL_HTTPSERV | FPL_MAIN | FPL_FSTREAM_HEART;

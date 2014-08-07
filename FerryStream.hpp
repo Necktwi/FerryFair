@@ -86,7 +86,7 @@ public:
             throw Exception("Illegal initial packet. FFJSON::Exception:" + string(e.what()));
             delete init_ffjson;
         }
-        ffl_notice("new connection received with path :%s", this->path.c_str());
+        ffl_notice(FPL_FSTREAM_HEART, "new connection received with path :%s", this->path.c_str());
         delete init_ffjson;
         packs_to_send[this->path] = new list<FFJSON*>();
         this->heartThread = new thread(&FerryStream::heart, this);
@@ -168,7 +168,7 @@ private:
                     }
                     if ((packStartIndex = (int) fs->buffer.find("{index:", packStartIndex)) >= 0) {
                         if (!goodPacket) {
-                            ffl_err("packet %d corrupted.", index);
+                            ffl_err(FPL_FSTREAM_HEART, "packet %d corrupted.", index);
                         }
                         goodPacket = false;
                         dindex = 7 + packStartIndex;
@@ -221,7 +221,7 @@ private:
                             i--;
                             frame = (*frames)[i]->val.string;
                             if ((*frames)[i]->length != (*sizes)[i]->val.number) {
-                                cout << "\n" << getTime() << " FerryStream: " << fs->path << ": packetNo: " << fn_b << " frameNo: " << i << " frame size changed. Sent frame length :" << (*sizes)[i]->val.number << "; Received frame length:" << (*frames)[i]->length << ".\n";
+                                ffl_err(FPL_FSTREAM_HEART, "FerryStream: %s: packetNo: %s frameNo: %d frame size changed. Sent frame length :%d; Received frame length:%d.", fs->path.c_str(), fn_b.c_str(), i, (*sizes)[i]->val.number, (*frames)[i]->length);
                             }
                             fn = fn_b + "-" + string(itoa(i)) + ".jpeg";
                             fd = open(fn.c_str(), O_WRONLY | O_TRUNC | O_CREAT);
@@ -231,7 +231,7 @@ private:
                             if (s >= 0) {
                                 ffl_debug(FPL_FSTREAM_HEART, "%s: frame %s successfully written", fs->path.c_str(), fn.c_str());
                             } else {
-                                ffl_err("%s: frame %s save failed", fs->path.c_str(), fn.c_str());
+                                ffl_err(FPL_FSTREAM_HEART, "%s: frame %s save failed", fs->path.c_str(), fn.c_str());
                             }
                         }
                         ofstream mp3segment(fn_b + ".mp3", std::ios_base::out | std::ios_base::binary);
