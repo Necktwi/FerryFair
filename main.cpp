@@ -7,17 +7,16 @@
 
 #define APP_NAME "FairPlay"
 
-#include "ServerSocket.h"
-#include "SocketException.h"
-#include "mystdlib.h"
-#include "myconverters.h"
-#include "debug.h"
-#include "FFJSON.h"
 #include "WSServer.h"
-#include "libwebsockets/lib/libwebsockets.h"
-#include "FerryStream.hpp"
+#include "FerryStream.h"
 #include "global.h"
-#include "debug.h"
+#include <base/ServerSocket.h>
+#include <base/SocketException.h>
+#include <base/mystdlib.h>
+#include <base/myconverters.h>
+#include <base/FFJSON.h>
+#include <base/logger.h>
+#include <libwebsockets.h>
 #include <linux/prctl.h>
 #include <cstdlib>
 #include <string>
@@ -43,6 +42,7 @@ using namespace std;
  * 
  */
 
+int child_exit_status = 0;
 int port = 0;
 std::map<libwebsocket*, string> wsi_path_map;
 std::map < std::string, list < libwebsocket* >*> path_wsi_map;
@@ -99,7 +99,7 @@ string runMode = "normal";
 
 void stopRunningProcess() {
     if (runningProcess > 0) {
-        ffl_notice(FPOL_MAIN | NO_NEW_LINE, "Stopping current process...");
+        ffl_notice(FPL_MAIN | NO_NEW_LINE, "Stopping current process...");
         if (kill(runningProcess, SIGTERM) != -1) {
             cout << "OK\n";
         } else {
@@ -124,8 +124,8 @@ int readConfig() {
         ff_log_level = config["logLevel"];
         return 0;
     } catch (FFJSON::Exception e) {
-        ffl_err(FPOL_MAIN, "Reading configuration failed. Please check the configuration file");
-        ffl_debug(FPOL_MAIN, "%s", e.what());
+        ffl_err(FPL_MAIN, "Reading configuration failed. Please check the configuration file");
+        ffl_debug(FPL_MAIN, "%s", e.what());
         return -1;
     }
     return 0;
@@ -141,11 +141,11 @@ wait_till_child_dead:
         if (deadpid == -1 && waitpid(secondChild, &status, WNOHANG) == 0) {
             goto wait_till_child_dead;
         }
-        ffl_warn(FPOL_MAIN, "%d process exited!", deadpid);
+        ffl_warn(FPL_MAIN, "%d process exited!", deadpid);
         secondFork();
     } else {
         secondChild = getpid();
-        ffl_notice(FPOL_MAIN, "second child started; pid= %d", secondChild);
+        ffl_notice(FPL_MAIN, "second child started; pid= %d", secondChild);
         prctl(PR_SET_PDEATHSIG, SIGHUP);
         run();
     }
@@ -169,11 +169,11 @@ wait_till_child_dead:
         if (deadpid == -1 && waitpid(firstChild, &status, WNOHANG) == 0) {
             goto wait_till_child_dead;
         }
-        ffl_debug(FPOL_MAIN, "%d process exited", deadpid);
+        ffl_debug(FPL_MAIN, "%d process exited", deadpid);
         firstFork();
     } else {
         firstChild = getpid();
-        ffl_notice(FPOL_MAIN, "firstChild started; pid=%d", firstChild);
+        ffl_notice(FPL_MAIN, "firstChild started; pid=%d", firstChild);
         fflush(stdout);
         prctl(PR_SET_PDEATHSIG, SIGHUP);
         secondFork();

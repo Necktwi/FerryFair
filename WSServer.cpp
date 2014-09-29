@@ -44,15 +44,15 @@
 #include "lws_config.h"
 #endif
 
-#include "JPEGImage.h"
-#include "libwebsockets/lib/libwebsockets.h"
-#include "WSServer.h"
-#include "FFJSON.h"
-#include "mystdlib.h"
-#include "FerryStream.hpp"
+#include "FerryStream.h"
 #include "global.h"
-#include "libwebsockets/lib/private-libwebsockets.h"
-#include "Socket.h"
+#include "WSServer.h"
+#include "private-libwebsockets.h"
+#include "libwebsockets.h"
+#include <base/JPEGImage.h>
+#include <base/FFJSON.h>
+#include <base/mystdlib.h>
+#include <base/Socket.h>
 #include <iostream>
 #include <malloc.h>
 
@@ -456,7 +456,7 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
         void *user, void *in, size_t len) {
     struct per_session_data__fairplay *pss = (struct per_session_data__fairplay *) user;
     int n;
-    std::list<FFJSON>::iterator ii;
+    std::list<FFJSON*>::iterator ii;
     switch (reason) {
 
 #ifndef LWS_NO_SERVER
@@ -506,6 +506,7 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
                     break;
                 }
                 case FRAGSTATE_NEW_PCK:
+                {
                     ii = pss->i;
                     ii++;
                     if (pss->endHit) {
@@ -514,16 +515,17 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
                             pss->i++;
                             ii++;
                         } else {
-                            ffl_debug(FPL_WSSERV, "unexpected callback for frame %d on ws %p with path %s", (int) (*pss->i)["index"].val.number, wsi, pss->fs->path.c_str());
+                            ffl_debug(FPL_WSSERV, "unexpected callback for frame %d on ws %p with path %s", (int) (**pss->i)["index"], wsi, pss->fs->path.c_str());
                             pss->endHit = true;
                             break;
                         }
                     }
-                    if (pss->i->ffjson.length() < MAX_ECHO_PAYLOAD) {
-                        n = libwebsocket_write(wsi, (unsigned char*) pss->i->ffjson.c_str(), pss->i->ffjson.length(), LWS_WRITE_TEXT);
+                    std::string* pl = &pss->fs->packetStrBuffer[(**pss->i)["index"]];
+                    if (pl->length() < MAX_ECHO_PAYLOAD) {
+                        n = libwebsocket_write(wsi, (unsigned char*) pl->c_str(), pl->length(), LWS_WRITE_TEXT);
                     } else {
-                        pss->payload = &pss->i->ffjson;
-                        pss->initByte = (unsigned char*) pss->i->ffjson.c_str();
+                        pss->payload = pl;
+                        pss->initByte = (unsigned char*) pl->c_str();
                         n = libwebsocket_write(wsi, pss->initByte, MAX_ECHO_PAYLOAD, (libwebsocket_write_protocol) (LWS_WRITE_TEXT | LWS_WRITE_NO_FIN));
                         //                        for (n = 0; n < MAX_ECHO_PAYLOAD; n++)
                         //                            pss->sum += pss->i->ffjson.c_str()[n];
@@ -531,7 +533,7 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
                         pss->state = FRAGSTATE_MORE_FRAGS;
                         libwebsocket_callback_on_writable(context, wsi);
                     }
-                    ffl_debug(FPL_WSSERV, "frame index %d", (int) (*pss->i)["index"].val.number);
+                    ffl_debug(FPL_WSSERV, "frame index %d", (int) (**pss->i)["index"]);
                     if (n < 0) {
                         lwsl_err("ERROR %d writing to socket, hanging up\n", n);
                         return 1;
@@ -547,6 +549,7 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
                         pss->endHit = true;
                     }
                     break;
+                }
                 case FRAGSTATE_SEND_ERRMSG:
                 {
                     if (pss->payload->length() < MAX_ECHO_PAYLOAD) {
@@ -630,7 +633,7 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
                             FFJSON ffjson(*pss->payload);
                             delete pss->payload;
                             pss->payload = new std::string;
-                            std::string path = std::string((char*) (ffjson[std::string("path")].val.string), ffjson[std::string("path")].length);
+                            std::string path = std::string((const char*) (ffjson["path"]), ffjson["path"].size);
                             int bufferSize;
                             if (validate_path_l(path)) {
                                 if ((*wsi_path_map_l)[wsi].length() != 0) {
@@ -645,7 +648,7 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
                                     FerryStream* fs = (*ferryStreams_l)[path];
                                     if (fs != NULL) {
                                         pss->fs = fs;
-                                        bufferSize = (int) ffjson["bufferSize"].val.number;
+                                        bufferSize = (int) ffjson["bufferSize"];
                                         ffl_debug(FPL_WSSERV, "client has buffer size %d", bufferSize);
                                         bufferSize = (bufferSize > 0)&&(pss->fs->packetBufferSize >= bufferSize) ? bufferSize : pss->fs->packetBufferSize; //validate input data
                                         int initpck = (initpck = (fs->packetBuffer.size() - bufferSize)) > 0 ? initpck : 0;

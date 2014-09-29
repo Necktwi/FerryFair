@@ -5,8 +5,8 @@
  * Created on Jun 16, 2014, 6:44:18 PM
  */
 
-#include "mystdlib.h"
-#include "JPEGImage.h"
+#include <base/mystdlib.h>
+#include <base/JPEGImage.h>
 #include <stdlib.h>
 #include <iostream>
 #include <fstream>
@@ -48,8 +48,8 @@ int main(int argc, char** argv) {
         fn.resize(fn.size() - 4);
         outfile.open(fn + /*".b64jpg.txt"*/"b64HT.txt", std::ios::binary | std::ios::out);
         //std::string image((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
-//        JPEGImage myimage((char*) image.c_str(), image.size());
-//        char* patchedImage = myimage.huffmanPatchChar();
+        //        JPEGImage myimage((char*) image.c_str(), image.size());
+        //        char* patchedImage = myimage.huffmanPatchChar();
         size_t s;
         char * b64_s = base64_encode((const unsigned char*) JPEGImage::StdHuffmanTable, 420, (size_t*) & s);
         //outfile.write("data:image/jpeg;base64,", 23);

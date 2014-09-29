@@ -35,8 +35,8 @@ OBJECTDIR=${CND_BUILDDIR}/${CND_CONF}/${CND_PLATFORM}
 
 # Object Files
 OBJECTFILES= \
+	${OBJECTDIR}/FerryStream.o \
 	${OBJECTDIR}/WSServer.o \
-	${OBJECTDIR}/debug.o \
 	${OBJECTDIR}/global.o \
 	${OBJECTDIR}/main.o
 
@@ -62,39 +62,37 @@ FFLAGS=
 ASFLAGS=
 
 # Link Libraries and Options
-LDLIBSOPTIONS=-L/usr/lib/i386-linux-gnu ../libwebsockets/build/lib/libwebsockets.a ../base/dist/Debug/GNU-Linux-x86/libbase.so -lssl -lpthread -lcrypto -lz
+LDLIBSOPTIONS=-L/usr/lib/i386-linux-gnu -L../libwebsockets/build/lib /usr/local/lib/libwebsockets.a -lssl -lpthread -lcrypto -lz -lbase
 
 # Build Targets
 .build-conf: ${BUILD_SUBPROJECTS}
 	"${MAKE}"  -f nbproject/Makefile-${CND_CONF}.mk ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ferrymediaserver
 
-${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ferrymediaserver: ../libwebsockets/build/lib/libwebsockets.a
-
-${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ferrymediaserver: ../base/dist/Debug/GNU-Linux-x86/libbase.so
+${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ferrymediaserver: /usr/local/lib/libwebsockets.a
 
 ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ferrymediaserver: ${OBJECTFILES}
 	${MKDIR} -p ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}
 	${LINK.cc} -o ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ferrymediaserver ${OBJECTFILES} ${LDLIBSOPTIONS}
 
+${OBJECTDIR}/FerryStream.o: FerryStream.cpp 
+	${MKDIR} -p ${OBJECTDIR}
+	${RM} "$@.d"
+	$(COMPILE.cc) -g -D_DEBUG -I. -I/usr/local/include -I/usr/include/ferryfair -I../libwebsockets/lib -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/FerryStream.o FerryStream.cpp
+
 ${OBJECTDIR}/WSServer.o: WSServer.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/WSServer.o WSServer.cpp
-
-${OBJECTDIR}/debug.o: debug.cpp 
-	${MKDIR} -p ${OBJECTDIR}
-	${RM} "$@.d"
-	$(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/debug.o debug.cpp
+	$(COMPILE.cc) -g -D_DEBUG -I. -I/usr/local/include -I/usr/include/ferryfair -I../libwebsockets/lib -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/WSServer.o WSServer.cpp
 
 ${OBJECTDIR}/global.o: global.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/global.o global.cpp
+	$(COMPILE.cc) -g -D_DEBUG -I. -I/usr/local/include -I/usr/include/ferryfair -I../libwebsockets/lib -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/global.o global.cpp
 
 ${OBJECTDIR}/main.o: main.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/main.o main.cpp
+	$(COMPILE.cc) -g -D_DEBUG -I. -I/usr/local/include -I/usr/include/ferryfair -I../libwebsockets/lib -std=c++11 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/main.o main.cpp
 
 # Subprojects
 .build-subprojects:
@@ -113,14 +111,27 @@ ${TESTDIR}/TestFiles/f2: ${TESTDIR}/tests/MJPEGHTadder.o ${OBJECTFILES:%.o=%_nom
 ${TESTDIR}/tests/Base64Image.o: tests/Base64Image.cpp 
 	${MKDIR} -p ${TESTDIR}/tests
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -I. -std=c++11 -MMD -MP -MF "$@.d" -o ${TESTDIR}/tests/Base64Image.o tests/Base64Image.cpp
+	$(COMPILE.cc) -g -D_DEBUG -I. -I/usr/local/include -I/usr/include/ferryfair -I../libwebsockets/lib -I. -std=c++11 -MMD -MP -MF "$@.d" -o ${TESTDIR}/tests/Base64Image.o tests/Base64Image.cpp
 
 
 ${TESTDIR}/tests/MJPEGHTadder.o: tests/MJPEGHTadder.cpp 
 	${MKDIR} -p ${TESTDIR}/tests
 	${RM} "$@.d"
-	$(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -I. -std=c++11 -MMD -MP -MF "$@.d" -o ${TESTDIR}/tests/MJPEGHTadder.o tests/MJPEGHTadder.cpp
+	$(COMPILE.cc) -g -D_DEBUG -I. -I/usr/local/include -I/usr/include/ferryfair -I../libwebsockets/lib -I. -std=c++11 -MMD -MP -MF "$@.d" -o ${TESTDIR}/tests/MJPEGHTadder.o tests/MJPEGHTadder.cpp
 
+
+${OBJECTDIR}/FerryStream_nomain.o: ${OBJECTDIR}/FerryStream.o FerryStream.cpp 
+	${MKDIR} -p ${OBJECTDIR}
+	@NMOUTPUT=`${NM} ${OBJECTDIR}/FerryStream.o`; \
+	if (echo "$$NMOUTPUT" | ${GREP} '|main$$') || \
+	   (echo "$$NMOUTPUT" | ${GREP} 'T main$$') || \
+	   (echo "$$NMOUTPUT" | ${GREP} 'T _main$$'); \
+	then  \
+	    ${RM} "$@.d";\
+	    $(COMPILE.cc) -g -D_DEBUG -I. -I/usr/local/include -I/usr/include/ferryfair -I../libwebsockets/lib -std=c++11 -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/FerryStream_nomain.o FerryStream.cpp;\
+	else  \
+	    ${CP} ${OBJECTDIR}/FerryStream.o ${OBJECTDIR}/FerryStream_nomain.o;\
+	fi
 
 ${OBJECTDIR}/WSServer_nomain.o: ${OBJECTDIR}/WSServer.o WSServer.cpp 
 	${MKDIR} -p ${OBJECTDIR}
@@ -130,22 +141,9 @@ ${OBJECTDIR}/WSServer_nomain.o: ${OBJECTDIR}/WSServer.o WSServer.cpp
 	   (echo "$$NMOUTPUT" | ${GREP} 'T _main$$'); \
 	then  \
 	    ${RM} "$@.d";\
-	    $(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -std=c++11 -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/WSServer_nomain.o WSServer.cpp;\
+	    $(COMPILE.cc) -g -D_DEBUG -I. -I/usr/local/include -I/usr/include/ferryfair -I../libwebsockets/lib -std=c++11 -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/WSServer_nomain.o WSServer.cpp;\
 	else  \
 	    ${CP} ${OBJECTDIR}/WSServer.o ${OBJECTDIR}/WSServer_nomain.o;\
-	fi
-
-${OBJECTDIR}/debug_nomain.o: ${OBJECTDIR}/debug.o debug.cpp 
-	${MKDIR} -p ${OBJECTDIR}
-	@NMOUTPUT=`${NM} ${OBJECTDIR}/debug.o`; \
-	if (echo "$$NMOUTPUT" | ${GREP} '|main$$') || \
-	   (echo "$$NMOUTPUT" | ${GREP} 'T main$$') || \
-	   (echo "$$NMOUTPUT" | ${GREP} 'T _main$$'); \
-	then  \
-	    ${RM} "$@.d";\
-	    $(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -std=c++11 -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/debug_nomain.o debug.cpp;\
-	else  \
-	    ${CP} ${OBJECTDIR}/debug.o ${OBJECTDIR}/debug_nomain.o;\
 	fi
 
 ${OBJECTDIR}/global_nomain.o: ${OBJECTDIR}/global.o global.cpp 
@@ -156,7 +154,7 @@ ${OBJECTDIR}/global_nomain.o: ${OBJECTDIR}/global.o global.cpp
 	   (echo "$$NMOUTPUT" | ${GREP} 'T _main$$'); \
 	then  \
 	    ${RM} "$@.d";\
-	    $(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -std=c++11 -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/global_nomain.o global.cpp;\
+	    $(COMPILE.cc) -g -D_DEBUG -I. -I/usr/local/include -I/usr/include/ferryfair -I../libwebsockets/lib -std=c++11 -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/global_nomain.o global.cpp;\
 	else  \
 	    ${CP} ${OBJECTDIR}/global.o ${OBJECTDIR}/global_nomain.o;\
 	fi
@@ -169,7 +167,7 @@ ${OBJECTDIR}/main_nomain.o: ${OBJECTDIR}/main.o main.cpp
 	   (echo "$$NMOUTPUT" | ${GREP} 'T _main$$'); \
 	then  \
 	    ${RM} "$@.d";\
-	    $(COMPILE.cc) -g -D_DEBUG -I.. -I. -I../base -I../libwebsockets/include -std=c++11 -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/main_nomain.o main.cpp;\
+	    $(COMPILE.cc) -g -D_DEBUG -I. -I/usr/local/include -I/usr/include/ferryfair -I../libwebsockets/lib -std=c++11 -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/main_nomain.o main.cpp;\
 	else  \
 	    ${CP} ${OBJECTDIR}/main.o ${OBJECTDIR}/main_nomain.o;\
 	fi

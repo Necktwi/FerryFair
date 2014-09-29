@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<configurationDescriptor version="94">
+<configurationDescriptor version="95">
   <logicalFolder name="root" displayName="root" projectFiles="true" kind="ROOT">
     <logicalFolder name="HeaderFiles"
                    displayName="Header Files"
                    projectFiles="true">
-      <itemPath>FerryStream.hpp</itemPath>
+      <itemPath>FerryStream.h</itemPath>
       <itemPath>WSServer.h</itemPath>
-      <itemPath>debug.h</itemPath>
       <itemPath>global.h</itemPath>
     </logicalFolder>
     <logicalFolder name="ResourceFiles"
@@ -16,8 +15,8 @@
     <logicalFolder name="SourceFiles"
                    displayName="Source Files"
                    projectFiles="true">
+      <itemPath>FerryStream.cpp</itemPath>
       <itemPath>WSServer.cpp</itemPath>
-      <itemPath>debug.cpp</itemPath>
       <itemPath>global.cpp</itemPath>
       <itemPath>main.cpp</itemPath>
     </logicalFolder>
@@ -45,6 +44,9 @@
       <itemPath>Makefile</itemPath>
     </logicalFolder>
   </logicalFolder>
+  <sourceRootList>
+    <Elem>../libwebsockets/lib</Elem>
+  </sourceRootList>
   <projectmakefile>Makefile</projectmakefile>
   <confs>
     <conf name="Debug" type="1">
@@ -62,10 +64,10 @@
         <ccTool>
           <standard>8</standard>
           <incDir>
-            <pElem>..</pElem>
             <pElem>.</pElem>
-            <pElem>../base</pElem>
-            <pElem>../libwebsockets/include</pElem>
+            <pElem>/usr/local/include</pElem>
+            <pElem>/usr/include/ferryfair</pElem>
+            <pElem>../libwebsockets/lib</pElem>
           </incDir>
           <preprocessorList>
             <Elem>_DEBUG</Elem>
@@ -74,26 +76,25 @@
         <linkerTool>
           <linkerAddLib>
             <pElem>/usr/lib/i386-linux-gnu</pElem>
+            <pElem>../libwebsockets/build/lib</pElem>
           </linkerAddLib>
           <linkerLibItems>
-            <linkerLibFileItem>../libwebsockets/build/lib/libwebsockets.a</linkerLibFileItem>
-            <linkerLibFileItem>../base/dist/Debug/GNU-Linux-x86/libbase.so</linkerLibFileItem>
+            <linkerLibFileItem>/usr/local/lib/libwebsockets.a</linkerLibFileItem>
             <linkerOptionItem>-lssl</linkerOptionItem>
             <linkerOptionItem>-lpthread</linkerOptionItem>
             <linkerOptionItem>-lcrypto</linkerOptionItem>
             <linkerOptionItem>-lz</linkerOptionItem>
+            <linkerOptionItem>-lbase</linkerOptionItem>
           </linkerLibItems>
         </linkerTool>
       </compileType>
-      <item path="FerryStream.hpp" ex="false" tool="3" flavor2="0">
+      <item path="FerryStream.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="FerryStream.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="WSServer.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="WSServer.h" ex="false" tool="3" flavor2="0">
-      </item>
-      <item path="debug.cpp" ex="false" tool="1" flavor2="0">
-      </item>
-      <item path="debug.h" ex="false" tool="3" flavor2="0">
       </item>
       <folder path="TestFiles/f1">
         <cTool>
@@ -165,15 +166,13 @@
           <output>${TESTDIR}/TestFiles/f1</output>
         </linkerTool>
       </compileType>
-      <item path="FerryStream.hpp" ex="false" tool="3" flavor2="0">
+      <item path="FerryStream.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="FerryStream.h" ex="false" tool="3" flavor2="0">
       </item>
       <item path="WSServer.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="WSServer.h" ex="false" tool="3" flavor2="0">
-      </item>
-      <item path="debug.cpp" ex="false" tool="1" flavor2="0">
-      </item>
-      <item path="debug.h" ex="false" tool="3" flavor2="0">
       </item>
       <folder path="TestFiles/f1">
         <cTool>

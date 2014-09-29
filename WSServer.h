@@ -12,10 +12,13 @@
 #define LOCAL_RESOURCE_PATH "./WebsocketServer"
 
 
-#include "libwebsockets/lib/libwebsockets.h"
-#include "FerryStream.hpp"
+#include "FerryStream.h"
+#include <libwebsockets.h>
+#include <base/FFJSON.h>
 #include <string>
 #include <map>
+#include <list>
+#include <thread>
 
 class WSServer {
 public:
@@ -76,7 +79,7 @@ public:
         unsigned int len;
         unsigned int index;
         bool initiated;
-        std::list<FFJSON>::iterator i;
+        std::list<FFJSON*>::iterator i;
         FerryStream* fs;
 
         /**
@@ -141,6 +144,6 @@ private:
             struct libwebsocket *wsi,
             enum libwebsocket_callback_reasons reason, void *user,
             void *in, size_t len);
-    thread* heartThread;
+    std::thread* heartThread;
 };
 #endif	/* WSSERVER_H */

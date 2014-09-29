@@ -35,8 +35,8 @@ OBJECTDIR=${CND_BUILDDIR}/${CND_CONF}/${CND_PLATFORM}
 
 # Object Files
 OBJECTFILES= \
+	${OBJECTDIR}/FerryStream.o \
 	${OBJECTDIR}/WSServer.o \
-	${OBJECTDIR}/debug.o \
 	${OBJECTDIR}/global.o \
 	${OBJECTDIR}/main.o
 
@@ -72,15 +72,15 @@ ${TESTDIR}/TestFiles/f1: ${OBJECTFILES}
 	${MKDIR} -p ${TESTDIR}/TestFiles
 	${LINK.cc} -o ${TESTDIR}/TestFiles/f1 ${OBJECTFILES} ${LDLIBSOPTIONS}
 
+${OBJECTDIR}/FerryStream.o: FerryStream.cpp 
+	${MKDIR} -p ${OBJECTDIR}
+	${RM} "$@.d"
+	$(COMPILE.cc) -O2 -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/FerryStream.o FerryStream.cpp
+
 ${OBJECTDIR}/WSServer.o: WSServer.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	${RM} "$@.d"
 	$(COMPILE.cc) -O2 -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/WSServer.o WSServer.cpp
-
-${OBJECTDIR}/debug.o: debug.cpp 
-	${MKDIR} -p ${OBJECTDIR}
-	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -I. -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/debug.o debug.cpp
 
 ${OBJECTDIR}/global.o: global.cpp 
 	${MKDIR} -p ${OBJECTDIR}
@@ -118,6 +118,19 @@ ${TESTDIR}/tests/MJPEGHTadder.o: tests/MJPEGHTadder.cpp
 	$(COMPILE.cc) -O2 -I. -I. -MMD -MP -MF "$@.d" -o ${TESTDIR}/tests/MJPEGHTadder.o tests/MJPEGHTadder.cpp
 
 
+${OBJECTDIR}/FerryStream_nomain.o: ${OBJECTDIR}/FerryStream.o FerryStream.cpp 
+	${MKDIR} -p ${OBJECTDIR}
+	@NMOUTPUT=`${NM} ${OBJECTDIR}/FerryStream.o`; \
+	if (echo "$$NMOUTPUT" | ${GREP} '|main$$') || \
+	   (echo "$$NMOUTPUT" | ${GREP} 'T main$$') || \
+	   (echo "$$NMOUTPUT" | ${GREP} 'T _main$$'); \
+	then  \
+	    ${RM} "$@.d";\
+	    $(COMPILE.cc) -O2 -I. -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/FerryStream_nomain.o FerryStream.cpp;\
+	else  \
+	    ${CP} ${OBJECTDIR}/FerryStream.o ${OBJECTDIR}/FerryStream_nomain.o;\
+	fi
+
 ${OBJECTDIR}/WSServer_nomain.o: ${OBJECTDIR}/WSServer.o WSServer.cpp 
 	${MKDIR} -p ${OBJECTDIR}
 	@NMOUTPUT=`${NM} ${OBJECTDIR}/WSServer.o`; \
@@ -129,19 +142,6 @@ ${OBJECTDIR}/WSServer_nomain.o: ${OBJECTDIR}/WSServer.o WSServer.cpp
 	    $(COMPILE.cc) -O2 -I. -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/WSServer_nomain.o WSServer.cpp;\
 	else  \
 	    ${CP} ${OBJECTDIR}/WSServer.o ${OBJECTDIR}/WSServer_nomain.o;\
-	fi
-
-${OBJECTDIR}/debug_nomain.o: ${OBJECTDIR}/debug.o debug.cpp 
-	${MKDIR} -p ${OBJECTDIR}
-	@NMOUTPUT=`${NM} ${OBJECTDIR}/debug.o`; \
-	if (echo "$$NMOUTPUT" | ${GREP} '|main$$') || \
-	   (echo "$$NMOUTPUT" | ${GREP} 'T main$$') || \
-	   (echo "$$NMOUTPUT" | ${GREP} 'T _main$$'); \
-	then  \
-	    ${RM} "$@.d";\
-	    $(COMPILE.cc) -O2 -I. -Dmain=__nomain -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/debug_nomain.o debug.cpp;\
-	else  \
-	    ${CP} ${OBJECTDIR}/debug.o ${OBJECTDIR}/debug_nomain.o;\
 	fi
 
 ${OBJECTDIR}/global_nomain.o: ${OBJECTDIR}/global.o global.cpp 

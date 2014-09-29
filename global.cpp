@@ -1,6 +1,6 @@
 #include "global.h"
-#include "mystdlib.h"
-#include "logger.h"
+#include <base/mystdlib.h>
+#include <base/logger.h>
 #include <string>
 #include <list>
 
@@ -10,6 +10,9 @@ std::map<std::string, std::string*> streamHeads;
 bool new_pck_chk = false;
 int force_exit = 0;
 char resource_path[50] = "/home/gowtham/FairPlay/";
+int debug = 0;
+int stderrfd = -1;
+int stdoutfd = -1;
 
 /**
  * logging section

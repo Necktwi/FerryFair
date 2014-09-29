@@ -5,7 +5,7 @@
  * Created on 31 May, 2014, 2:41:17 PM
  */
 
-#include "JPEGImage.h"
+#include <base/JPEGImage.h>
 #include <stdlib.h>
 #include <iostream>
 #include <fstream>
@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
                 std::istreambuf_iterator<char>());
         JPEGImage myimage((char*) image.c_str(), image.size());
         char* patchedImage = myimage.huffmanPatchChar();
-        outfile.write(patchedImage,myimage.patchedImageSize);
+        outfile.write(patchedImage, myimage.patchedImageSize);
         //outfile << patchedImage;
         outfile.close();
         infile.close();
