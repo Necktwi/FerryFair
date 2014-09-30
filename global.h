@@ -11,7 +11,6 @@
 #define NELEMS(x)  (sizeof(x) / sizeof(x[0]))
 
 #include <base/FFJSON.h>
-#include <libwebsockets.h>
 #include <string>
 #include <map>
 #include <list>
@@ -21,7 +20,7 @@ extern std::map<std::string, bool> packs_to_send;
 extern std::map<std::string, std::string*> streamHeads;
 extern bool new_pck_chk;
 extern int force_exit;
-extern char resource_path[50];
+extern char* resource_path;
 extern int debug;
 extern int stderrfd;
 extern int stdoutfd;

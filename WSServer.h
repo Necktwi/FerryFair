@@ -9,7 +9,6 @@
 #define	WSSERVER_H
 
 #define MAX_ECHO_PAYLOAD 8000
-#define LOCAL_RESOURCE_PATH "./WebsocketServer"
 
 
 #include "FerryStream.h"
@@ -117,14 +116,14 @@ public:
         std::map<std::string, FerryStream*>* ferryStreams;
     };
     WSServer(WSServerArgs* args);
-    libwebsocket_protocols protocols[2] = {
+    libwebsocket_protocols protocols[3] = {
         /* first protocol must always be HTTP handler */
-        //        {
-        //            "http-only", /* name */
-        //            WSServer::callback_http, /* callback */
-        //            sizeof (struct per_session_data__http), /* per_session_data_size */
-        //            0, /* max frame size / rx buffer */
-        //        },
+        {
+            "http-only", /* name */
+            WSServer::callback_http, /* callback */
+            sizeof (struct per_session_data__http), /* per_session_data_size */
+            0, /* max frame size / rx buffer */
+        },
         {
             "fairplay",
             WSServer::callbackFairPlayWS,

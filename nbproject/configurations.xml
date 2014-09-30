@@ -44,9 +44,6 @@
       <itemPath>Makefile</itemPath>
     </logicalFolder>
   </logicalFolder>
-  <sourceRootList>
-    <Elem>../libwebsockets/lib</Elem>
-  </sourceRootList>
   <projectmakefile>Makefile</projectmakefile>
   <confs>
     <conf name="Debug" type="1">
@@ -67,7 +64,6 @@
             <pElem>.</pElem>
             <pElem>/usr/local/include</pElem>
             <pElem>/usr/include/ferryfair</pElem>
-            <pElem>../libwebsockets/lib</pElem>
           </incDir>
           <preprocessorList>
             <Elem>_DEBUG</Elem>
@@ -76,15 +72,14 @@
         <linkerTool>
           <linkerAddLib>
             <pElem>/usr/lib/i386-linux-gnu</pElem>
-            <pElem>../libwebsockets/build/lib</pElem>
           </linkerAddLib>
           <linkerLibItems>
-            <linkerLibFileItem>/usr/local/lib/libwebsockets.a</linkerLibFileItem>
             <linkerOptionItem>-lssl</linkerOptionItem>
             <linkerOptionItem>-lpthread</linkerOptionItem>
             <linkerOptionItem>-lcrypto</linkerOptionItem>
             <linkerOptionItem>-lz</linkerOptionItem>
             <linkerOptionItem>-lbase</linkerOptionItem>
+            <linkerOptionItem>-lwebsockets</linkerOptionItem>
           </linkerLibItems>
         </linkerTool>
       </compileType>

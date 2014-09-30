@@ -47,8 +47,7 @@
 #include "FerryStream.h"
 #include "global.h"
 #include "WSServer.h"
-#include "private-libwebsockets.h"
-#include "libwebsockets.h"
+#include <libwebsockets.h>
 #include <base/JPEGImage.h>
 #include <base/FFJSON.h>
 #include <base/mystdlib.h>
@@ -56,6 +55,8 @@
 #include <iostream>
 #include <malloc.h>
 
+#define LOCAL_RESOURCE_PATH "/home/gowtham/www/fairplay"
+char *resource_path = LOCAL_RESOURCE_PATH;
 
 static std::map<libwebsocket*, std::string>* wsi_path_map_l;
 static std::map<std::string, std::list<libwebsocket*>*> *path_wsi_map_l;
@@ -463,7 +464,7 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
 
         case LWS_CALLBACK_ESTABLISHED:
         {
-            ffl_notice(FPL_WSSERV, "viewer %s:%d connected", Socket::getIpAddr(wsi->sock).c_str(), Socket::getPort(wsi->sock));
+            ffl_notice(FPL_WSSERV, "viewer %s:%d connected", Socket::getIpAddr(libwebsocket_get_socket_fd(wsi)).c_str(), Socket::getPort(libwebsocket_get_socket_fd(wsi)));
             pss->state = FRAGSTATE_NEW_PCK;
             break;
         }
