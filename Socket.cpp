@@ -1,1 +1,0 @@
-/home/gowtham/NetBeansProjects/remotedevicecontroller/Socket.cpp
