@@ -22,5 +22,6 @@ int stdoutfd = -1;
  * enabled log level
  */
 
-int ff_log_type = FFL_ERR | FFL_WARN | FFL_NOTICE;
-unsigned int ff_log_level = FPL_FPORT | FPL_WSSERV | FPL_HTTPSERV | FPL_MAIN | FPL_FSTREAM_HEART;
+int ff_log_type = FFL_ERR | FFL_WARN | FFL_NOTICE | FFL_DEBUG;
+//unsigned int ff_log_level = FPL_FPORT | FPL_WSSERV | FPL_HTTPSERV | FPL_MAIN | FPL_FSTREAM_HEART;
+unsigned int ff_log_level = FPL_HTTPSERV;

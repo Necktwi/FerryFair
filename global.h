@@ -24,6 +24,9 @@ extern char* resource_path;
 extern int debug;
 extern int stderrfd;
 extern int stdoutfd;
+extern FFJSON config;
+extern std::string hostname;
+extern std::string domainname;
 
 enum _fp_log_level {
     FPL_MAIN = 1 << 0,

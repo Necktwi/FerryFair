@@ -43,6 +43,7 @@
                    kind="IMPORTANT_FILES_FOLDER">
       <itemPath>Makefile</itemPath>
     </logicalFolder>
+    <itemPath>config.json</itemPath>
   </logicalFolder>
   <projectmakefile>Makefile</projectmakefile>
   <confs>
@@ -70,6 +71,7 @@
           </preprocessorList>
         </ccTool>
         <linkerTool>
+          <output>${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ferrymediaserver</output>
           <linkerAddLib>
             <pElem>/usr/lib/i386-linux-gnu</pElem>
           </linkerAddLib>
@@ -78,8 +80,8 @@
             <linkerOptionItem>-lpthread</linkerOptionItem>
             <linkerOptionItem>-lcrypto</linkerOptionItem>
             <linkerOptionItem>-lz</linkerOptionItem>
-            <linkerOptionItem>-lbase</linkerOptionItem>
             <linkerOptionItem>-lwebsockets</linkerOptionItem>
+            <linkerOptionItem>-lbase</linkerOptionItem>
           </linkerLibItems>
         </linkerTool>
       </compileType>
@@ -90,6 +92,8 @@
       <item path="WSServer.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="WSServer.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="config.json" ex="false" tool="3" flavor2="0">
       </item>
       <folder path="TestFiles/f1">
         <cTool>
@@ -168,6 +172,8 @@
       <item path="WSServer.cpp" ex="false" tool="1" flavor2="0">
       </item>
       <item path="WSServer.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="config.json" ex="false" tool="3" flavor2="0">
       </item>
       <folder path="TestFiles/f1">
         <cTool>

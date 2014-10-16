@@ -62,7 +62,7 @@ FFLAGS=
 ASFLAGS=
 
 # Link Libraries and Options
-LDLIBSOPTIONS=-L/usr/lib/i386-linux-gnu -lssl -lpthread -lcrypto -lz -lbase -lwebsockets
+LDLIBSOPTIONS=-L/usr/lib/i386-linux-gnu -lssl -lpthread -lcrypto -lz -lwebsockets -lbase
 
 # Build Targets
 .build-conf: ${BUILD_SUBPROJECTS}
