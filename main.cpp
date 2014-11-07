@@ -38,61 +38,62 @@
 
 using namespace std;
 
-/*
- * 
+/**
+ * enabled log level
  */
+
+int ff_log_type = FFL_ERR | FFL_WARN | FFL_NOTICE | FFL_DEBUG;
+unsigned int ff_log_level = FPL_FPORT | FPL_WSSERV | FPL_HTTPSERV | FPL_MAIN
+		| FPL_FSTREAM_HEART;
+//unsigned int ff_log_level = FPL_HTTPSERV;
+
 
 int child_exit_status = 0;
 int port = 0;
-std::map<libwebsocket*, string> wsi_path_map;
-std::map < std::string, list < libwebsocket* >*> path_wsi_map;
-std::map<string, FerryStream*> ferrystreams;
 std::map<libwebsocket*, WSServer::per_session_data__fairplay*> wsi_psdf_map;
 std::string configFile;
-string recordsFolder = "/var/" + string(APP_NAME) + "records/";
-string logFile = "/var/log/" + string(APP_NAME) + ".log";
-string initFile = "/etc/init/" + string(APP_NAME) + ".conf";
-string initOverrideFile = "/etc/init/" + string(APP_NAME) + ".override";
-string initdFile = "/etc/init.d/" + string(APP_NAME);
+string recordsFolder = "/var/" APP_NAME "records/";
+string logFile = "/var/log/" APP_NAME ".log";
+string initFile = "/etc/init/" APP_NAME ".conf";
+string initOverrideFile = "/etc/init/" APP_NAME ".override";
+string initdFile = "/etc/init.d/" APP_NAME;
 string installationFolder = "/usr/local/bin/";
-string binFile = installationFolder + string(APP_NAME);
-string rootBinLnk = "/usr/bin/" + string(APP_NAME);
-string srcFolder = "/usr/local/src/" + string(APP_NAME);
-string deviceRulesFile = "/etc/udev/rules.d/" + string(APP_NAME) + ".rules";
-string runningProcessFile = "/var/tmp/" + string(APP_NAME) + ".pid";
+string binFile = installationFolder + APP_NAME;
+string rootBinLnk = "/usr/bin/" APP_NAME;
+string srcFolder = "/usr/local/src/" APP_NAME;
+string deviceRulesFile = "/etc/udev/rules.d/" APP_NAME ".rules";
+string runningProcessFile = "/var/tmp/" APP_NAME ".pid";
 string internetTestURL;
 string corpNWGW;
 string homeFolder;
 FFJSON config;
 string hostname;
 string domainname;
-
+unsigned int duration = 0;
 int run();
 
-void ferryStreamFuneral(string stream_path) {
-	//delete ferrystreams[stream_path];
-	ferrystreams[stream_path] = NULL;
+void ferryStreamFuneral(int stream_path) {
 }
 int next_option;
 
 void print_usage(FILE* stream, int exit_code, char* program_name) {
 	fprintf(stream, "Usage: %s <option> [<parameter>]\n", program_name);
-	string doc = "-c --configure Configures " + string(APP_NAME) + ""
+	string doc = "-c --configure Configures " APP_NAME ""
 			"\n-f --config-file <file name> it reads configuration from the "
 			"file specified. It should be given ahead of all other options"
-			"\n-d --update Updates " + string(APP_NAME) + ""
+			"\n-d --update Updates " APP_NAME ""
 			"\n-h --help Display this usage information."
-			"\n-i --install Installs " + string(APP_NAME) + "."
-			"\n-r --reinstall Reinstall the " + string(APP_NAME) + ""
+			"\n-i --install Installs " APP_NAME "."
+			"\n-r --reinstall Reinstall the " APP_NAME ""
 			"\n-s --start=\033[4mTYPE\033[0m Runs client. If \033[4mTYPE\033[0m"
-			" is 'daemon' " + string(APP_NAME) + " runs as daemon. If \033["
-			"4mTYPE\033[0m is 'normal' " + string(APP_NAME) + " runs normally."
-			"\n-u --un-install Un-installs " + string(APP_NAME) + "."
-			"\n-x --stop Terminates " + string(APP_NAME) + "."
+			" is 'daemon' " APP_NAME " runs as daemon. If \033["
+			"4mTYPE\033[0m is 'normal' " APP_NAME " runs normally."
+			"\n-t --time <seconds> runs the program of duration <seconds>"
+			"\n-u --un-install Un-installs " APP_NAME "."
+			"\n-x --stop Terminates " APP_NAME "."
 			"\n---------------------------"
 			"\nHave a nice day :)\n\n";
 	fprintf(stream, (const char*) doc.c_str());
-	exit(exit_code);
 }
 pid_t rootProcess;
 pid_t firstChild;
@@ -255,7 +256,7 @@ void configure() {
 					struct stat st;
 					if (val.compare("true") == 0) {
 						if (stat(initFile.c_str(), &st) != -1) {
-							cout << "\nAllowing to run " + string(APP_NAME) + " at startup...";
+							cout << "\nAllowing to run " APP_NAME " at startup...";
 							if (stat(initOverrideFile.c_str(), &st) != -1) {
 								string rmfcmd = "rm " + initOverrideFile;
 								system(rmfcmd.c_str());
@@ -263,11 +264,11 @@ void configure() {
 							writeConfigValue(pn, val);
 							cout << "ok\n";
 						} else {
-							cout << "\nInstall " + string(APP_NAME) + " in first.\n";
+							cout << "\nInstall " APP_NAME " in first.\n";
 						}
 					} else if (val.compare("false") == 0) {
 						if (stat(initFile.c_str(), &st) != 1) {
-							cout << "\nDisabling " + string(APP_NAME) + " to run at startup...";
+							cout << "\nDisabling " APP_NAME " to run at startup...";
 							if (stat(initOverrideFile.c_str(), &st) == -1) {
 								int fd = open(initOverrideFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC);
 								string buf = "manual";
@@ -277,7 +278,7 @@ void configure() {
 							writeConfigValue(pn, val);
 							cout << "ok\n";
 						} else {
-							cout << "\nInstall " + string(APP_NAME) + " in first.\n";
+							cout << "\nInstall " APP_NAME " in first.\n";
 						}
 					}
 				}
@@ -292,43 +293,28 @@ void configure() {
 	}
 }
 
-int test(void *) {
-
-}
+unsigned int starttime = time(NULL);
 
 int run() {
 	port = 92711;
-	ServerSocket* ss;
+	ServerSocket* ss = NULL;
 	debug = 1;
-
+	b64_hmt = base64_encode((const unsigned char*) JPEGImage::StdHuffmanTable, 420, (size_t*) & b64_hmt_l);
 	WSServer::WSServerArgs ws_server_args;
 	memset(&ws_server_args, 0, sizeof (WSServer::WSServerArgs));
-	ws_server_args.path_wsi_map = &path_wsi_map;
-	ws_server_args.wsi_path_map = &wsi_path_map;
 	ws_server_args.debug_level = 31;
-	ws_server_args.ferryStreams = &ferrystreams;
 	WSServer* wss = new WSServer(&ws_server_args);
 	try {
 		ss = new ServerSocket(92711);
 	} catch (SocketException e) {
 		ffl_err(FPL_MAIN, "Unable to create socket on port: %d", port);
-		exit(1);
 	}
-	while (true && !force_exit) {
+	while (ss && !force_exit && (duration == 0 || duration > (time(NULL) - starttime))) {
 		try {
 			ffl_notice(FPL_MAIN, "waiting for a connection on %d ...", 92711);
 			FerryStream* fs = new FerryStream(ss->accept(),
 					&ferryStreamFuneral);
-			if (ferrystreams[fs->path] == NULL) {
-				ferrystreams[fs->path] = fs;
-			} else {
-				if (ferrystreams[fs->path]->isConnectionAlive()) {
-					delete fs;
-				} else {
-					delete ferrystreams[fs->path];
-					ferrystreams[fs->path] = fs;
-				}
-			}
+			cleanDeadFSList();
 			ffl_notice(FPL_MAIN, "a connection accepted.");
 		} catch (SocketException e) {
 			ffl_warn(FPL_MAIN, "Exception accepting incoming connection: %s",
@@ -336,15 +322,22 @@ int run() {
 		} catch (FerryStream::Exception e) {
 			ffl_err(FPL_MAIN, "Exception creating a new FerryStream: %s",
 					e.what());
-			fflush(stdout);
 		}
 	}
+	force_exit = 1;
+	sleep(5);
+	cleanDeadFSList();
+	cleanLiveFSList();
 	delete ss;
+	delete wss;
+	terminate_all_paths();
+	free(b64_hmt);
+	ffl_notice(FPL_MAIN, "BYE!");
 	return 0;
 }
 
 int main(int argc, char** argv) {
-	const char* const short_options = "cdf:hirs:tux";
+	const char* const short_options = "cdf:hirs:t:ux";
 	string opt;
 	const struct option long_options[] = {
 		{"configure", 0, NULL, 'c'},
@@ -354,7 +347,7 @@ int main(int argc, char** argv) {
 		{"install", 0, NULL, 'i'},
 		{"reinstall", 0, NULL, 'r'},
 		{"start", 1, NULL, 's'},
-		{"test", 0, NULL, 't'},
+		{"time", 1, NULL, 't'},
 		{"uninstall", 0, NULL, 'u'},
 		{"stop", 0, NULL, 'x'},
 		{NULL, 0, NULL, 0}
@@ -406,7 +399,7 @@ int main(int argc, char** argv) {
 				update();
 				break;
 			case 't':
-				test(NULL);
+				duration = std::stoi(optarg);
 				break;
 			case 'f':
 				configFile = string(optarg);
@@ -415,7 +408,6 @@ int main(int argc, char** argv) {
 				print_usage(stderr, 1, argv[0]);
 				break;
 			case -1:
-				print_usage(stderr, 1, argv[0]);
 				break;
 		}
 	} while (next_option != -1);

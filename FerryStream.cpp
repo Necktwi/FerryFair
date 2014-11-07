@@ -36,7 +36,7 @@ FerryStream::FerryStream() {
 FerryStream::FerryStream(const FerryStream& orig) {
 }
 
-FerryStream::FerryStream(ServerSocket::Connection * source, void(*funeral)(string)) : source(source), funeral(funeral) {
+FerryStream::FerryStream(ServerSocket::Connection * source, void(*funeral)(int)) : source(source), funeral(funeral) {
 	string initPack;
 	try {
 		*source >> this->buffer;
@@ -50,11 +50,13 @@ FerryStream::FerryStream(ServerSocket::Connection * source, void(*funeral)(strin
 	} catch (FFJSON::Exception e) {
 		throw Exception("Unable parse initial packet. FFJSON::Exception:" + string(e.what()));
 	}
+	string path;
 	try {
-		if ((this->path = string((const char*) (*init_ffjson)["path"])).length() < 0) {
+		if ((path = string((const char*) (*init_ffjson)["path"])).length() < 0) {
 			throw Exception("path length didn't met required value");
 			delete init_ffjson;
 		};
+		this->path = init_path(path);
 		if ((source->MAXRECV = (int) (*init_ffjson)["MAXPACKSIZE"]) <= 0) {
 			throw Exception("Max packet size didn't met required value");
 			delete init_ffjson;
@@ -63,34 +65,21 @@ FerryStream::FerryStream(ServerSocket::Connection * source, void(*funeral)(strin
 		throw Exception("Illegal initial packet. FFJSON::Exception:" + string(e.what()));
 		delete init_ffjson;
 	}
-	ffl_notice(FPL_FSTREAM_HEART, "new connection received with path :%s", this->path.c_str());
+	ffl_notice(FPL_FSTREAM_HEART, "new connection received with path :%s", path.c_str());
 	delete init_ffjson;
-	packs_to_send[this->path] = new list<FFJSON*>();
+	packs_to_send[this->path] = true;
+	liveFSList.push_back(this);
 	this->heartThread = new thread(&FerryStream::heart, this);
 	//pthread_create(&heartThread, NULL, (void*(*)(void*)) & this->heart, NULL);
 }
 
 FerryStream::~FerryStream() {
 	delete this->source;
-	std::map < std::string, bool> ::iterator i;
-	i = packs_to_send.begin();
-	while (i != packs_to_send.end()) {
-		if (i->first.compare(this->path) == 0) {
-			packs_to_send.erase(i);
-			break;
-		}
-		i++;
-	}
-	std::map<std::string, std::string*> ::iterator j;
-	j = streamHeads.begin();
-	while (j != streamHeads.end()) {
-		if (j->first.compare(this->path) == 0) {
-			free((void*) j->second->c_str());
-			delete j->second;
-			streamHeads.erase(j);
-			break;
-		}
-		j++;
+	try {
+		heartThread->join();
+		delete heartThread;
+	} catch (SocketException e) {
+		ffl_debug(FPL_FSTREAM_HEART, "socket: %s", e.description().c_str());
 	}
 }
 
@@ -144,9 +133,11 @@ void FerryStream::heart(FerryStream* fs) {
 					terminatingSign = "";
 					break;
 				}
-				if ((packStartIndex = (int) fs->buffer.find("{index:", packStartIndex)) >= 0) {
+				if ((packStartIndex = (int) fs->buffer.find("{index:",
+						packStartIndex)) >= 0) {
 					if (!goodPacket) {
-						ffl_err(FPL_FSTREAM_HEART, "packet %d corrupted.", index);
+						ffl_err(FPL_FSTREAM_HEART, "packet %d corrupted. "
+								"Discarding %dbytes", index, truebuffer.length());
 					}
 					goodPacket = false;
 					dindex = 7 + packStartIndex;
@@ -187,8 +178,12 @@ void FerryStream::heart(FerryStream* fs) {
 			try {
 				FFJSON* media_pack = new FFJSON(truebuffer);
 				if (media_pack->isType(FFJSON::OBJ_TYPE::OBJECT) && &(*media_pack)["ferryframes"] != NULL) {
+					ofstream offpmpack;
+					offpmpack.open("offpmpack.json");
+					offpmpack << truebuffer;
+					offpmpack.close();
 					vector<FFJSON*>* frames = (*media_pack)["ferryframes"].val.array;
-					vector<FFJSON*>* sizes = (*media_pack)["framesizes"].val.array;
+					//vector<FFJSON*>* sizes = (*media_pack)["framesizes"].val.array;
 					char* ferrymp3 = (*media_pack)["ferrymp3"].val.string;
 					int i = frames->size();
 					const char* frame;
@@ -198,49 +193,82 @@ void FerryStream::heart(FerryStream* fs) {
 					while (i > 0) {
 						i--;
 						frame = (const char*) (*frames)[i];
-						if ((*frames)[i]->size != (int) (*(*sizes)[i])) {
-							ffl_err(FPL_FSTREAM_HEART, "FerryStream: %s: packetNo: %s frameNo: %d frame size changed. Sent frame length :%d; Received frame length:%d.", fs->path.c_str(), fn_b.c_str(), i, (int) (*(*sizes)[i]), (*frames)[i]->size);
-						}
+						//						if ((*frames)[i]->size != (int) (*(*sizes)[i])) {
+						//							ffl_err(FPL_FSTREAM_HEART, "FerryStream: %s: packetNo: %s frameNo: %d frame size changed. Sent frame length :%d; Received frame length:%d.", id_path_map[fs->path].c_str(), fn_b.c_str(), i, (int) (*(*sizes)[i]), (*frames)[i]->size);
+						//						}
 						fn = fn_b + "-" + string(itoa(i)) + ".jpeg";
 						fd = open(fn.c_str(), O_WRONLY | O_TRUNC | O_CREAT);
 						int s;
 						s = write(fd, frame, (*frames)[i]->size);
 						close(fd);
 						if (s >= 0) {
-							ffl_debug(FPL_FSTREAM_HEART, "%s: frame %s successfully written", fs->path.c_str(), fn.c_str());
+							ffl_debug(FPL_FSTREAM_HEART, "%s: frame %s successfully"
+									" written", id_path_map[fs->path].c_str(), fn.c_str());
 						} else {
-							ffl_err(FPL_FSTREAM_HEART, "%s: frame %s save failed", fs->path.c_str(), fn.c_str());
+							ffl_err(FPL_FSTREAM_HEART, "%s: frame %s save"
+									" failed", id_path_map[fs->path].c_str(), fn.c_str());
 						}
 					}
 					ofstream mp3segment(fn_b + ".mp3", std::ios_base::out | std::ios_base::binary);
 					mp3segment.write(ferrymp3, (*media_pack)["ferrymp3"].size);
 					mp3segment.close();
-					//(*media_pack)["ferryframes"].setEFlag(B64ENCODE);
-					//(*media_pack)["ferrymp3"].setEFLAG(B64ENCODE);
-					fs->packetStrBuffer[(*media_pack)["index"]] = media_pack->stringify();
+					(*media_pack)["ferryframes"].setEFlag(FFJSON::B64ENCODE);
+					(*media_pack)["ferrymp3"].setEFlag(FFJSON::B64ENCODE);
+					pack_string_map[media_pack] = new string(media_pack->stringify());
 					packs_to_send[fs->path] = true;
 					new_pck_chk = true;
-					if (fs->packetBuffer.size() >= fs->packetBufferSize) {
-						fs->packetStrBuffer.erase((int) (**fs->packetBuffer.begin())["index"]);
-						delete (*fs->packetBuffer.begin());
-						fs->packetBuffer.pop_front();
+					std::list<FFJSON*>* packsbuf = path_packs_map[fs->path];
+					if (packsbuf->size() >= packBufSize) {
+						FFJSON* head = *packsbuf->begin();
+						delete pack_string_map[head];
+						pack_string_map.erase(head);
+						ffl_debug(FPL_FSTREAM_HEART, "Bye %d :) Kicking him out (;",
+								(int) (*head)["index"]);
+						delete head;
+						packsbuf->pop_front();
 					}
-					fs->packetBuffer.push_back(media_pack);
+					packsbuf->push_back(media_pack);
 				} else {
 					delete media_pack;
-					fs->packetBuffer.pop_back();
 				}
 			} catch (FFJSON::Exception e) {
-				ffl_err(FPL_FPORT, "Illegal meadia pack received on %s", fs->path.c_str());
+				ffl_err(FPL_FPORT, "Illegal meadia pack received on %s", id_path_map[fs->path].c_str());
 				ffl_debug(FPL_FPORT, "FFJSON::Exception: %s", e.what());
 			}
 
 		} catch (SocketException e) {
-			ffl_err(FPL_FPORT, "I, %s dying! Connection to %s lost.", fs->path.c_str(), fs->source->getDestinationIP().c_str());
-			fs->funeral(fs-> path);
-			delete fs;
+			ffl_err(FPL_FPORT, "I, %s dying! Connection to %s lost.", id_path_map[fs->path].c_str(), fs->source->getDestinationIP().c_str());
 			break;
 		}
+	}
+	deadFSList.push_back(fs);
+}
 
+std::list<FerryStream*> deadFSList;
+std::list<FerryStream*> liveFSList;
+
+void cleanDeadFSList() {
+	list<FerryStream*>::iterator i = deadFSList.begin();
+	while (i != deadFSList.end()) {
+		list<FerryStream*>::iterator j = liveFSList.begin();
+		while (j != liveFSList.end()) {
+			if (*j == *i) {
+				liveFSList.erase(j);
+				break;
+			}
+			j++;
+		}
+		delete (*i);
+		i++;
+		deadFSList.pop_front();
+	}
+}
+
+void cleanLiveFSList() {
+	list<FerryStream*>::iterator i = liveFSList.begin();
+	while (i != liveFSList.end()) {
+		delete (*i);
+		i++;
+		liveFSList.pop_front();
 	}
 }

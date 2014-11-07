@@ -50,7 +50,7 @@
 #include <libwebsockets.h>
 #include <base/JPEGImage.h>
 #include <base/FFJSON.h>
-//#include "FFJSON.h"
+#include <base/logger.h>
 #include <base/mystdlib.h>
 #include <base/Socket.h>
 #include <iostream>
@@ -61,10 +61,6 @@ using namespace std;
 #define LWS_NO_CLIENT
 #define LOCAL_RESOURCE_PATH "/home/gowtham/Projects/fairplay"
 char *resource_path = LOCAL_RESOURCE_PATH;
-
-static std::map<libwebsocket*, std::string>* wsi_path_map_l;
-static std::map<std::string, std::list<libwebsocket*>*> *path_wsi_map_l;
-static std::map<string, FerryStream*>* ferryStreams_l;
 
 FFJSON HTTPModel;
 
@@ -182,6 +178,9 @@ int WSServer::callback_http(struct libwebsocket_context *context,
 	struct per_session_data__http *pss =
 			(struct per_session_data__http *) user;
 	const char *mimetype;
+	FFJSON ans;
+	FFJSON* ansobj;
+
 #ifdef EXTERNAL_POLL
 	struct libwebsocket_pollargs *pa = (struct libwebsocket_pollargs *) in;
 #endif
@@ -292,6 +291,9 @@ int WSServer::callback_http(struct libwebsocket_context *context,
 				 */
 				libwebsocket_callback_on_writable(context, wsi);
 				break;
+			} else if (!strcmp((const char *) in, "/model.json")) {
+				pss->payload = new string(models[pss->vhost].stringify(true));
+				goto sendJSONPayload;
 			}
 
 			/* if not, send a file the easy way */
@@ -403,19 +405,21 @@ int WSServer::callback_http(struct libwebsocket_context *context,
 			lwsl_notice("LWS_CALLBACK_HTTP_BODY_COMPLETION\n");
 			/* the whole of the sent body arried, close the connection */
 
-			FFJSON ans(*pss->payload);
-			cout << ans.prettyString() << endl;
-			FFJSON* ansobj = models[pss->vhost].answerObject(&ans);
-			cout << models[pss->vhost].prettyString() << endl;
+			ans.init(*pss->payload);
+			ffl_debug(FPL_HTTPSERV, "%s", ans.stringify().c_str());
+			ansobj = models[pss->vhost].answerObject(&ans);
 			if (ansobj) {
-				(*pss->payload) =
+				pss->payload->assign(ansobj->stringify(true));
+				delete ansobj;
+sendJSONPayload:
+				ffl_debug(FPL_HTTPSERV, "%s", pss->payload->c_str());
+				string header =
 						"HTTP/1.0 200 OK\x0d\x0a"
 						"Server: libwebsockets\x0d\x0a"
 						"Content-Type: application/json\x0d\x0a"
-						"Content-Length: " + 
+						"Content-Length: " +
 						to_string((unsigned int) pss->payload->length()) +
-						"\x0d\x0a%s\x0d\x0a" + ansobj->stringify();
-				delete ansobj;
+						"\x0d\x0a\x0d\x0a";
 				/*
 				 * send the http headers...
 				 * this won't block since it's the first payload sent
@@ -423,23 +427,22 @@ int WSServer::callback_http(struct libwebsocket_context *context,
 				 * (too small for partial)
 				 */
 
-				pss->offset = pss->payload->c_str();
-				n = libwebsocket_write(wsi, (unsigned char*) pss->offset,
-						pss->payload->length(), LWS_WRITE_HTTP);
-
+				m = header.length();
+				n = libwebsocket_write(wsi, (unsigned char*) header.c_str(),
+						m, LWS_WRITE_HTTP);
 				if (n < 0) {
 					delete pss->payload;
 					return -1;
 				}
-				pss->offset + n;
+				pss->offset = pss->payload->c_str();
 				/*
 				 * book us a LWS_CALLBACK_HTTP_WRITEABLE callback
 				 */
 				libwebsocket_callback_on_writable(context, wsi);
 			} else {
+				delete pss->payload;
 				libwebsockets_return_http_status(context, wsi,
 						HTTP_STATUS_OK, NULL);
-
 				return -1;
 			}
 			break;
@@ -482,9 +485,16 @@ int WSServer::callback_http(struct libwebsocket_context *context,
 				} while (!lws_send_pipe_choked(wsi));
 			} else {
 				do {
-					m = libwebsocket_write(wsi, (unsigned char*) pss->offset,
-							pss->payload->length()-
-							(pss->offset - pss->payload->c_str()),
+					n = pss->payload->length()-
+							(pss->offset - pss->payload->c_str());
+					if (n < 0) {
+						goto bail;
+					}
+					/* sent it all, close conn */
+					if (n == 0) {
+						goto flush_bail;
+					}
+					m = libwebsocket_write(wsi, (unsigned char*) pss->offset, n,
 							LWS_WRITE_HTTP);
 					if (m < 0) {
 						goto bail;
@@ -621,23 +631,20 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
 			switch (pss->state) {
 				case FRAGSTATE_INIT_PCK:
 				{
-					if (!pss->initiated) {
-						(*path_wsi_map_l)[pss->fs->path]->push_back(wsi);
-						pss->initiated = true;
-					}
-					size_t s;
-					char * b64_s = base64_encode((const unsigned char*) JPEGImage::StdHuffmanTable, 420, (size_t*) & s);
-					pss->payload->append("{\"HuffmanTable\":\"");
-					pss->payload->append((const char*) b64_s, s);
+					pss->payload = new string("{\"HuffmanTable\":\"");
+					pss->payload->append((const char*) b64_hmt, b64_hmt_l);
 					pss->payload->append("\"}");
-					free(b64_s);
 					if (pss->payload->length() < MAX_ECHO_PAYLOAD) {
-						n = libwebsocket_write(wsi, (unsigned char*) pss->payload->c_str(), pss->payload->length(), LWS_WRITE_TEXT);
+						n = libwebsocket_write(wsi, (unsigned char*) pss->payload->c_str(),
+								pss->payload->length(), LWS_WRITE_TEXT);
 						pss->state = FRAGSTATE_NEW_PCK;
 						delete pss->payload;
+						break;
 					} else {
 						pss->initByte = (unsigned char*) pss->payload->c_str();
-						n = libwebsocket_write(wsi, pss->initByte, MAX_ECHO_PAYLOAD, (libwebsocket_write_protocol) (LWS_WRITE_TEXT | LWS_WRITE_NO_FIN));
+						n = libwebsocket_write(wsi, pss->initByte, MAX_ECHO_PAYLOAD,
+								(libwebsocket_write_protocol) (LWS_WRITE_TEXT |
+								LWS_WRITE_NO_FIN));
 						pss->initByte += MAX_ECHO_PAYLOAD;
 						pss->state = FRAGSTATE_MORE_FRAGS;
 						pss->deletePayload = true;
@@ -655,42 +662,53 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
 				}
 				case FRAGSTATE_NEW_PCK:
 				{
+					//If incoming packets arrive after websocket on the path
+					if (pss->i == pss->packs->end()) {
+						if (pss->packs->size() == 0)break;
+						pss->i = pss->packs->begin();
+					}
+
 					ii = pss->i;
 					ii++;
 					if (pss->endHit) {
 						pss->endHit = false;
-						if (ii != pss->fs->packetBuffer.end()) {
+						if (ii != pss->packs->end()) {
 							pss->i++;
 							ii++;
 						} else {
-							ffl_debug(FPL_WSSERV, "unexpected callback for frame %d on ws %p with path %s", (int) (**pss->i)["index"], wsi, pss->fs->path.c_str());
+							ffl_debug(FPL_WSSERV,
+									"unexpected callback for frame %d on ws %p"
+									" with path %s", (int) (**pss->i)["index"],
+									wsi, id_path_map[wsi_path_map[wsi]].c_str());
 							pss->endHit = true;
 							break;
 						}
 					}
-					std::string* pl = &pss->fs->packetStrBuffer[(**pss->i)["index"]];
+					std::string* pl = pack_string_map[*pss->i];
 					if (pl->length() < MAX_ECHO_PAYLOAD) {
-						n = libwebsocket_write(wsi, (unsigned char*) pl->c_str(), pl->length(), LWS_WRITE_TEXT);
+						n = libwebsocket_write(wsi, (unsigned char*) pl->c_str(),
+								pl->length(), LWS_WRITE_TEXT);
 					} else {
 						pss->payload = pl;
 						pss->initByte = (unsigned char*) pl->c_str();
-						n = libwebsocket_write(wsi, pss->initByte, MAX_ECHO_PAYLOAD, (libwebsocket_write_protocol) (LWS_WRITE_TEXT | LWS_WRITE_NO_FIN));
-						//                        for (n = 0; n < MAX_ECHO_PAYLOAD; n++)
-						//                            pss->sum += pss->i->ffjson.c_str()[n];
-						pss->initByte += MAX_ECHO_PAYLOAD;
+						n = libwebsocket_write(wsi, pss->initByte, MAX_ECHO_PAYLOAD,
+								(libwebsocket_write_protocol) (LWS_WRITE_TEXT |
+								LWS_WRITE_NO_FIN));
+						pss->initByte += n;
 						pss->state = FRAGSTATE_MORE_FRAGS;
 						libwebsocket_callback_on_writable(context, wsi);
 					}
-					ffl_debug(FPL_WSSERV, "frame index %d", (int) (**pss->i)["index"]);
+					ffl_debug(FPL_WSSERV, "frame index %d sent to %p",
+							(int) (**pss->i)["index"], wsi);
 					if (n < 0) {
 						lwsl_err("ERROR %d writing to socket, hanging up\n", n);
 						return 1;
 					}
-					if (n < (int) pss->len) {
+					if (n < (int) MAX_ECHO_PAYLOAD || n < pl->length()) {
 						lwsl_err("Partial write\n");
 						return -1;
 					}
-					if (ii != pss->fs->packetBuffer.end()) {
+					if (ii != pss->packs->end()) {
 						pss->i++;
 						libwebsocket_callback_on_writable(context, wsi);
 					} else {
@@ -701,9 +719,13 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
 				case FRAGSTATE_SEND_ERRMSG:
 				{
 					if (pss->payload->length() < MAX_ECHO_PAYLOAD) {
-						n = libwebsocket_write(wsi, (unsigned char*) pss->payload->c_str(), pss->payload->length(), LWS_WRITE_TEXT);
+						n = libwebsocket_write(wsi, (unsigned char*)
+								pss->payload->c_str(), pss->payload->length(),
+								LWS_WRITE_TEXT);
 					} else {
-						ffl_err(FPL_WSSERV, "error msg greater than MAX_ECHO_PAYLOAD is being sent. Verify ur code!");
+						ffl_err(FPL_WSSERV,
+								"error msg greater than MAX_ECHO_PAYLOAD "
+								"is being sent. Verify ur code!");
 					}
 					pss->state = FRAGSTATE_NEW_PCK;
 					delete pss->payload;
@@ -724,27 +746,31 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
 					int length = (pss->payload->length() - slength);
 					int rlength = length - MAX_ECHO_PAYLOAD;
 					length = length > MAX_ECHO_PAYLOAD ? MAX_ECHO_PAYLOAD : length;
-					n = libwebsocket_write(wsi, pss->initByte, length, (libwebsocket_write_protocol) (rlength > 0 ? (LWS_WRITE_CONTINUATION | LWS_WRITE_NO_FIN) : LWS_WRITE_CONTINUATION));
-					pss->initByte += length;
-					length = slength + length;
-					//                    for (int i = slength; i < length; i++)
-					//                        pss->sum += pss->payload->c_str()[i];
+					n = libwebsocket_write(wsi, pss->initByte, length,
+							(libwebsocket_write_protocol) (rlength > 0 ?
+							(LWS_WRITE_CONTINUATION | LWS_WRITE_NO_FIN) :
+							LWS_WRITE_CONTINUATION));
+					pss->initByte += n;
 					if (n < 0) {
 						lwsl_err("ERROR %d writing to socket, hanging up\n", n);
+						if (pss->deletePayload) {
+							pss->deletePayload = false;
+							delete pss->payload;
+							pss->payload = NULL;
+						}
 						return 1;
 					}
-					if (n < (int) pss->len) {
+					if (n < (int) length) {
 						lwsl_err("Partial write\n");
+						if (pss->deletePayload) {
+							pss->deletePayload = false;
+							delete pss->payload;
+							pss->payload = NULL;
+						}
 						return -1;
 					}
+					length = slength + length;
 					if (rlength <= 0) {
-						//                        ii = pss->i;
-						//                        ii++;
-						//                        if (ii == pss->fs->packetBuffer.end()) {
-						//                            pss->endHit = true;
-						//                        } else {
-						//                            libwebsocket_callback_on_writable(context, wsi);
-						//                        }
 						pss->initByte == NULL;
 						pss->state = FRAGSTATE_NEW_PCK;
 						if (pss->deletePayload) {
@@ -763,79 +789,60 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
 
 		case LWS_CALLBACK_RECEIVE:
 			if (len > MAX_ECHO_PAYLOAD) {
-				lwsl_err("Server received packet bigger than %u, hanging up\n", MAX_ECHO_PAYLOAD);
+				lwsl_err("Server received packet bigger than %u, hanging up\n",
+						MAX_ECHO_PAYLOAD);
 				return 1;
 			}
-			//            memcpy(&pss->buf[LWS_SEND_BUFFER_PRE_PADDING], in, len);
-			//            pss->len = (unsigned int) len;
-			//            libwebsocket_callback_on_writable(context, wsi);
+			//memcpy(&pss->buf[LWS_SEND_BUFFER_PRE_PADDING], in, len);
+			//pss->len = (unsigned int) len;
+			//libwebsocket_callback_on_writable(context, wsi);
 			switch (pss->state) {
 				case FRAGSTATE_NEW_PCK:
 					pss->payload = new std::string();
 					pss->state = FRAGSTATE_MORE_FRAGS;
 				case FRAGSTATE_MORE_FRAGS:
 					pss->payload->append((char*) in);
-					if (libwebsocket_is_final_fragment(wsi)) {
-						try {
-							ffl_debug(FPL_WSSERV, (const char*) pss->payload->c_str());
-							FFJSON ffjson(*pss->payload);
-							delete pss->payload;
-							pss->payload = new std::string;
-							std::string path = std::string((const char*) (ffjson["path"]), ffjson["path"].size);
-							int bufferSize;
-							if (validate_path_l(path)) {
-								if ((*wsi_path_map_l)[wsi].length() != 0) {
-									if ((*wsi_path_map_l)[wsi].compare(path) == 0) {
-										//ignore
-									}
-								} else {
-									(*wsi_path_map_l)[wsi] = path;
-									if ((*path_wsi_map_l)[path] == NULL) {
-										(*path_wsi_map_l)[path] = new std::list<libwebsocket*>();
-									}
-									FerryStream* fs = (*ferryStreams_l)[path];
-									if (fs != NULL) {
-										pss->fs = fs;
-										bufferSize = (int) ffjson["bufferSize"];
-										ffl_debug(FPL_WSSERV, "client has buffer size %d", bufferSize);
-										bufferSize = (bufferSize > 0)&&(pss->fs->packetBufferSize >= bufferSize) ? bufferSize : pss->fs->packetBufferSize; //validate input data
-										int initpck = (initpck = (fs->packetBuffer.size() - bufferSize)) > 0 ? initpck : 0;
-										pss->i = fs->packetBuffer.begin();
-										std::advance(pss->i, initpck);
-										//                            initPack = "{\"initialPacks\":" + std::to_string(fs->packetBuffer.size()) + "}";
-										//                            libwebsocket_write(wsi, (unsigned char*) initPack.c_str(), initPack.length(), LWS_WRITE_TEXT);
-										if (fs->packetBuffer.size() > 0) {
-											pss->state = FRAGSTATE_INIT_PCK;
-											libwebsocket_callback_on_writable(context, wsi);
-											//                                while (i != fs->packetBuffer.end()) {
-											//                                    pss->payload = &i->ffjson;
-											//                                    libwebsocket_callback_on_writable(context, wsi);
-											//                                    if ((debug & 2) == 2) {
-											//                                        std::cout << "\n" << getTime() << " callback_echo: " << path << ":" << (*i)["index"].val.number << " is qued to " << wsi << "\n";
-											//                                    }
-											//                                    //libwebsocket_write(wsi, (unsigned char*) i->ffjson.c_str(), i->ffjson.length(), LWS_WRITE_TEXT);
-											//                                    i++;
-											//                                }
-										}
-									} else {
-										//initPack = "{\"error\":\"No stream yet started on this path\"}";
-										//libwebsocket_write(wsi, (unsigned char*) initPack.c_str(), initPack.length(), LWS_WRITE_TEXT);
-									}
+					if (libwebsockets_remaining_packet_payload(wsi) == 0 &&
+							libwebsocket_is_final_fragment(wsi)) {
+						ffl_debug(FPL_WSSERV, (const char*) pss->payload->c_str());
+						FFJSON ffjson(*pss->payload);
+						delete pss->payload;
+						pss->payload = NULL;
+						std::string path = std::string((const char*) (ffjson["path"]),
+								ffjson["path"].size);
+						int pathId;
+						int bufferSize;
+						if (validate_path_l(path)) {
+							pathId = init_path(path);
+							if ((wsi_path_map).find(wsi) != wsi_path_map.end()) {
+								if ((wsi_path_map)[wsi] == pathId) {
+									//ignore
 								}
 							} else {
-								pss->payload = new std::string("{\"error\":\"Illegal path\"}");
-								pss->state = FRAGSTATE_SEND_ERRMSG;
-								//memcpy(&pss->buf[LWS_SEND_BUFFER_PRE_PADDING], response, strlen(response));
-								libwebsocket_callback_on_writable(context, wsi);
+								(wsi_path_map)[wsi] = pathId;
+								if (path_packs_map.find(pathId) != path_packs_map.end()) {
+									pss->packs = path_packs_map[pathId];
+									path_wsi_map[pathId]->push_back(wsi);
+									bufferSize = (int) ffjson["bufferSize"];
+									ffl_debug(FPL_WSSERV, "client has buffer size %d",
+											bufferSize);
+									//validate input data
+									bufferSize = (bufferSize > 0)&&(packBufSize >= bufferSize)
+											? bufferSize : packBufSize;
+									int initpck = (initpck = (pss->packs->size()
+											- bufferSize)) > 0 ? initpck : 0;
+									pss->i = pss->packs->begin();
+									std::advance(pss->i, initpck);
+									pss->state = FRAGSTATE_INIT_PCK;
+									libwebsocket_callback_on_writable(context, wsi);
+								}
 							}
-						} catch (FFJSON::Exception e) {
-							//std::cout << "\n" << getTime() << " LWS_CALLBACK_RECEIVE: incomprehensible data received" << " \n";
-							ffl_err(FPL_WSSERV, "incomprehensible data received");
-							pss->payload = new std::string("{\"error\":\"data isn't in JSON format\"}");
-							//memcpy(&pss->buf[LWS_SEND_BUFFER_PRE_PADDING], response, strlen(response));
+						} else {
+							pss->payload = new std::string("{\"error\":\"Illegal path\"}");
 							pss->state = FRAGSTATE_SEND_ERRMSG;
+							//memcpy(&pss->buf[LWS_SEND_BUFFER_PRE_PADDING],
+							//response, strlen(response));
 							libwebsocket_callback_on_writable(context, wsi);
-							break;
 						}
 					}
 					break;
@@ -844,18 +851,18 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
 
 		case LWS_CALLBACK_CLOSED:
 		{
-			std::map<libwebsocket*, std::string>::iterator i;
-			i = wsi_path_map_l->begin();
-			std::string path;
-			while (i != wsi_path_map_l->end()) {
+			std::map<libwebsocket*, int>::iterator i;
+			i = wsi_path_map.begin();
+			int path = 0;
+			while (i != wsi_path_map.end()) {
 				if (wsi == i->first) {
 					path = i->second;
-					wsi_path_map_l->erase(i);
+					wsi_path_map.erase(i);
 					break;
 				}
 			}
-			if (path.length() != 0) {
-				std::list<libwebsocket*>& wsil = *(*path_wsi_map_l)[path];
+			if (path != 0) {
+				std::list<libwebsocket*>& wsil = *(path_wsi_map)[path];
 				std::list<libwebsocket*>::iterator j = wsil.begin();
 				while (j != wsil.end()) {
 					if (*j == wsi) {
@@ -928,11 +935,6 @@ static struct option options[] = {
 };
 
 WSServer::WSServer(WSServerArgs* args) {
-	ferryStreams_l = args->ferryStreams;
-	path_wsi_map_l = args->path_wsi_map;
-	wsi_path_map_l = args->wsi_path_map;
-
-	int n = 0;
 	port = 17291;
 	use_ssl = 0;
 	char interface_name[128] = "";
@@ -956,7 +958,8 @@ WSServer::WSServer(WSServerArgs* args) {
 #ifndef LWS_NO_SERVER
 	lwsl_notice("Built to support server operations\n");
 #endif
-
+	client = 0;
+	interface[0] = '\0';
 #ifndef LWS_NO_CLIENT
 #endif
 
@@ -995,6 +998,11 @@ WSServer::WSServer(WSServerArgs* args) {
 	//    this->protocols[1].callback = NULL;
 	//    this->protocols[1].per_session_data_size = 0;
 	this->heartThread = new thread(&WSServer::heart, this);
+}
+
+WSServer::~WSServer() {
+	heartThread->join();
+	delete heartThread;
 }
 
 FFJSON WSServer::models(FFJSON::OBJECT);
@@ -1086,7 +1094,7 @@ int WSServer::heart(WSServer* wss) {
 #endif
 	signal(SIGINT, sighandler);
 
-	while (n >= 0 && !force_exit) {
+	while (n >= 0 && !force_exit && (duration == 0 || duration > (time(NULL) - starttime))) {
 #ifndef LWS_NO_CLIENT
 		struct timeval tv;
 
@@ -1100,16 +1108,17 @@ int WSServer::heart(WSServer* wss) {
 		}
 #endif
 		if (new_pck_chk) {
-			std::map < std::string, bool>::iterator i;
+			std::map <int, bool>::iterator i;
 			i = packs_to_send.begin();
 			while (i != packs_to_send.end()) {
 				if (i->second) {
-					std::list<libwebsocket*>& wa = *(*path_wsi_map_l)[i->first];
+					std::list<libwebsocket*>& wa = *(path_wsi_map)[i->first];
 					if (&wa != NULL) {
 						std::list<libwebsocket*>::iterator j = wa.begin();
 						while (j != wa.end()) {
 							libwebsocket_callback_on_writable(wss->context, *j);
-							ffl_debug(FPL_WSSERV, "%s:%d", i->first.c_str(), *j);
+							ffl_debug(FPL_WSSERV, "%s:%p",
+									id_path_map[i->first].c_str(), *j);
 							j++;
 						}
 					} else {
@@ -1123,6 +1132,7 @@ int WSServer::heart(WSServer* wss) {
 		}
 		n = libwebsocket_service(wss->context, 10);
 	}
+	force_exit = 1;
 #ifndef LWS_NO_CLIENT
 bail:
 #endif

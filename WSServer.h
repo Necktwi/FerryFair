@@ -8,7 +8,7 @@
 #ifndef WSSERVER_H
 #define	WSSERVER_H
 
-#define MAX_ECHO_PAYLOAD 8000
+#define MAX_ECHO_PAYLOAD 1024
 
 
 #include "FerryStream.h"
@@ -82,8 +82,7 @@ public:
 		unsigned int index;
 		bool initiated;
 		std::list<FFJSON*>::iterator i;
-		FerryStream* fs;
-
+		std::list<FFJSON*>* packs;
 		/**
 		 * It is set if the packet in the list pointed by i is the last packet in the list when the last packet was sent. when sending a packet if it is set 'i' is incremented before sending the packet.
 		 */
@@ -114,11 +113,12 @@ public:
 		int use_ssl;
 		int port;
 		char intreface[20];
-		std::map<libwebsocket*, std::string>* wsi_path_map;
-		std::map<std::string, std::list<libwebsocket*>*> *path_wsi_map;
-		std::map<std::string, FerryStream*>* ferryStreams;
 	};
+
 	WSServer(WSServerArgs* args);
+
+	virtual ~WSServer();
+
 	libwebsocket_protocols protocols[3] = {
 		/* first protocol must always be HTTP handler */
 		{

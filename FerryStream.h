@@ -32,48 +32,48 @@
 
 using namespace std;
 
-class FerryStream {
+class FerryStream : thread {
 public:
 
-    class Exception : std::exception {
-    public:
+	class Exception : std::exception {
+	public:
 
-        Exception(std::string e);
+		Exception(std::string e);
 
-        const char* what() const throw ();
+		const char* what() const throw ();
 
-        ~Exception() throw ();
+		~Exception() throw ();
 
-    private:
-        std::string identifier;
-    };
-    std::string path;
+	private:
+		std::string identifier;
+	};
+	int path;
 
-    FerryStream();
+	FerryStream();
 
-    FerryStream(const FerryStream& orig);
+	FerryStream(const FerryStream& orig);
 
-    FerryStream(ServerSocket::Connection * source, void(*funeral)(string));
+	FerryStream(ServerSocket::Connection * source, void(*funeral)(int));
 
-    ~FerryStream();
+	~FerryStream();
 
-    short packetBufferSize = 60;
-    list<FFJSON*> packetBuffer;
-    map<int, std::string> packetStrBuffer;
+	void die();
 
-    void die();
-
-    bool isConnectionAlive();
+	bool isConnectionAlive();
 
 private:
-    ServerSocket::Connection * source = NULL;
-    thread* heartThread;
-    bool suicide = false;
-    string buffer = "";
+	ServerSocket::Connection * source = NULL;
+	thread* heartThread;
+	bool suicide = false;
+	string buffer = "";
 
-    static void heart(FerryStream* fs);
-    void(*funeral)(string path);
+	static void heart(FerryStream* fs);
+	void(*funeral)(int path);
 };
 
+extern std::list<FerryStream*> deadFSList;
+extern std::list<FerryStream*> liveFSList;
+void cleanDeadFSList();
+void cleanLiveFSList();
 #endif	/* FERRYSTREAM_H */
 

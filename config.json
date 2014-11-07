@@ -5,8 +5,8 @@
 	"bootup": true,
 	"internetTestURL": "www.google.com",
 	"corpNWGW": "192.168.2.1",
-	"logType": 3,
-	"logLevel": 1,
+	"logType": 15,
+	"logLevel": 15,
 	"virtualWebHosts": {
 		"fairplay": {
 			"rootdir": "/home/gowtham/Projects/fairplay"
