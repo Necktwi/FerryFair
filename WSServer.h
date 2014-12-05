@@ -69,11 +69,20 @@ public:
 		std::string identifier;
 	};
 
+	struct user_session{
+		unsigned int session_id = 0;
+		unsigned int user_id = 0;
+		char username[32] = "";
+		bool is_authenticated = false;
+		time_t last_access_time = 0;
+	};
+
 	struct per_session_data__http {
 		int fd;
 		char vhost[128];
 		string* payload = NULL;
 		const char* offset = NULL;
+		unsigned int session_id=0;
 	};
 
 	struct per_session_data__fairplay {
@@ -83,18 +92,23 @@ public:
 		bool initiated;
 		std::list<FFJSON*>::iterator i;
 		std::list<FFJSON*>* packs;
+
 		/**
-		 * It is set if the packet in the list pointed by i is the last packet in the list when the last packet was sent. when sending a packet if it is set 'i' is incremented before sending the packet.
+		 * It is set if the packet in the list pointed by i is the last packet in the list 
+		 * when the last packet was sent. when sending a packet if it is set, 'i' is incremented
+		 * before sending the packet.
 		 */
 		bool endHit;
 		bool morechunks;
 
 		/**
-		 * when there are more chunks to send the initByte is assigned with address pointing to next chunk.
+		 * when there are more chunks to send the initByte is assigned with address pointing
+		 * to next chunk.
 		 */
 		unsigned char* initByte;
 		unsigned long sum;
 		bool deletePayload = false;
+
 		/**
 		 * 
 		 */
@@ -146,6 +160,10 @@ private:
 			struct libwebsocket *wsi,
 			enum libwebsocket_callback_reasons reason,
 			void *user, void *in, size_t len);
+	static std::map<unsigned int, user_session*> user_sessions;
+	static unsigned int session_count;
+	static unsigned int create_session();
+	static unsigned int valid_session(unsigned int session_id);
 	std::thread* heartThread;
 	static FFJSON models;
 };
