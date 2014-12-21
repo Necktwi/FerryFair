@@ -159,6 +159,12 @@ const char * get_mimetype(const char *file) {
 	if (!strcmp(&file[n - 5], ".json"))
 		return "application/json";
 
+	if (!strcmp(&file[n - 4], ".txt"))
+		return "text/plain";
+	
+	if (!strcmp(&file[n - 7], ".ffjson"))
+		return "text/plain";
+	
 	return NULL;
 }
 
