@@ -1,6 +1,6 @@
 {
 	"name": "FairPlay configuration file",
-	"homeFolder": "/home/gowtham/www/ferryplayer/",
+	"homeFolder": "/home/gowtham/workspace/www",
 	"port": 9271,
 	"bootup": true,
 	"internetTestURL": "www.google.com",

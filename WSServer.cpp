@@ -257,7 +257,7 @@ int WSServer::callback_http(struct libwebsocket_context *context,
 							pin_length = i - pin;
 							value.assign(buf + pin, pin_length);
 							cookies[name]=value;
-							ffl_debug(FPL_HTTPSERV, "%s:%s", name.c_str(), value.c_str());
+							fs_debug(FPL_HTTPSERV, "%s:%s", name.c_str(), value.c_str());
 							if(buf[i+1] == ' ') ++i;
 							pin = i+1;
 							break;
@@ -276,14 +276,14 @@ int WSServer::callback_http(struct libwebsocket_context *context,
 				sprintf(other_headers,
 					"Set-Cookie: session_id=%u\x0d\x0a",
 					session_id);				
-				ffl_debug(FPL_HTTPSERV, "session %u created", session_id);
+				fs_debug(FPL_HTTPSERV, "session %u created", session_id);
 			}
-			ffl_debug(FPL_HTTPSERV, "session: %u", session_id);
+			fs_debug(FPL_HTTPSERV, "session: %u", session_id);
 			lws_hdr_copy(wsi, buf, sizeof buf, WSI_TOKEN_HOST);
 			string connection(buf);
 			int dnamenail = -1;
 			dnamenail = connection.find(domainname);
-			ffl_debug(FPL_HTTPSERV, "connection: %s, domainname: %s",buf,domainname.c_str());
+			fs_debug(FPL_HTTPSERV, "connection: %s, domainname: %s",buf,domainname.c_str());
 			if (dnamenail != string::npos) {
 				string vhost;
 				if(dnamenail <= 0){
@@ -293,7 +293,7 @@ int WSServer::callback_http(struct libwebsocket_context *context,
 				} else{
 					vhost = connection.substr(0, dnamenail - 1);
 				}
-				ffl_debug(FPL_HTTPSERV, "vhost: %s", vhost.c_str());
+				fs_debug(FPL_HTTPSERV, "vhost: %s", vhost.c_str());
 				strncpy(pss->vhost, vhost.c_str(), vhost.length());
 				pss->vhost[vhost.length()] = '\0';
 			}
@@ -352,7 +352,7 @@ int WSServer::callback_http(struct libwebsocket_context *context,
 			}
 
 			p = buffer;
-			ffl_debug(FPL_HTTPSERV, "Sending %s", buf);
+			fs_debug(FPL_HTTPSERV, "Sending %s", buf);
 
 #ifdef WIN32
 			pss->fd = open(buf, O_RDONLY | _O_BINARY);
@@ -361,7 +361,7 @@ int WSServer::callback_http(struct libwebsocket_context *context,
 #endif
 
 			if (pss->fd < 0){
-				ffl_debug(FPL_HTTPSERV, "unable to open file");
+				fs_debug(FPL_HTTPSERV, "unable to open file");
 				return -1;
 			}
 
@@ -426,13 +426,13 @@ int WSServer::callback_http(struct libwebsocket_context *context,
 			/* the whole of the sent body arried, close the connection */
 
 			ans.init(*pss->payload);
-			ffl_debug(FPL_HTTPSERV, "%s", ans.stringify().c_str());
+			fs_debug(FPL_HTTPSERV, "%s", ans.stringify().c_str());
 			ansobj = models[pss->vhost].answerObject(&ans);
 			if (ansobj) {
 				pss->payload->assign(ansobj->stringify(true));
 				delete ansobj;
 sendJSONPayload:
-				ffl_debug(FPL_HTTPSERV, "%s", pss->payload->c_str());
+				fs_debug(FPL_HTTPSERV, "%s", pss->payload->c_str());
 				string header =
 						"HTTP/1.0 200 OK\x0d\x0a"
 						"Server: libwebsockets\x0d\x0a"
@@ -641,7 +641,7 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
 
 		case LWS_CALLBACK_ESTABLISHED:
 		{
-			ffl_notice(FPL_WSSERV, "viewer %s:%d connected", Socket::getIpAddr(libwebsocket_get_socket_fd(wsi)).c_str(), Socket::getPort(libwebsocket_get_socket_fd(wsi)));
+			fs_notice(FPL_WSSERV, "viewer %s:%d connected", Socket::getIpAddr(libwebsocket_get_socket_fd(wsi)).c_str(), Socket::getPort(libwebsocket_get_socket_fd(wsi)));
 			pss->state = FRAGSTATE_NEW_PCK;
 			break;
 		}
@@ -696,7 +696,7 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
 							pss->i++;
 							ii++;
 						} else {
-							ffl_debug(FPL_WSSERV,
+							fs_debug(FPL_WSSERV,
 									"unexpected callback for frame %d on ws %p"
 									" with path %s", (int) (**pss->i)["index"],
 									wsi, id_path_map[wsi_path_map[wsi]].c_str());
@@ -718,7 +718,7 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
 						pss->state = FRAGSTATE_MORE_FRAGS;
 						libwebsocket_callback_on_writable(context, wsi);
 					}
-					ffl_debug(FPL_WSSERV, "frame index %d sent to %p",
+					fs_debug(FPL_WSSERV, "frame index %d sent to %p",
 							(int) (**pss->i)["index"], wsi);
 					if (n < 0) {
 						lwsl_err("ERROR %d writing to socket, hanging up\n", n);
@@ -743,7 +743,7 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
 								pss->payload->c_str(), pss->payload->length(),
 								LWS_WRITE_TEXT);
 					} else {
-						ffl_err(FPL_WSSERV,
+						fs_err(FPL_WSSERV,
 								"error msg greater than MAX_ECHO_PAYLOAD "
 								"is being sent. Verify ur code!");
 					}
@@ -825,7 +825,7 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
 					pss->payload->append((char*) in);
 					if (libwebsockets_remaining_packet_payload(wsi) == 0 &&
 							libwebsocket_is_final_fragment(wsi)) {
-						ffl_debug(FPL_WSSERV, (const char*) pss->payload->c_str());
+						fs_debug(FPL_WSSERV, (const char*) pss->payload->c_str());
 						FFJSON ffjson(*pss->payload);
 						delete pss->payload;
 						pss->payload = NULL;
@@ -845,7 +845,7 @@ int WSServer::callbackFairPlayWS(struct libwebsocket_context *context,
 									pss->packs = path_packs_map[pathId];
 									path_wsi_map[pathId]->push_back(wsi);
 									bufferSize = (int) ffjson["bufferSize"];
-									ffl_debug(FPL_WSSERV, "client has buffer size %d",
+									fs_debug(FPL_WSSERV, "client has buffer size %d",
 											bufferSize);
 									//validate input data
 									bufferSize = (bufferSize > 0)&&(packBufSize >= bufferSize)
@@ -1138,7 +1138,7 @@ int WSServer::heart(WSServer* wss) {
 						std::list<libwebsocket*>::iterator j = wa.begin();
 						while (j != wa.end()) {
 							libwebsocket_callback_on_writable(wss->context, *j);
-							ffl_debug(FPL_WSSERV, "%s:%p",
+							fs_debug(FPL_WSSERV, "%s:%p",
 									id_path_map[i->first].c_str(), *j);
 							j++;
 						}

@@ -42,7 +42,7 @@ public:
 
 		const char* what() const throw ();
 
-		~Exception() throw ();
+		//~Exception() throw ();
 
 	private:
 		std::string identifier;

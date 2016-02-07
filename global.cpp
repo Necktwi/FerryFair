@@ -26,6 +26,8 @@ int stderrfd = -1;
 int stdoutfd = -1;
 int init_path_id = 0;
 std::mutex ipMutex;
+_ff_log_type fs_log_type = FFL_ERR;
+unsigned int fs_log_level = 0;
 
 int init_path(std::string path) {
 	ipMutex.lock();

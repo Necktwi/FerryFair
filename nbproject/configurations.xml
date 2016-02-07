@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<configurationDescriptor version="95">
+<configurationDescriptor version="97">
   <logicalFolder name="root" displayName="root" projectFiles="true" kind="ROOT">
     <logicalFolder name="HeaderFiles"
                    displayName="Header Files"
@@ -43,6 +43,27 @@
                    kind="IMPORTANT_FILES_FOLDER">
       <itemPath>Makefile</itemPath>
     </logicalFolder>
+    <logicalFolder name="TestFiles"
+                   displayName="Test Files"
+                   projectFiles="false"
+                   kind="TEST_LOGICAL_FOLDER">
+      <logicalFolder name="f1"
+                     displayName="Base64Image"
+                     projectFiles="true"
+                     kind="TEST">
+      </logicalFolder>
+      <logicalFolder name="f2"
+                     displayName="MJPEGHTadder"
+                     projectFiles="true"
+                     kind="TEST">
+      </logicalFolder>
+    </logicalFolder>
+    <logicalFolder name="ExternalFiles"
+                   displayName="Important Files"
+                   projectFiles="false"
+                   kind="IMPORTANT_FILES_FOLDER">
+      <itemPath>Makefile</itemPath>
+    </logicalFolder>
     <itemPath>config.json</itemPath>
   </logicalFolder>
   <projectmakefile>Makefile</projectmakefile>
@@ -63,8 +84,10 @@
           <standard>8</standard>
           <incDir>
             <pElem>.</pElem>
+            <pElem>/home/gowtham/workspace/libwebsockets-old/build/lib/Headers</pElem>
             <pElem>/usr/local/include</pElem>
             <pElem>/usr/include/ferryfair</pElem>
+            <pElem>/usr/local/include/ferryfair</pElem>
           </incDir>
           <preprocessorList>
             <Elem>_DEBUG</Elem>
@@ -74,14 +97,15 @@
           <output>${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ferrymediaserver</output>
           <linkerAddLib>
             <pElem>/usr/lib/i386-linux-gnu</pElem>
+            <pElem>/home/gowtham/workspace/libwebsockets-old/build/lib</pElem>
           </linkerAddLib>
           <linkerLibItems>
             <linkerOptionItem>-lssl</linkerOptionItem>
             <linkerOptionItem>-lpthread</linkerOptionItem>
             <linkerOptionItem>-lcrypto</linkerOptionItem>
             <linkerOptionItem>-lz</linkerOptionItem>
-            <linkerOptionItem>-lwebsockets</linkerOptionItem>
             <linkerOptionItem>-lbase</linkerOptionItem>
+            <linkerLibFileItem>/home/gowtham/workspace/libwebsockets-old/build/lib/libwebsockets.a</linkerLibFileItem>
           </linkerLibItems>
         </linkerTool>
       </compileType>

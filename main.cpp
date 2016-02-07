@@ -103,7 +103,7 @@ string runMode = "normal";
 
 void stopRunningProcess() {
 	if (runningProcess > 0) {
-		ffl_notice(FPL_MAIN | NO_NEW_LINE, "Stopping current process...");
+		fs_notice(FPL_MAIN | NO_NEW_LINE, "Stopping current process...");
 		if (kill(runningProcess, SIGTERM) != -1) {
 			cout << "OK\n";
 		} else {
@@ -128,8 +128,8 @@ int readConfig() {
 		ff_log_type = config["logType"];
 		ff_log_level = config["logLevel"];
 	} catch (FFJSON::Exception e) {
-		ffl_err(FPL_MAIN, "Reading configuration failed. Please check the configuration file");
-		ffl_debug(FPL_MAIN, "%s", e.what());
+		fs_err(FPL_MAIN, "Reading configuration failed. Please check the configuration file");
+		fs_debug(FPL_MAIN, "%s", e.what());
 		return -1;
 	}
 	std::ifstream hfile("/etc/hostname", ios::ate | ios::in);
@@ -159,11 +159,11 @@ wait_till_child_dead:
 		if (deadpid == -1 && waitpid(secondChild, &status, WNOHANG) == 0) {
 			goto wait_till_child_dead;
 		}
-		ffl_warn(FPL_MAIN, "%d process exited!", deadpid);
+		fs_warn(FPL_MAIN, "%d process exited!", deadpid);
 		secondFork();
 	} else {
 		secondChild = getpid();
-		ffl_notice(FPL_MAIN, "second child started; pid= %d", secondChild);
+		fs_notice(FPL_MAIN, "second child started; pid= %d", secondChild);
 		prctl(PR_SET_PDEATHSIG, SIGHUP);
 		run();
 	}
@@ -186,11 +186,11 @@ wait_till_child_dead:
 		if (deadpid == -1 && waitpid(firstChild, &status, WNOHANG) == 0) {
 			goto wait_till_child_dead;
 		}
-		ffl_debug(FPL_MAIN, "%d process exited", deadpid);
+		fs_debug(FPL_MAIN, "%d process exited", deadpid);
 		firstFork();
 	} else {
 		firstChild = getpid();
-		ffl_notice(FPL_MAIN, "firstChild started; pid=%d", firstChild);
+		fs_notice(FPL_MAIN, "firstChild started; pid=%d", firstChild);
 		fflush(stdout);
 		prctl(PR_SET_PDEATHSIG, SIGHUP);
 		secondFork();
@@ -307,20 +307,20 @@ int run() {
 	try {
 		ss = new ServerSocket(92711);
 	} catch (SocketException e) {
-		ffl_err(FPL_MAIN, "Unable to create socket on port: %d", port);
+		fs_err(FPL_MAIN, "Unable to create socket on port: %d", port);
 	}
 	while (ss && !force_exit && (duration == 0 || duration > (time(NULL) - starttime))) {
 		try {
-			ffl_notice(FPL_MAIN, "waiting for a connection on %d ...", 92711);
+			fs_notice(FPL_MAIN, "waiting for a connection on %d ...", 92711);
 			FerryStream* fs = new FerryStream(ss->accept(),
 					&ferryStreamFuneral);
 			cleanDeadFSList();
-			ffl_notice(FPL_MAIN, "a connection accepted.");
+			fs_notice(FPL_MAIN, "a connection accepted.");
 		} catch (SocketException e) {
-			ffl_warn(FPL_MAIN, "Exception accepting incoming connection: %s",
+			fs_warn(FPL_MAIN, "Exception accepting incoming connection: %s",
 					e.description().c_str());
 		} catch (FerryStream::Exception e) {
-			ffl_err(FPL_MAIN, "Exception creating a new FerryStream: %s",
+			fs_err(FPL_MAIN, "Exception creating a new FerryStream: %s",
 					e.what());
 		}
 	}
@@ -332,7 +332,7 @@ int run() {
 	delete wss;
 	terminate_all_paths();
 	free(b64_hmt);
-	ffl_notice(FPL_MAIN, "BYE!");
+	fs_notice(FPL_MAIN, "BYE!");
 	return 0;
 }
 
