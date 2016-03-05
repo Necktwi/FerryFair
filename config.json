@@ -5,8 +5,27 @@
 	"bootup": true,
 	"internetTestURL": "www.google.com",
 	"corpNWGW": "192.168.2.1",
-	"logType": 15,
+	"#logType": "
+		One can specify type of log to print in this field. It takes additive values 
+		of following to print combination of them. 
+			Errors=1,
+			Warnings=2,
+			Notices=4,
+			Debug=8
+	",
+	"logType": [8,4,2,1],
+	
+	"#logLevel": "
+		One can specify level of log to print in this fild. It takes additive values of 
+		following to print combination of them. 
+			Main=1,
+			Fstream_heart=2,
+			ws_Server=4,
+			http_server=8,
+			fport=16
+	",
 	"logLevel": 15,
+	
 	"virtualWebHosts": {
 		"fairplay": {
 			"rootdir": "/home/gowtham/workspace/fairplay"

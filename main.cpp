@@ -125,8 +125,22 @@ int readConfig() {
 		port = config["port"];
 		internetTestURL.assign(config["internetTestURL"]);
 		corpNWGW.assign(config["corpNWGW"]);
-		ff_log_type = config["logType"];
-		ff_log_level = config["logLevel"];
+		ff_log_type = 0;
+		ff_log_level = 0;
+		if (config["logType"].isType(FFJSON::ARRAY)) {
+			for (FFJSON::Iterator it = config["logType"].begin();
+					it != config["logType"].end(); it++)
+				ff_log_type |= (int) *it;
+		} else {
+			ff_log_type = config["logType"];
+		}
+		if (config["logLevel"].isType(FFJSON::ARRAY)) {
+			for (FFJSON::Iterator it = config["logLevel"].begin();
+					it != config["logLevel"].end(); it++)
+				ff_log_level |= (int) *it;
+		} else {
+			ff_log_level = config["logLevel"];
+		}
 	} catch (FFJSON::Exception e) {
 		fs_err(FPL_MAIN, "Reading configuration failed. Please check the configuration file");
 		fs_debug(FPL_MAIN, "%s", e.what());
@@ -305,13 +319,13 @@ int run() {
 	ws_server_args.debug_level = 31;
 	WSServer* wss = new WSServer(&ws_server_args);
 	try {
-		ss = new ServerSocket(92711);
+		ss = new ServerSocket(port);
 	} catch (SocketException e) {
 		fs_err(FPL_MAIN, "Unable to create socket on port: %d", port);
 	}
 	while (ss && !force_exit && (duration == 0 || duration > (time(NULL) - starttime))) {
 		try {
-			fs_notice(FPL_MAIN, "waiting for a connection on %d ...", 92711);
+			fs_notice(FPL_MAIN, "waiting for a connection on %d ...", port);
 			FerryStream* fs = new FerryStream(ss->accept(),
 					&ferryStreamFuneral);
 			cleanDeadFSList();

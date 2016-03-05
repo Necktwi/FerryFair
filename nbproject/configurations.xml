@@ -84,9 +84,7 @@
           <standard>8</standard>
           <incDir>
             <pElem>.</pElem>
-            <pElem>/home/gowtham/workspace/libwebsockets-old/build/lib/Headers</pElem>
             <pElem>/usr/local/include</pElem>
-            <pElem>/usr/include/ferryfair</pElem>
             <pElem>/usr/local/include/ferryfair</pElem>
           </incDir>
           <preprocessorList>
@@ -95,17 +93,13 @@
         </ccTool>
         <linkerTool>
           <output>${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/ferrymediaserver</output>
-          <linkerAddLib>
-            <pElem>/usr/lib/i386-linux-gnu</pElem>
-            <pElem>/home/gowtham/workspace/libwebsockets-old/build/lib</pElem>
-          </linkerAddLib>
           <linkerLibItems>
             <linkerOptionItem>-lssl</linkerOptionItem>
             <linkerOptionItem>-lpthread</linkerOptionItem>
             <linkerOptionItem>-lcrypto</linkerOptionItem>
             <linkerOptionItem>-lz</linkerOptionItem>
             <linkerOptionItem>-lbase</linkerOptionItem>
-            <linkerLibFileItem>/home/gowtham/workspace/libwebsockets-old/build/lib/libwebsockets.a</linkerLibFileItem>
+            <linkerOptionItem>-lwebsockets</linkerOptionItem>
           </linkerLibItems>
         </linkerTool>
       </compileType>
