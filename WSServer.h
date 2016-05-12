@@ -6,7 +6,7 @@
  */
 
 #ifndef WSSERVER_H
-#define	WSSERVER_H
+#define WSSERVER_H
 
 #define MAX_ECHO_PAYLOAD 1024
 
@@ -45,11 +45,11 @@ public:
 	int listen_port;
 	struct lws_context_creation_info info;
 	int opts = 0;
-	struct libwebsocket_context *context;
+	struct lws_context *context;
 #ifndef LWS_NO_CLIENT
 	char address[256];
 	unsigned int oldus = 0;
-	struct libwebsocket *wsi;
+	struct lws *wsi;
 #endif
 
 	class Exception : std::exception {
@@ -69,7 +69,7 @@ public:
 		std::string identifier;
 	};
 
-	struct user_session{
+	struct user_session {
 		unsigned int session_id = 0;
 		unsigned int user_id = 0;
 		char username[32] = "";
@@ -82,7 +82,7 @@ public:
 		char vhost[128];
 		string* payload = NULL;
 		const char* offset = NULL;
-		unsigned int session_id=0;
+		unsigned int session_id = 0;
 	};
 
 	struct per_session_data__fairplay {
@@ -133,7 +133,7 @@ public:
 
 	virtual ~WSServer();
 
-	libwebsocket_protocols protocols[3] = {
+	lws_protocols protocols[3] = {
 		/* first protocol must always be HTTP handler */
 		{
 			"http-only", /* name */
@@ -152,13 +152,11 @@ public:
 
 private:
 	static int heart(WSServer* wss);
-	int static callbackFairPlayWS(struct libwebsocket_context *context,
-			struct libwebsocket *wsi,
-			enum libwebsocket_callback_reasons reason,
+	int static callbackFairPlayWS(struct lws *wsi,
+			enum lws_callback_reasons reason,
 			void *user, void *in, size_t len);
-	static int callback_http(struct libwebsocket_context *context,
-			struct libwebsocket *wsi,
-			enum libwebsocket_callback_reasons reason,
+	static int callback_http(struct lws *wsi,
+			enum lws_callback_reasons reason,
 			void *user, void *in, size_t len);
 	static std::map<unsigned int, user_session*> user_sessions;
 	static unsigned int session_count;
@@ -167,4 +165,4 @@ private:
 	std::thread* heartThread;
 	static FFJSON models;
 };
-#endif	/* WSSERVER_H */
+#endif /* WSSERVER_H */

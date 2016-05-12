@@ -50,7 +50,7 @@ unsigned int ff_log_level = FPL_FPORT | FPL_WSSERV | FPL_HTTPSERV | FPL_MAIN
 
 int child_exit_status = 0;
 int port = 0;
-std::map<libwebsocket*, WSServer::per_session_data__fairplay*> wsi_psdf_map;
+std::map<lws*, WSServer::per_session_data__fairplay*> wsi_psdf_map;
 std::string configFile;
 string recordsFolder = "/var/" APP_NAME "records/";
 string logFile = "/var/log/" APP_NAME ".log";

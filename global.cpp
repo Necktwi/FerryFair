@@ -12,8 +12,8 @@ std::map<int, std::string> id_path_map;
 std::map<int, std::list<FFJSON*>*> path_packs_map;
 std::map<FFJSON*, std::string*> pack_string_map;
 std::map<int, bool> packs_to_send;
-std::map<libwebsocket*, int> wsi_path_map;
-std::map<int, std::list<libwebsocket*>*> path_wsi_map;
+std::map<lws*, int> wsi_path_map;
+std::map<int, std::list<lws*>*> path_wsi_map;
 
 char* b64_hmt = NULL;
 int b64_hmt_l = 0;
@@ -35,7 +35,7 @@ int init_path(std::string path) {
 		path_id_map[path] = ++init_path_id;
 		id_path_map[init_path_id] = path;
 		path_packs_map[init_path_id] = new std::list<FFJSON*>();
-		path_wsi_map[init_path_id] = new std::list<libwebsocket*>();
+		path_wsi_map[init_path_id] = new std::list<lws*>();
 	}
 	ipMutex.unlock();
 	return path_id_map[path];
