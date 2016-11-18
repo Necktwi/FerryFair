@@ -120,7 +120,6 @@ int readConfig() {
 			std::istreambuf_iterator<char>());
 	try {
 		config.init(str);
-		FFJSON config(str);
 		homeFolder.assign((const char*)config["homeFolder"]);
 		port = config["port"];
 		internetTestURL.assign((const char*)config["internetTestURL"]);
@@ -310,7 +309,7 @@ void configure() {
 unsigned int starttime = time(NULL);
 
 int run() {
-	port = 92711;
+	port = config["port"];
 	ServerSocket* ss = NULL;
 	debug = 1;
 	b64_hmt = base64_encode((const unsigned char*) JPEGImage::StdHuffmanTable, 420, (size_t*) & b64_hmt_l);
@@ -318,6 +317,7 @@ int run() {
 	memset(&ws_server_args, 0, sizeof (WSServer::WSServerArgs));
 	//ws_server_args.debug_level = 65535;
 	ws_server_args.debug_level = 7;
+	ws_server_args.port=config["HTTPPort"];
 	WSServer* wss = new WSServer(&ws_server_args);
 	try {
 		ss = new ServerSocket(port);
@@ -368,9 +368,9 @@ int main(int argc, char** argv) {
 		{NULL, 0, NULL, 0}
 	};
 	struct stat st;
-	configFile = "/etc/" + std::string(APP_NAME) + ".conf";
+	configFile = "config.json";
 	if (stat(configFile.c_str(), &st) == -1) {
-		configFile = "config.json";
+		configFile = "/etc/" + std::string(APP_NAME) + ".json";
 	}
 	do {
 		next_option = getopt_long(argc, argv, short_options, long_options,

@@ -40,6 +40,7 @@
 			"rootdir": "/home/gowtham/workspace/famang"
 		}
 	},
+    "HTTPPort": 80,
 	"HttpUserSessionTimeout": 600,
 	"help": {
 		"homeFolder": "Its folder where FairPlay server looks for and stores all the data required.",
