@@ -44,3 +44,9 @@ install(FILES "${PROJECT_BINARY_DIR}/ferrymediaserverConfig.h"
 install(FILES "${PROJECT_SOURCE_DIR}/config.json"
     DESTINATION /etc
     RENAME ${PROJECT_NAME}.json)
+install(FILES "${PROJECT_SOURCE_DIR}/init.conf"
+    DESTINATION /etc/init
+    RENAME ${PROJECT_NAME}.init)
+install(FILES "${PROJECT_SOURCE_DIR}/init.override"
+    DESTINATION /etc/init
+    RENAME ${PROJECT_NAME}.override)
