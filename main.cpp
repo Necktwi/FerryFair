@@ -14,8 +14,8 @@
 #include <base/SocketException.h>
 #include <base/mystdlib.h>
 #include <base/myconverters.h>
-#include <base/FFJSON.h>
-#include <base/logger.h>
+#include <FFJSON.h>
+#include <logger.h>
 #include <libwebsockets.h>
 #include <linux/prctl.h>
 #include <cstdlib>
@@ -42,9 +42,9 @@ using namespace std;
  * enabled log level
  */
 
-int ff_log_type = FFL_ERR | FFL_WARN | FFL_NOTICE | FFL_DEBUG;
-unsigned int ff_log_level = FPL_FPORT | FPL_WSSERV | FPL_HTTPSERV | FPL_MAIN
-		| FPL_FSTREAM_HEART;
+//int ff_log_type = FFL_ERR | FFL_WARN | FFL_NOTICE | FFL_DEBUG;
+//unsigned int ff_log_level = FPL_FPORT | FPL_WSSERV | FPL_HTTPSERV | FPL_MAIN
+//		| FPL_FSTREAM_HEART;
 //unsigned int ff_log_level = FPL_HTTPSERV;
 
 
@@ -103,7 +103,7 @@ string runMode = "normal";
 
 void stopRunningProcess() {
 	if (runningProcess > 0) {
-		fs_notice(FPL_MAIN | NO_NEW_LINE, "Stopping current process...");
+		ffl_notice(FPL_MAIN | NO_NEW_LINE, "Stopping current process...");
 		if (kill(runningProcess, SIGTERM) != -1) {
 			cout << "OK\n";
 		} else {
@@ -121,29 +121,29 @@ int readConfig() {
 	try {
 		config.init(str);
 		FFJSON config(str);
-		homeFolder.assign(config["homeFolder"]);
+		homeFolder.assign((const char*)config["homeFolder"]);
 		port = config["port"];
-		internetTestURL.assign(config["internetTestURL"]);
-		corpNWGW.assign(config["corpNWGW"]);
-		ff_log_type = 0;
-		ff_log_level = 0;
+		internetTestURL.assign((const char*)config["internetTestURL"]);
+		corpNWGW.assign((const char*)config["corpNWGW"]);
+		unsigned int ff_log_type = 0;
+		unsigned int ff_log_level = 0;
 		if (config["logType"].isType(FFJSON::ARRAY)) {
 			for (FFJSON::Iterator it = config["logType"].begin();
 					it != config["logType"].end(); it++)
-				ff_log_type |= (int) *it;
+				ff_log_type |= (unsigned int)*it;
 		} else {
 			ff_log_type = config["logType"];
 		}
 		if (config["logLevel"].isType(FFJSON::ARRAY)) {
 			for (FFJSON::Iterator it = config["logLevel"].begin();
 					it != config["logLevel"].end(); it++)
-				ff_log_level |= (int) *it;
+				ff_log_level |= (unsigned int)*it;
 		} else {
 			ff_log_level = config["logLevel"];
 		}
 	} catch (FFJSON::Exception e) {
-		fs_err(FPL_MAIN, "Reading configuration failed. Please check the configuration file");
-		fs_debug(FPL_MAIN, "%s", e.what());
+		ffl_err(FPL_MAIN, "Reading configuration failed. Please check the configuration file");
+		ffl_debug(FPL_MAIN, "%s", e.what());
 		return -1;
 	}
 	std::ifstream hfile("/etc/hostname", ios::ate | ios::in);
@@ -173,11 +173,11 @@ wait_till_child_dead:
 		if (deadpid == -1 && waitpid(secondChild, &status, WNOHANG) == 0) {
 			goto wait_till_child_dead;
 		}
-		fs_warn(FPL_MAIN, "%d process exited!", deadpid);
+		ffl_warn(FPL_MAIN, "%d process exited!", deadpid);
 		secondFork();
 	} else {
 		secondChild = getpid();
-		fs_notice(FPL_MAIN, "second child started; pid= %d", secondChild);
+		ffl_notice(FPL_MAIN, "second child started; pid= %d", secondChild);
 		prctl(PR_SET_PDEATHSIG, SIGHUP);
 		run();
 	}
@@ -200,11 +200,11 @@ wait_till_child_dead:
 		if (deadpid == -1 && waitpid(firstChild, &status, WNOHANG) == 0) {
 			goto wait_till_child_dead;
 		}
-		fs_debug(FPL_MAIN, "%d process exited", deadpid);
+		ffl_debug(FPL_MAIN, "%d process exited", deadpid);
 		firstFork();
 	} else {
 		firstChild = getpid();
-		fs_notice(FPL_MAIN, "firstChild started; pid=%d", firstChild);
+		ffl_notice(FPL_MAIN, "firstChild started; pid=%d", firstChild);
 		fflush(stdout);
 		prctl(PR_SET_PDEATHSIG, SIGHUP);
 		secondFork();
@@ -316,25 +316,26 @@ int run() {
 	b64_hmt = base64_encode((const unsigned char*) JPEGImage::StdHuffmanTable, 420, (size_t*) & b64_hmt_l);
 	WSServer::WSServerArgs ws_server_args;
 	memset(&ws_server_args, 0, sizeof (WSServer::WSServerArgs));
-	ws_server_args.debug_level = 31;
+	//ws_server_args.debug_level = 65535;
+	ws_server_args.debug_level = 7;
 	WSServer* wss = new WSServer(&ws_server_args);
 	try {
 		ss = new ServerSocket(port);
 	} catch (SocketException e) {
-		fs_err(FPL_MAIN, "Unable to create socket on port: %d", port);
+		ffl_err(FPL_MAIN, "Unable to create socket on port: %d", port);
 	}
 	while (ss && !force_exit && (duration == 0 || duration > (time(NULL) - starttime))) {
 		try {
-			fs_notice(FPL_MAIN, "waiting for a connection on %d ...", port);
+			ffl_notice(FPL_MAIN, "waiting for a connection on %d ...", port);
 			FerryStream* fs = new FerryStream(ss->accept(),
 					&ferryStreamFuneral);
 			cleanDeadFSList();
-			fs_notice(FPL_MAIN, "a connection accepted.");
+			ffl_notice(FPL_MAIN, "a connection accepted.");
 		} catch (SocketException e) {
-			fs_warn(FPL_MAIN, "Exception accepting incoming connection: %s",
+			ffl_warn(FPL_MAIN, "Exception accepting incoming connection: %s",
 					e.description().c_str());
 		} catch (FerryStream::Exception e) {
-			fs_err(FPL_MAIN, "Exception creating a new FerryStream: %s",
+			ffl_err(FPL_MAIN, "Exception creating a new FerryStream: %s",
 					e.what());
 		}
 	}
@@ -346,7 +347,7 @@ int run() {
 	delete wss;
 	terminate_all_paths();
 	free(b64_hmt);
-	fs_notice(FPL_MAIN, "BYE!");
+	ffl_notice(FPL_MAIN, "BYE!");
 	return 0;
 }
 

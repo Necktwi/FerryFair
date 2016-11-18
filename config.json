@@ -4,7 +4,7 @@
 	"port": 9271,
 	"bootup": true,
 	"internetTestURL": "www.google.com",
-	"corpNWGW": "192.168.2.1",
+	"corpNWGW": "127.0.0.1",
 	"#logType": "
 		One can specify type of log to print in this field. It takes additive values 
 		of following to print combination of them. 
@@ -13,7 +13,7 @@
 			Notices=4,
 			Debug=8
 	",
-	"logType": [8,4,2,1],
+	"logType": [8, 4, 2, 1],
 	
 	"#logLevel": "
 		One can specify level of log to print in this fild. It takes additive values of 
@@ -24,7 +24,7 @@
 			http_server=8,
 			fport=16
 	",
-	"logLevel": 15,
+	"logLevel": [16, 8, 4, 1],
 	
 	"virtualWebHosts": {
 		"fairplay": {

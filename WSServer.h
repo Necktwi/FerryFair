@@ -13,7 +13,7 @@
 
 #include "FerryStream.h"
 #include <libwebsockets.h>
-#include <base/FFJSON.h>
+#include <FFJSON.h>
 #include <string>
 #include <map>
 #include <list>

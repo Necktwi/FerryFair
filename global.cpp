@@ -1,10 +1,10 @@
 #include "global.h"
 #include <base/mystdlib.h>
-#include <base/logger.h>
+#include <logger.h>
 #include <string>
 #include <list>
 #include <libwebsockets.h>
-#include <base/FFJSON.h>
+#include <FFJSON.h>
 #include <mutex>
 
 std::map<std::string, unsigned int> path_id_map;
@@ -26,8 +26,6 @@ int stderrfd = -1;
 int stdoutfd = -1;
 int init_path_id = 0;
 std::mutex ipMutex;
-_ff_log_type fs_log_type = (_ff_log_type) (FFL_ERR | FFL_NOTICE);
-unsigned int fs_log_level = (FPL_MAIN | FPL_WSSERV | FPL_FPORT);
 
 int init_path(std::string path) {
 	ipMutex.lock();
@@ -91,8 +89,10 @@ void terminate_all_paths() {
 	ipMutex.unlock();
 }
 
+
 /**
  * logging section
  */
-
+FF_LOG_TYPE fflAllowedType = (FF_LOG_TYPE) (FFL_ERR | FFL_NOTICE);
+unsigned int fflAllowedLevel = (FPL_MAIN | FPL_WSSERV | FPL_FPORT);
 

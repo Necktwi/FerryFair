@@ -10,7 +10,7 @@
 
 #define NELEMS(x)  (sizeof(x) / sizeof(x[0]))
 
-#include <base/FFJSON.h>
+#include <FFJSON.h>
 #include <string>
 #include <map>
 #include <list>
@@ -50,33 +50,8 @@ enum _fp_log_level {
 	NO_NEW_LINE = 1 << 31
 };
 
+void terminate_all_paths();
 int init_path(std::string path);
 void terminate_path(int path);
-void terminate_all_paths();
 
-extern _ff_log_type fs_log_type;
-extern unsigned int fs_log_level;
-
-
-#define fs_notice(level,...) ffl_notice(fs_log_type,fs_log_level,level,__VA_ARGS__)
-#define fs_warn(level,...) ffl_warn(fs_log_type,fs_log_level,level,__VA_ARGS__)
-#define fs_err(level,...) ffl_err(fs_log_type,fs_log_level,level,__VA_ARGS__)
-#define fs_info(level,...) ffl_info(fs_log_type,fs_log_level,level,__VA_ARGS__)
-
-/*
- *  weaker logging can be deselected at configure time using --disable-debug
- *  that gets rid of the overhead of checking while keeping _warn and _err
- *  active
- */
-#ifdef _DEBUG
-
-#define fs_debug(level,...) ffl_debug(fs_log_type,fs_log_level,level,__VA_ARGS__)
-#define ffl_parser(...) _ff_log(FFL_PARSER, __VA_ARGS__)
-#define ffl_header(...)  _ff_log(FFL_HEADER, __VA_ARGS__)
-#define ffl_ext(...)  _ff_log(FFL_EXT, __VA_ARGS__)
-#define ffl_client(...) _ff_log(FFL_CLIENT, __VA_ARGS__)
-#define ffl_latency(...) _ff_log(FFL_LATENCY, __VA_ARGS__)
-
-#endif /* _DEBUG */
-
-#endif	/* GLOBAL_H */
+#endif

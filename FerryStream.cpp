@@ -12,9 +12,9 @@
 #include <base/SocketException.h>
 #include <base/mystdlib.h>
 #include <base/myconverters.h>
-#include <base/FFJSON.h>
+#include <FFJSON.h>
 #include <base/JPEGImage.h>
-#include <base/logger.h>
+#include <logger.h>
 #include <cstdlib>
 #include <string>
 #include <iostream>
@@ -65,7 +65,7 @@ FerryStream::FerryStream(ServerSocket::Connection * source, void(*funeral)(int))
 		throw Exception("Illegal initial packet. FFJSON::Exception:" + string(e.what()));
 		delete init_ffjson;
 	}
-	fs_notice(FPL_FSTREAM_HEART, "new connection received with path :%s", path.c_str());
+	ffl_notice(FPL_FSTREAM_HEART, "new connection received with path :%s", path.c_str());
 	delete init_ffjson;
 	packs_to_send[this->path] = true;
 	liveFSList.push_back(this);
@@ -79,7 +79,7 @@ FerryStream::~FerryStream() {
 		heartThread->join();
 		delete heartThread;
 	} catch (SocketException e) {
-		fs_debug(FPL_FSTREAM_HEART, "socket: %s", e.description().c_str());
+		ffl_debug(FPL_FSTREAM_HEART, "socket: %s", e.description().c_str());
 	}
 }
 
@@ -136,7 +136,7 @@ void FerryStream::heart(FerryStream* fs) {
 				if ((packStartIndex = (int) fs->buffer.find("{index:",
 						packStartIndex)) >= 0) {
 					if (!goodPacket) {
-						fs_err(FPL_FSTREAM_HEART, "packet %d corrupted. "
+						ffl_err(FPL_FSTREAM_HEART, "packet %d corrupted. "
 								"Discarding %dbytes", index, truebuffer.length());
 					}
 					goodPacket = false;
@@ -194,7 +194,7 @@ void FerryStream::heart(FerryStream* fs) {
 						i--;
 						frame = (const char*) (*frames)[i];
 						//						if ((*frames)[i]->size != (int) (*(*sizes)[i])) {
-						//							fs_err(FPL_FSTREAM_HEART, "FerryStream: %s: packetNo: %s frameNo: %d frame size changed. Sent frame length :%d; Received frame length:%d.", id_path_map[fs->path].c_str(), fn_b.c_str(), i, (int) (*(*sizes)[i]), (*frames)[i]->size);
+						//							ffl_err(FPL_FSTREAM_HEART, "FerryStream: %s: packetNo: %s frameNo: %d frame size changed. Sent frame length :%d; Received frame length:%d.", id_path_map[fs->path].c_str(), fn_b.c_str(), i, (int) (*(*sizes)[i]), (*frames)[i]->size);
 						//						}
 						fn = fn_b + "-" + string(itoa(i)) + ".jpeg";
 						fd = open(fn.c_str(), O_WRONLY | O_TRUNC | O_CREAT);
@@ -202,10 +202,10 @@ void FerryStream::heart(FerryStream* fs) {
 						s = write(fd, frame, (*frames)[i]->size);
 						close(fd);
 						if (s >= 0) {
-							fs_debug(FPL_FSTREAM_HEART, "%s: frame %s successfully"
+							ffl_debug(FPL_FSTREAM_HEART, "%s: frame %s successfully"
 									" written", id_path_map[fs->path].c_str(), fn.c_str());
 						} else {
-							fs_err(FPL_FSTREAM_HEART, "%s: frame %s save"
+							ffl_err(FPL_FSTREAM_HEART, "%s: frame %s save"
 									" failed", id_path_map[fs->path].c_str(), fn.c_str());
 						}
 					}
@@ -222,7 +222,7 @@ void FerryStream::heart(FerryStream* fs) {
 						FFJSON* head = *packsbuf->begin();
 						delete pack_string_map[head];
 						pack_string_map.erase(head);
-						fs_debug(FPL_FSTREAM_HEART, "Bye %d :) Kicking him out (;",
+						ffl_debug(FPL_FSTREAM_HEART, "Bye %d :) Kicking him out (;",
 								(int) (*head)["index"]);
 						delete head;
 						packsbuf->pop_front();
@@ -232,12 +232,12 @@ void FerryStream::heart(FerryStream* fs) {
 					delete media_pack;
 				}
 			} catch (FFJSON::Exception e) {
-				fs_err(FPL_FPORT, "Illegal meadia pack received on %s", id_path_map[fs->path].c_str());
-				fs_debug(FPL_FPORT, "FFJSON::Exception: %s", e.what());
+				ffl_err(FPL_FPORT, "Illegal meadia pack received on %s", id_path_map[fs->path].c_str());
+				ffl_debug(FPL_FPORT, "FFJSON::Exception: %s", e.what());
 			}
 
 		} catch (SocketException e) {
-			fs_err(FPL_FPORT, "I, %s dying! Connection to %s lost.", id_path_map[fs->path].c_str(), fs->source->getDestinationIP().c_str());
+			ffl_err(FPL_FPORT, "I, %s dying! Connection to %s lost.", id_path_map[fs->path].c_str(), fs->source->getDestinationIP().c_str());
 			break;
 		}
 	}

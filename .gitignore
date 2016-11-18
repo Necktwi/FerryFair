@@ -16,6 +16,7 @@ libav_output_files/
 ferrymediacapture1/
 dist/
 build/
+buildQt/
 
 nbproject/private/
 build/
@@ -24,3 +25,4 @@ dist/
 nbdist/
 nbactions.xml
 nb-configuration.xml
+*.user

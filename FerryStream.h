@@ -13,9 +13,9 @@
 #include <base/SocketException.h>
 #include <base/mystdlib.h>
 #include <base/myconverters.h>
-#include <base/FFJSON.h>
+#include <FFJSON.h>
 #include <base/JPEGImage.h>
-#include <base/logger.h>
+#include <logger.h>
 #include <cstdlib>
 #include <string>
 #include <iostream>

@@ -22,6 +22,18 @@
  *  MA  02110-1301  USA
  */
 
+//#if defined(LWS_USE_POLARSSL)
+//#else
+//#if defined(LWS_USE_MBEDTLS)
+//#else
+//#if defined(LWS_OPENSSL_SUPPORT) && defined(LWS_HAVE_SSL_CTX_set1_param)
+///* location of the certificate revocation list */
+//extern char crl_path[1024];
+//#endif
+//#endif
+//#endif
+char crl_path[1024];
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -49,8 +61,8 @@
 #include "WSServer.h"
 #include <libwebsockets.h>
 #include <base/JPEGImage.h>
-#include <base/FFJSON.h>
-#include <base/logger.h>
+#include <FFJSON.h>
+#include <logger.h>
 #include <base/mystdlib.h>
 #include <base/Socket.h>
 #include <iostream>
@@ -70,6 +82,13 @@ bool validate_path_l(std::string& p) {
 		return true;
 	}
 	return false;
+}
+
+void test_server_lock(int care)
+{
+}
+void test_server_unlock(int care)
+{
 }
 
 static void
@@ -181,7 +200,8 @@ unsigned int WSServer::valid_session(unsigned int session_id) {
 	if (user_sessions.find(session_id) != user_sessions.end()) {
 		user_session* us = user_sessions[session_id];
 		time_t ct = time(NULL);
-		if ((ct - us->last_access_time) < (int) config["HttpUserSessionTimeout"]) {
+		if ((ct - us->last_access_time) <
+				(int) config["HttpUserSessionTimeout"]) {
 			us->last_access_time = time(NULL);
 			return session_id;
 		}
@@ -213,6 +233,7 @@ int WSServer::callback_http(struct lws *wsi,
 	const char *mimetype;
 	FFJSON ans;
 	FFJSON* ansobj;
+	unsigned long file_len, amount, sent;
 
 #ifdef EXTERNAL_POLL
 	struct lws_pollargs *pa = (struct lws_pollargs *) in;
@@ -237,7 +258,8 @@ int WSServer::callback_http(struct lws *wsi,
 							HTTP_STATUS_BAD_REQUEST, NULL);
 					return -1;
 				}
-				lws_hdr_copy(wsi, buf, sizeof buf, (lws_token_indexes) WSI_TOKEN_HTTP_COOKIE);
+				lws_hdr_copy(wsi, buf, sizeof buf, (lws_token_indexes)
+						WSI_TOKEN_HTTP_COOKIE);
 				int i = 0;
 				int pin = i;
 				int pin_length = 0;
@@ -256,7 +278,8 @@ int WSServer::callback_http(struct lws *wsi,
 							pin_length = i - pin;
 							value.assign(buf + pin, pin_length);
 							cookies[name] = value;
-							fs_debug(FPL_HTTPSERV, "%s:%s", name.c_str(), value.c_str());
+							ffl_debug(FPL_HTTPSERV, "%s:%s", name.c_str(),
+									value.c_str());
 							if (buf[i + 1] == ' ') ++i;
 							pin = i + 1;
 							break;
@@ -275,18 +298,19 @@ int WSServer::callback_http(struct lws *wsi,
 				sprintf(other_headers,
 						"Set-Cookie: session_id=%u\x0d\x0a",
 						session_id);
-				fs_debug(FPL_HTTPSERV, "session %u created", session_id);
+				ffl_debug(FPL_HTTPSERV, "session %u created", session_id);
 			}
-			fs_debug(FPL_HTTPSERV, "session: %u", session_id);
+			ffl_debug(FPL_HTTPSERV, "session: %u", session_id);
 			lws_hdr_copy(wsi, buf, sizeof buf, WSI_TOKEN_HOST);
 			string connection(buf);
 			int dnamenail = -1;
 			dnamenail = connection.find('.');
-			fs_debug(FPL_HTTPSERV, "connection: %s, domainname: %s", buf, domainname.c_str());
+			ffl_debug(FPL_HTTPSERV, "connection: %s, domainname: %s", buf,
+					domainname.c_str());
 			if (dnamenail != string::npos) {
 				string vhost;
 				vhost = connection.substr(0, dnamenail);
-				fs_debug(FPL_HTTPSERV, "vhost: %s", vhost.c_str());
+				ffl_debug(FPL_HTTPSERV, "vhost: %s", vhost.c_str());
 				strncpy(pss->vhost, vhost.c_str(), vhost.length());
 				pss->vhost[vhost.length()] = '\0';
 			}
@@ -294,11 +318,11 @@ int WSServer::callback_http(struct lws *wsi,
 			if (!config["virtualWebHosts"][pss->vhost])
 				strncpy(pss->vhost, "www", 4);
 			lResourcePath.assign((const char*)
-			config["virtualWebHosts"][pss->vhost]["rootdir"]);
+			  config["virtualWebHosts"][pss->vhost]["rootdir"]);
 
 			if (!models[pss->vhost]) {
-				std::ifstream t(string((const char*) config["virtualWebHosts"][pss->vhost]
-						["rootdir"]) + "/model.json");
+				std::ifstream t(string((const char*) config["virtualWebHosts"]
+						[pss->vhost]["rootdir"]) + "/model.json");
 				if (t.is_open()) {
 					std::string str((std::istreambuf_iterator<char>(t)),
 							std::istreambuf_iterator<char>());
@@ -341,24 +365,22 @@ int WSServer::callback_http(struct lws *wsi,
 				return -1;
 			}
 
-			p = buffer;
-			fs_debug(FPL_HTTPSERV, "Sending %s", buf);
+			p = buffer+LWS_PRE;
+			ffl_debug(FPL_HTTPSERV, "Sending %s", buf);
 
-#ifdef WIN32
-			pss->fd = open(buf, O_RDONLY | _O_BINARY);
-#else
-			pss->fd = open(buf, O_RDONLY);
-#endif
+			//pss->fd = open(buf, O_RDONLY | _O_BINARY);
+			pss->fd=lws_plat_file_open(wsi, buf, &file_len,
+				LWS_O_RDONLY);
 
-			if (pss->fd < 0) {
-				fs_debug(FPL_HTTPSERV, "unable to open file");
+			if (pss->fd < LWS_INVALID_FILE) {
+				ffl_debug(FPL_HTTPSERV, "unable to open file");
 				return -1;
 			}
 
 			fstat(pss->fd, &stat_buf);
 
 			p += sprintf((char *) p,
-					"HTTP/1.0 200 OK\x0d\x0a"
+					"HTTP/1.1 200 OK\x0d\x0a"
 					"Server: libwebsockets\x0d\x0a"
 					"Content-Type: %s\x0d\x0a"
 					"Content-Length: %u\x0d\x0a%s\x0d\x0a",
@@ -371,11 +393,11 @@ int WSServer::callback_http(struct lws *wsi,
 			 * (too small for partial)
 			 */
 
-			n = lws_write(wsi, buffer,
-					p - buffer, LWS_WRITE_HTTP);
+			n = lws_write(wsi, buffer+LWS_PRE,
+					p - (buffer+LWS_PRE), LWS_WRITE_HTTP_HEADERS);
 
 			if (n < 0) {
-				close(pss->fd);
+				lws_plat_file_close(wsi, pss->fd);
 				return -1;
 			}
 
@@ -417,142 +439,129 @@ int WSServer::callback_http(struct lws *wsi,
 			/* the whole of the sent body arried, close the connection */
 
 			ans.init(*pss->payload);
-			fs_debug(FPL_HTTPSERV, "%s", ans.stringify().c_str());
-			ansobj = models[pss->vhost].answerObject(&ans);
-			if (ansobj) {
-				pss->payload->assign(ansobj->stringify(true));
-				delete ansobj;
-sendJSONPayload:
-				fs_debug(FPL_HTTPSERV, "%s", pss->payload->c_str());
-				string header =
-						"HTTP/1.0 200 OK\x0d\x0a"
-						"Server: libwebsockets\x0d\x0a"
-						"Content-Type: application/json\x0d\x0a"
-						"Content-Length: " +
-						to_string((unsigned int) pss->payload->length()) +
-						"\x0d\x0a\x0d\x0a";
-				/*
-				 * send the http headers...
-				 * this won't block since it's the first payload sent
-				 * on the connection since it was established
-				 * (too small for partial)
-				 */
+			ffl_debug(FPL_HTTPSERV, "%s", ans.stringify().c_str());
 
-				m = header.length();
-				n = lws_write(wsi, (unsigned char*) header.c_str(),
-						m, LWS_WRITE_HTTP);
-				if (n < 0) {
-					delete pss->payload;
-					return -1;
-				}
-				pss->offset = pss->payload->c_str();
-				/*
-				 * book us a LWS_CALLBACK_HTTP_WRITEABLE callback
-				 */
-				lws_callback_on_writable(wsi);
-			} else {
+			ansobj = models[pss->vhost].answerObject(&ans);
+			pss->payload->assign(ansobj->stringify(true));
+			delete ansobj;
+sendJSONPayload:
+			ffl_debug(FPL_HTTPSERV, "%s", pss->payload->c_str());
+			string header =
+					"HTTP/1.1 200 OK\x0d\x0a"
+					"Server: libwebsockets\x0d\x0a"
+					"Content-Type: application/json\x0d\x0a"
+					"Content-Length: " +
+					to_string((unsigned int) pss->payload->length()) +
+					"\x0d\x0a\x0d\x0a";
+			/*
+			 * send the http headers...
+			 * this won't block since it's the first payload sent
+			 * on the connection since it was established
+			 * (too small for partial)
+			 */
+
+			m = header.length();
+			n = lws_write(wsi, (unsigned char*) header.c_str(),
+					m, LWS_WRITE_HTTP);
+			if (n < 0) {
 				delete pss->payload;
-				lws_return_http_status(wsi,
-						HTTP_STATUS_OK, NULL);
 				return -1;
 			}
+			pss->offset = pss->payload->c_str();
+			/*
+			 * book us a LWS_CALLBACK_HTTP_WRITEABLE callback
+			 */
+			lws_callback_on_writable(wsi);
 			break;
 		}
 
 		case LWS_CALLBACK_HTTP_FILE_COMPLETION:
+		{
 			//		lwsl_info("LWS_CALLBACK_HTTP_FILE_COMPLETION seen\n");
 			/* kill the connection after we sent one file */
 			return -1;
-
+		}
 		case LWS_CALLBACK_HTTP_WRITEABLE:
+		{
+			lwsl_info("LWS_CALLBACK_HTTP_WRITEABLE\n");
+
+
+			if (pss->fd == LWS_INVALID_FILE)
+				goto try_to_reuse;
 			/*
 			 * we can send more of whatever it is we were sending
 			 */
-			if (pss->payload == NULL) {
 				do {
-					n = read(pss->fd, buffer, sizeof buffer);
+				      n = sizeof(buffer) - LWS_PRE;
+
+				      /* but if the peer told us he wants less, we can adapt */
+				      m = lws_get_peer_write_allowance(wsi);
+
+				      /* -1 means not using a protocol that has this info */
+				      if (m == 0)
+					/* right now, peer can't handle anything */
+					goto later;
+
+				      if (m != -1 && m < n)
+					/* he couldn't handle that much */
+					n = m;
+
+				      n = lws_plat_file_read(wsi, pss->fd,
+							       &amount, buffer + LWS_PRE, n);
 					/* problem reading, close conn */
-					if (n < 0)
+					if (n < 0){
+					    lwsl_err("problem reading file\n");
 						goto bail;
+					  }
+					n = (int)amount;
 					/* sent it all, close conn */
 					if (n == 0)
-						goto flush_bail;
+						goto penultimate;
 					/*
 					 * because it's HTTP and not websocket, don't need to take
 					 * care about pre and postamble
 					 */
-					m = lws_write(wsi, buffer, n, LWS_WRITE_HTTP);
-					if (m < 0)
+					m = lws_write(wsi, buffer + LWS_PRE, n, LWS_WRITE_HTTP);
+					if (m < 0){
+					  lwsl_err("write failed\n");
 						/* write failed, close conn */
 						goto bail;
-					if (m != n)
-						/* partial write, adjust */
-						lseek(pss->fd, m - n, SEEK_CUR);
-
+					  }
 					if (m) /* while still active, extend timeout */
-						lws_set_timeout(wsi,
-							PENDING_TIMEOUT_HTTP_CONTENT, 5);
+						lws_set_timeout(wsi, PENDING_TIMEOUT_HTTP_CONTENT, 5);
+					sent += m;
 
 				} while (!lws_send_pipe_choked(wsi));
-			} else {
-				do {
-					n = pss->payload->length()-
-							(pss->offset - pss->payload->c_str());
-					if (n < 0) {
-						goto bail;
-					}
-					/* sent it all, close conn */
-					if (n == 0) {
-						goto flush_bail;
-					}
-					m = lws_write(wsi, (unsigned char*) pss->offset, n,
-							LWS_WRITE_HTTP);
-					if (m < 0) {
-						goto bail;
-					}
-					pss->offset += m;
-					if (m) /* while still active, extend timeout */
-						lws_set_timeout(wsi,
-							PENDING_TIMEOUT_HTTP_CONTENT, 5);
-				} while (!lws_send_pipe_choked(wsi));
-			}
-			lws_callback_on_writable(wsi);
-			break;
-flush_bail:
-			/* true if still partial pending */
-			if (lws_send_pipe_choked(wsi)) {
-				lws_callback_on_writable(wsi);
-				break;
-			}
+
+later:
+		lws_callback_on_writable(wsi);
+		break;
+flushbail:
+penultimate:
+		lws_plat_file_close(wsi, pss->fd);
+		pss->fd = LWS_INVALID_FILE;
+		goto try_to_reuse;
+
 
 bail:
 			if (pss->payload != NULL) {
 				delete pss->payload;
-			} else {
-				close(pss->fd);
 			}
+			lws_plat_file_close(wsi, pss->fd);
 			return -1;
+		}
+	    /*
+	     * callback for confirming to continue with client IP appear in
+	     * protocol 0 callback since no websocket protocol has been agreed
+	     * yet.  You can just ignore this if you won't filter on client IP
+	     * since the default unhandled callback return is 0 meaning let the
+	     * connection continue.
+	     */
+	    case LWS_CALLBACK_FILTER_NETWORK_CONNECTION:
+		    /* if we returned non-zero from here, we kill the connection */
+		    break;
 
-			/*
-			 * callback for confirming to continue with client IP appear in
-			 * protocol 0 callback since no websocket protocol has been agreed
-			 * yet.  You can just ignore this if you won't filter on client IP
-			 * since the default uhandled callback return is 0 meaning let the
-			 * connection continue.
-			 */
 
-		case LWS_CALLBACK_FILTER_NETWORK_CONNECTION:
-#if 0
-			lws_get_peer_addresses(context, wsi, (int) (long) in, client_name,
-					sizeof (client_name), client_ip, sizeof (client_ip));
-
-			fprintf(stderr, "Received network connect from %s (%s)\n",
-					client_name, client_ip);
-#endif
-			/* if we returned non-zero from here, we kill the connection */
-			break;
-
-#ifdef EXTERNAL_POLL
 			/*
 			 * callbacks for managing the external poll() array appear in
 			 * protocol 0 callback
@@ -563,6 +572,7 @@ bail:
 			 * lock mutex to protect pollfd state
 			 * called before any other POLL related callback
 			 */
+	    test_server_lock(len);
 			break;
 
 		case LWS_CALLBACK_UNLOCK_POLL:
@@ -570,8 +580,9 @@ bail:
 			 * unlock mutex to protect pollfd state when
 			 * called after any other POLL related callback
 			 */
+	    test_server_unlock(len);
 			break;
-
+#ifdef EXTERNAL_POLL
 		case LWS_CALLBACK_ADD_POLL_FD:
 
 			if (count_pollfds >= max_poll_elements) {
@@ -611,10 +622,52 @@ bail:
 			/* return pthread_getthreadid_np(); */
 
 			break;
+#if defined(LWS_USE_POLARSSL)
+#else
+#if defined(LWS_USE_MBEDTLS)
+#else
+#if defined(LWS_OPENSSL_SUPPORT)
+	case LWS_CALLBACK_OPENSSL_PERFORM_CLIENT_CERT_VERIFICATION:
+		/* Verify the client certificate */
+		if (!len || (SSL_get_verify_result((SSL*)in) != X509_V_OK)) {
+			int err = X509_STORE_CTX_get_error((X509_STORE_CTX*)user);
+			int depth = X509_STORE_CTX_get_error_depth((X509_STORE_CTX*)user);
+			const char* msg = X509_verify_cert_error_string(err);
+			lwsl_err("LWS_CALLBACK_OPENSSL_PERFORM_CLIENT_CERT_VERIFICATION: SSL error: %s (%d), depth: %d\n", msg, err, depth);
+			return 1;
+		}
+		break;
+#if defined(LWS_HAVE_SSL_CTX_set1_param)
+	case LWS_CALLBACK_OPENSSL_LOAD_EXTRA_SERVER_VERIFY_CERTS:
+		if (crl_path[0]) {
+			/* Enable CRL checking */
+			X509_VERIFY_PARAM *param = X509_VERIFY_PARAM_new();
+			X509_VERIFY_PARAM_set_flags(param, X509_V_FLAG_CRL_CHECK);
+			SSL_CTX_set1_param((SSL_CTX*)user, param);
+			X509_STORE *store = SSL_CTX_get_cert_store((SSL_CTX*)user);
+			X509_LOOKUP *lookup = X509_STORE_add_lookup(store, X509_LOOKUP_file());
+			n = X509_load_cert_crl_file(lookup, crl_path, X509_FILETYPE_PEM);
+			X509_VERIFY_PARAM_free(param);
+			if (n != 1) {
+				char errbuf[256];
+				n = ERR_get_error();
+				lwsl_err("LWS_CALLBACK_OPENSSL_LOAD_EXTRA_SERVER_VERIFY_CERTS: SSL error: %s (%d)\n", ERR_error_string(n, errbuf), n);
+				return 1;
+			}
+		}
+		break;
+#endif
+#endif
+#endif
+#endif
 
 		default:
 			break;
 	}
+	return 0;
+try_to_reuse:
+	if (lws_http_transaction_completed(wsi))
+	  return -1;
 
 	return 0;
 }
@@ -622,7 +675,8 @@ bail:
 int WSServer::callbackFairPlayWS(struct lws *wsi,
 		enum lws_callback_reasons reason,
 		void *user, void *in, size_t len) {
-	struct per_session_data__fairplay *pss = (struct per_session_data__fairplay *) user;
+	struct per_session_data__fairplay *pss =
+			(struct per_session_data__fairplay *) user;
 	int n;
 	std::list<FFJSON*>::iterator ii;
 	switch (reason) {
@@ -631,7 +685,9 @@ int WSServer::callbackFairPlayWS(struct lws *wsi,
 
 		case LWS_CALLBACK_ESTABLISHED:
 		{
-			fs_notice(FPL_WSSERV, "viewer %s:%d connected", Socket::getIpAddr(lws_get_socket_fd(wsi)).c_str(), Socket::getPort(lws_get_socket_fd(wsi)));
+			ffl_notice(FPL_WSSERV, "viewer %s:%d connected",
+					Socket::getIpAddr(lws_get_socket_fd(wsi)).c_str(),
+					Socket::getPort(lws_get_socket_fd(wsi)));
 			pss->state = FRAGSTATE_NEW_PCK;
 			break;
 		}
@@ -686,7 +742,7 @@ int WSServer::callbackFairPlayWS(struct lws *wsi,
 							pss->i++;
 							ii++;
 						} else {
-							fs_debug(FPL_WSSERV,
+							ffl_debug(FPL_WSSERV,
 									"unexpected callback for frame %d on ws %p"
 									" with path %s", (int) (**pss->i)["index"],
 									wsi, id_path_map[wsi_path_map[wsi]].c_str());
@@ -708,7 +764,7 @@ int WSServer::callbackFairPlayWS(struct lws *wsi,
 						pss->state = FRAGSTATE_MORE_FRAGS;
 						lws_callback_on_writable(wsi);
 					}
-					fs_debug(FPL_WSSERV, "frame index %d sent to %p",
+					ffl_debug(FPL_WSSERV, "frame index %d sent to %p",
 							(int) (**pss->i)["index"], wsi);
 					if (n < 0) {
 						lwsl_err("ERROR %d writing to socket, hanging up\n", n);
@@ -735,7 +791,7 @@ int WSServer::callbackFairPlayWS(struct lws *wsi,
 								pss->payload->c_str(), pss->payload->length(),
 								LWS_WRITE_TEXT);
 					} else {
-						fs_err(FPL_WSSERV,
+						ffl_err(FPL_WSSERV,
 								"error msg greater than MAX_ECHO_PAYLOAD "
 								"is being sent. Verify ur code!");
 					}
@@ -817,7 +873,7 @@ int WSServer::callbackFairPlayWS(struct lws *wsi,
 					pss->payload->append((char*) in);
 					if (lws_remaining_packet_payload(wsi) == 0 &&
 							lws_is_final_fragment(wsi)) {
-						fs_debug(FPL_WSSERV, (const char*) pss->payload->c_str());
+						ffl_debug(FPL_WSSERV, (const char*) pss->payload->c_str());
 						FFJSON ffjson(*pss->payload);
 						delete pss->payload;
 						pss->payload = NULL;
@@ -837,7 +893,7 @@ int WSServer::callbackFairPlayWS(struct lws *wsi,
 									pss->packs = path_packs_map[pathId];
 									path_wsi_map[pathId]->push_back(wsi);
 									bufferSize = (int) ffjson["bufferSize"];
-									fs_debug(FPL_WSSERV, "client has buffer size %d",
+									ffl_debug(FPL_WSSERV, "client has buffer size %d",
 											bufferSize);
 									//validate input data
 									bufferSize = (bufferSize > 0)&&(packBufSize >= bufferSize)
@@ -947,8 +1003,21 @@ static struct option options[] = {
 	{ NULL, 0, 0, 0}
 };
 
+static const struct lws_extension exts[] = {
+	{
+		"permessage-deflate",
+		lws_extension_callback_pm_deflate,
+		"permessage-deflate"
+	},
+	{
+		"deflate-frame",
+		lws_extension_callback_pm_deflate,
+		"deflate_frame"
+	},
+	{ NULL, NULL, NULL /* terminator */ }
+};
 WSServer::WSServer(WSServerArgs* args) {
-	port = 80;
+	port = 8080;
 	use_ssl = 0;
 	char interface_name[128] = "";
 #ifndef WIN32
@@ -1084,8 +1153,24 @@ int WSServer::heart(WSServer* wss) {
 	}
 	wss->info.gid = -1;
 	wss->info.uid = -1;
-	wss->info.options = wss->opts;
+	wss->info.options = wss->opts | LWS_SERVER_OPTION_VALIDATE_UTF8;
 
+	wss->info.max_http_header_pool = 16;
+	wss->info.extensions = exts;
+	wss->info.timeout_secs = 5;
+	wss->info.ssl_cipher_list = "ECDHE-ECDSA-AES256-GCM-SHA384:"
+			       "ECDHE-RSA-AES256-GCM-SHA384:"
+			       "DHE-RSA-AES256-GCM-SHA384:"
+			       "ECDHE-RSA-AES256-SHA384:"
+			       "HIGH:!aNULL:!eNULL:!EXPORT:"
+			       "!DES:!MD5:!PSK:!RC4:!HMAC_SHA1:"
+			       "!SHA1:!DHE-RSA-AES128-GCM-SHA256:"
+			       "!DHE-RSA-AES128-SHA256:"
+			       "!AES128-GCM-SHA256:"
+			       "!AES128-SHA256:"
+			       "!DHE-RSA-AES256-SHA256:"
+			       "!AES256-GCM-SHA384:"
+			       "!AES256-SHA256";
 	wss->context = lws_create_context(&wss->info);
 
 	if (wss->context == NULL) {
@@ -1107,7 +1192,8 @@ int WSServer::heart(WSServer* wss) {
 #endif
 	signal(SIGINT, sighandler);
 
-	while (n >= 0 && !force_exit && (duration == 0 || duration > (time(NULL) - starttime))) {
+	while (n >= 0 && !force_exit && (duration == 0 || duration > (time(NULL) -
+			starttime))) {
 #ifndef LWS_NO_CLIENT
 		struct timeval tv;
 
@@ -1130,7 +1216,7 @@ int WSServer::heart(WSServer* wss) {
 						std::list<lws*>::iterator j = wa.begin();
 						while (j != wa.end()) {
 							lws_callback_on_writable(*j);
-							fs_debug(FPL_WSSERV, "%s:%p",
+							ffl_debug(FPL_WSSERV, "%s:%p",
 									id_path_map[i->first].c_str(), *j);
 							j++;
 						}
