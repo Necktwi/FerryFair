@@ -39,5 +39,5 @@ set_target_properties(ferrymediaserver
     SOVERSION ${FFJSON_VERSION_MAJOR}
     )
 install(TARGETS ${PROJECT_NAME} DESTINATION bin)
-install(FILES "${PROJECT_BINARY_DIR}/FFJSONConfig.h"
+install(FILES "${PROJECT_BINARY_DIR}/ferrymediaserverConfig.h"
     DESTINATION include/${Umbrella})
