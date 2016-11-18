@@ -5,7 +5,7 @@
  * Created on 24 November, 2013, 12:25 AM
  */
 
-#define APP_NAME "FairPlay"
+#define APP_NAME "ferrymediaserver"
 
 #include "WSServer.h"
 #include "FerryStream.h"
