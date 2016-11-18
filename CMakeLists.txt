@@ -42,4 +42,5 @@ install(TARGETS ${PROJECT_NAME} DESTINATION bin)
 install(FILES "${PROJECT_BINARY_DIR}/ferrymediaserverConfig.h"
     DESTINATION include/${Umbrella})
 install(FILES "${PROJECT_SOURCE_DIR}/config.json"
-    DESTINATION /etc/${PROJECT_NAME}.json)
+    DESTINATION /etc
+    RENAME ${PROJECT_NAME}.json)
