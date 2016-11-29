@@ -1,4 +1,4 @@
-ferryfair (1.0-0ubuntu2) xenial; urgency=medium
+ferryfair (1.0-0ubuntu1) xenial; urgency=medium
 
   * www is running gr8 (Closes: #2001)
    - works with latest libwebsockets
