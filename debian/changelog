@@ -1,6 +1,6 @@
-ferryfair (1.0-0ubuntu1) xenial; urgency=medium
+ferryfair (1.0-1ubuntu1) xenial; urgency=medium
 
   * www is running gr8 (Closes: #2001)
    - works with latest libwebsockets
 
- -- Satya Gowtham Kudupudi (necktwi) <satyagowtham.k@gmail.com>  Tue, 29 Nov 2016 22:01:07 +0530
+ -- Satya Gowtham Kudupudi (necktwi) <satyagowtham.k@gmail.com>  Tue, 30 Nov 2016 01:01:07 +0530
