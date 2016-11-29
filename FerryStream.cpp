@@ -197,7 +197,7 @@ void FerryStream::heart(FerryStream* fs) {
 						//							ffl_err(FPL_FSTREAM_HEART, "FerryStream: %s: packetNo: %s frameNo: %d frame size changed. Sent frame length :%d; Received frame length:%d.", id_path_map[fs->path].c_str(), fn_b.c_str(), i, (int) (*(*sizes)[i]), (*frames)[i]->size);
 						//						}
 						fn = fn_b + "-" + string(itoa(i)) + ".jpeg";
-						fd = open(fn.c_str(), O_WRONLY | O_TRUNC | O_CREAT);
+						fd = open(fn.c_str(), O_WRONLY | O_TRUNC | O_CREAT, 0755);
 						int s;
 						s = write(fd, frame, (*frames)[i]->size);
 						close(fd);
