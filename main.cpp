@@ -283,7 +283,7 @@ void configure() {
 						if (stat(initFile.c_str(), &st) != 1) {
 							cout << "\nDisabling " APP_NAME " to run at startup...";
 							if (stat(initOverrideFile.c_str(), &st) == -1) {
-								int fd = open(initOverrideFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC);
+								int fd = open(initOverrideFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0755);
 								string buf = "manual";
 								write(fd, buf.c_str(), buf.length());
 								close(fd);
