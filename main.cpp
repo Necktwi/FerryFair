@@ -93,7 +93,7 @@ void print_usage(FILE* stream, int exit_code, char* program_name) {
 			"\n-x --stop Terminates " APP_NAME "."
 			"\n---------------------------"
 			"\nHave a nice day :)\n\n";
-	fputs(stream, (const char*) doc.c_str());
+	fputs((const char*) doc.c_str(), stream);
 }
 pid_t rootProcess;
 pid_t firstChild;
