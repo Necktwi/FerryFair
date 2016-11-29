@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.5)
 include(GNUInstallDirs)
-project (ferrymediaserver)
+project (ferryfair)
 IF (DEFINED _DEBUG)
 ADD_DEFINITIONS(-D_DEBUG=${_DEBUG})
 ENDIF()
