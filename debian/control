@@ -1,17 +1,17 @@
 Source: ferryfair
-Priority: optional
+Priority: extra
 Maintainer: Satya Gowtham Kudupudi <satyagowtham.k@gmail.com>
-Build-Depends: debhelper (>= 9), cmake, libffjson-dev, liblogger-dev, libwebsockets-dev, libferrybase-dev
+Build-Depends: debhelper (>= 9), cmake, libffjson-dev, liblogger-dev, libwebsockets-dev, libferrybase-dev, libssl-dev,libcrypto++-dev
 Standards-Version: 3.9.7
-Section: non-free/libs
+Section: non-free/utils
 Homepage: https://github.com/necktwi/ferryfair
 Vcs-Git: https://github.com/necktwi/ferryfair.git
 Vcs-Browser: https://github.com/necktwi/ferryfair
 
 Package: ferryfair
-Section: non-free/libdevel
+Section: non-free/utils
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libffjson1, liblogger1, libferrybase1, libwebsockets7
+Depends: ${shlibs:Depends}, ${misc:Depends}, libffjson1, liblogger1, libferrybase1, libwebsockets7, libssl-dev, libcrypto++9v5
 Description: server for ferryfair.com
  a controller of entire organization
 
