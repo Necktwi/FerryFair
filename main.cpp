@@ -10,10 +10,10 @@
 #include "WSServer.h"
 #include "FerryStream.h"
 #include "global.h"
-#include <base/ServerSocket.h>
-#include <base/SocketException.h>
-#include <base/mystdlib.h>
-#include <base/myconverters.h>
+#include <ferrybase/ServerSocket.h>
+#include <ferrybase/SocketException.h>
+#include <ferrybase/mystdlib.h>
+#include <ferrybase/myconverters.h>
 #include <FFJSON.h>
 #include <logger.h>
 #include <libwebsockets.h>

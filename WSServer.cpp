@@ -60,11 +60,11 @@ char crl_path[1024];
 #include "global.h"
 #include "WSServer.h"
 #include <libwebsockets.h>
-#include <base/JPEGImage.h>
+#include <ferrybase/JPEGImage.h>
 #include <FFJSON.h>
 #include <logger.h>
-#include <base/mystdlib.h>
-#include <base/Socket.h>
+#include <ferrybase/mystdlib.h>
+#include <ferrybase/Socket.h>
 #include <iostream>
 #include <malloc.h>
 

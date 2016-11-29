@@ -9,13 +9,13 @@
 #define	FERRYSTREAM_H
 
 #include "global.h"
-#include <base/ServerSocket.h>
-#include <base/SocketException.h>
-#include <base/mystdlib.h>
-#include <base/myconverters.h>
-#include <FFJSON.h>
-#include <base/JPEGImage.h>
+#include <ferrybase/ServerSocket.h>
+#include <ferrybase/SocketException.h>
+#include <ferrybase/mystdlib.h>
+#include <ferrybase/myconverters.h>
+#include <ferrybase/JPEGImage.h>
 #include <logger.h>
+#include <FFJSON.h>
 #include <cstdlib>
 #include <string>
 #include <iostream>
