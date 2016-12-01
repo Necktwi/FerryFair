@@ -23,7 +23,7 @@ file(GLOB HEADERS *.h)
 file(GLOB SOURCES *.cpp)
 include_directories(${PROJECT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_INSTALL_FULL_INCLUDEDIR}/${Umbrella})
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
-target_link_libraries(${PROJECT_NAME} websockets ssl crypto pthread FFJSON logger ferrybase xml2 pthread ssl crypto rt)
+target_link_libraries(${PROJECT_NAME} websockets FFJSON logger ferrybase xml2 pthread ssl crypto rt)
 set_target_properties(${PROJECT_NAME}
     PROPERTIES
     VERSION ${VERSION_MAJOR}.${VERSION_MINOR}
