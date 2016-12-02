@@ -1,0 +1,42 @@
+cmake_minimum_required (VERSION 3.5)
+include(GNUInstallDirs)
+project (ferryfair)
+IF (DEFINED _DEBUG)
+ADD_DEFINITIONS(-D_DEBUG=${_DEBUG})
+ENDIF()
+set (VERSION_MAJOR 1)
+set (VERSION_MINOR 0)
+set (Umbrella "ferryfair")
+IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+# Mac OS X specific code
+SET(macOS ON)
+ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+
+set (GCC_COVERAGE_COMPILE_FLAGS "-std=c++14")
+set (GCC_COVERAGE_LINK_FLAGS "-Wl,-unresolved-symbols=ignore-in-shared-libs")
+IF (DEFINED _DEBUG)
+set (GCC_COVERAGE_COMPILE_FLAGS "${GCC_COVERAGE_COMPILE_FLAGS} -g")
+set (GCC_COVERAGE_LINK_FLAGS "${GCC_COVERAGE_LINK_FLAGS} -g")
+ENDIF()
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
+set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${GCC_COVERAGE_LINK_FLAGS}")
+file(GLOB HEADERS *.h)
+file(GLOB SOURCES *.cpp)
+include_directories(${PROJECT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_INSTALL_FULL_INCLUDEDIR}/${Umbrella})
+add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+target_link_libraries(${PROJECT_NAME} websockets FFJSON logger ferrybase pthread ssl crypto)
+set_target_properties(${PROJECT_NAME}
+    PROPERTIES
+    VERSION ${VERSION_MAJOR}.${VERSION_MINOR}
+    SOVERSION ${VERSION_MAJOR}
+    )
+install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES "${PROJECT_SOURCE_DIR}/config.json"
+    DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}
+    RENAME ${PROJECT_NAME}.json)
+install(FILES "${PROJECT_SOURCE_DIR}/init.conf"
+    DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/init
+    RENAME ${PROJECT_NAME}.init)
+install(FILES "${PROJECT_SOURCE_DIR}/init.override"
+    DESTINATION /etc/init
+    RENAME ${PROJECT_NAME}.override)
