@@ -13,7 +13,7 @@ SET(macOS ON)
 ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 set (GCC_COVERAGE_COMPILE_FLAGS "-std=c++14")
-set (GCC_COVERAGE_LINK_FLAGS "-Wl,-unresolved-symbols=ignore-in-shared-libs")
+set (GCC_COVERAGE_LINK_FLAGS "-fPIC -Wl,-unresolved-symbols=ignore-in-shared-libs")
 IF (DEFINED _DEBUG)
 set (GCC_COVERAGE_COMPILE_FLAGS "${GCC_COVERAGE_COMPILE_FLAGS} -g")
 set (GCC_COVERAGE_LINK_FLAGS "${GCC_COVERAGE_LINK_FLAGS} -g")
