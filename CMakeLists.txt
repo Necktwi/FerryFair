@@ -7,13 +7,17 @@ ENDIF()
 set (VERSION_MAJOR 1)
 set (VERSION_MINOR 0)
 set (Umbrella "ferryfair")
+configure_file (
+    "${PROJECT_SOURCE_DIR}/config.h.in"
+    "${PROJECT_BINARY_DIR}/config.h"
+    )
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 # Mac OS X specific code
 SET(macOS ON)
 ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 set (GCC_COVERAGE_COMPILE_FLAGS "-std=c++14")
-set (GCC_COVERAGE_LINK_FLAGS "-Wl,-unresolved-symbols=ignore-in-shared-libs")
+set (GCC_COVERAGE_LINK_FLAGS "-fPIC -Wl,-unresolved-symbols=ignore-in-shared-libs")
 IF (DEFINED _DEBUG)
 set (GCC_COVERAGE_COMPILE_FLAGS "${GCC_COVERAGE_COMPILE_FLAGS} -g")
 set (GCC_COVERAGE_LINK_FLAGS "${GCC_COVERAGE_LINK_FLAGS} -g")
@@ -38,5 +42,5 @@ install(FILES "${PROJECT_SOURCE_DIR}/init.conf"
     DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/init
     RENAME ${PROJECT_NAME}.init)
 install(FILES "${PROJECT_SOURCE_DIR}/init.override"
-    DESTINATION /etc/init
+    DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/init
     RENAME ${PROJECT_NAME}.override)
