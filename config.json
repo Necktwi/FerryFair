@@ -1,6 +1,6 @@
 {
 	"name": "FairPlay configuration file",
-	"homeFolder": "/home/gowtham/workspace/www",
+	"homeFolder": "/var/www",
 	"port": 9271,
 	"bootup": true,
 	"internetTestURL": "www.google.com",
@@ -34,7 +34,7 @@
 			"rootdir": "/home/gowtham/workspace/deb"
 		},
 		"www": {
-			"rootdir": "/home/gowtham/workspace/www"
+			"rootdir": "/var/www"
 		},
 		"famang": {
 			"rootdir": "/home/gowtham/workspace/famang"
