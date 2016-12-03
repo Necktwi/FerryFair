@@ -354,10 +354,14 @@ int WSServer::callback_http(struct lws *wsi,
 
 			strcpy(buf, lResourcePath.c_str());
 			strncat((char*) buf, (const char*) in, sizeof (buf) - lResourcePath.length());
-			if (((const char*) in)[len - 1] == '/') {
-				strcat(buf, "index.html");
-			}
-			buf[sizeof (buf) - 1] = '\0';
+			char* pExtNail = strchr(buf, '.');
+                        if (((const char*) in)[len - 1] == '/') {
+                                strcat(buf, "index.html");
+                        }
+                        else if(!pExtNail){
+                                strcat(buf, "/index.html");
+                        }
+                        buf[sizeof (buf) - 1] = '\0';
 
 			/* refuse to serve files we don't understand */
 			mimetype = get_mimetype(buf);
