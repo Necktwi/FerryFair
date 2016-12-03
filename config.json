@@ -1,6 +1,6 @@
 {
 	"name": "FairPlay configuration file",
-	"homeFolder": "/var/www",
+	"homeFolder": "/home/ubuntu/workspace/www",
 	"port": 9271,
 	"bootup": true,
 	"internetTestURL": "www.google.com",
@@ -28,16 +28,16 @@
 	
 	"virtualWebHosts": {
 		"fairplay": {
-			"rootdir": "/home/gowtham/workspace/fairplay"
+			"rootdir": "/home/ubuntu/workspace/fairplay"
 		},
 		"deb": {
-			"rootdir": "/home/gowtham/workspace/deb"
+			"rootdir": "/home/ubuntu/workspace/deb"
 		},
 		"www": {
-			"rootdir": "/var/www"
+			"rootdir": "/home/ubuntu/workspace/www"
 		},
-		"famang": {
-			"rootdir": "/home/gowtham/workspace/famang"
+		"underconstruction": {
+			"rootdir": "/home/ubuntu/workspace/w3"
 		}
 	},
     "HTTPPort": 80,
@@ -63,3 +63,4 @@
 		"
 	}
 }
+
