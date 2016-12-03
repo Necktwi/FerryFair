@@ -5,8 +5,7 @@
  * Created on 24 November, 2013, 12:25 AM
  */
 
-#define APP_NAME "ferrymediaserver"
-
+#include "config.h"
 #include "WSServer.h"
 #include "FerryStream.h"
 #include "global.h"
@@ -370,7 +369,7 @@ int main(int argc, char** argv) {
 	struct stat st;
 	configFile = "config.json";
 	if (stat(configFile.c_str(), &st) == -1) {
-		configFile = "/etc/" + std::string(APP_NAME) + ".json";
+		configFile = string(CONFIG_INSTALL_LOCATION)+"/"+string(APP_NAME) + ".json";
 	}
 	do {
 		next_option = getopt_long(argc, argv, short_options, long_options,
