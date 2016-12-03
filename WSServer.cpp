@@ -183,6 +183,9 @@ const char * get_mimetype(const char *file) {
 
 	if (!strcmp(&file[n - 7], ".ffjson"))
 		return "text/plain";
+	
+	if (!strcmp(&file[n - 5], ".woff"))
+                return "application/x-font-woff";
 
 	return NULL;
 }
