@@ -114,7 +114,8 @@ void stopRunningProcess() {
 int ferr;
 
 int readConfig() {
-	std::ifstream t(configFile);
+	ffl_notice(FPL_MAIN, "ConfigFile: %s", configFile.c_str());
+        std::ifstream t(configFile);
 	std::string str((std::istreambuf_iterator<char>(t)),
 			std::istreambuf_iterator<char>());
 	try {
@@ -369,7 +370,7 @@ int main(int argc, char** argv) {
 	struct stat st;
 	configFile = "config.json";
 	if (stat(configFile.c_str(), &st) == -1) {
-		configFile = string(CONFIG_INSTALL_LOCATION)+"/"+string(APP_NAME) + ".json";
+		configFile = string(CONFIG_INSTALL_DIR) + "/" + string(APP_NAME) + ".json";
 	}
 	do {
 		next_option = getopt_long(argc, argv, short_options, long_options,
