@@ -187,6 +187,9 @@ const char * get_mimetype(const char *file) {
 	if (!strcmp(&file[n - 5], ".woff"))
                 return "application/x-font-woff";
 
+	if (!strcmp(&file[n - 11], ".safariextz"))
+                return "application/octet-stream";
+
 	return NULL;
 }
 
