@@ -316,7 +316,7 @@ int run() {
 	WSServer::WSServerArgs ws_server_args;
 	memset(&ws_server_args, 0, sizeof (WSServer::WSServerArgs));
 	//ws_server_args.debug_level = 65535;
-	ws_server_args.debug_level = 7;
+	ws_server_args.debug_level = config["lwsDebug"];
 	ws_server_args.port=config["HTTPPort"];
 	WSServer* wss = new WSServer(&ws_server_args);
 	try {

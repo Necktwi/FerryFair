@@ -1027,13 +1027,15 @@ static const struct lws_extension exts[] = {
 	{ NULL, NULL, NULL /* terminator */ }
 };
 WSServer::WSServer(WSServerArgs* args) {
-	port = 8080;
+	port = args->port;
 	use_ssl = 0;
 	char interface_name[128] = "";
 #ifndef WIN32
 	syslog_options = LOG_PID | LOG_PERROR;
 #endif
-
+#ifndef LWS_NO_DAEMONIZE
+        int daemonize = 0;
+#endif
 #ifndef LWS_NO_CLIENT
 	rate_us = 250000;
 #endif
@@ -1074,10 +1076,7 @@ WSServer::WSServer(WSServerArgs* args) {
 	}
 #endif
 	debug_level = args->debug_level;
-	use_ssl = args->use_ssl; /* 1 = take care about cert verification, 2 = allow anything */
-	if (args->port > 0) {
-		port = args->port;
-	}
+	use_ssl = config["useSSL"]; /* 1 = take care about cert verification, 2 = allow anything */
 	if (strlen(args->intreface) > 0) {
 		strncpy(interface, args->intreface, sizeof interface);
 		interface[(sizeof interface) - 1] = '\0';
@@ -1123,18 +1122,15 @@ int WSServer::heart(WSServer* wss) {
 	}
 #endif
 
-#ifdef WIN32
-#else
+#ifndef _WIN32
 	/* we will only try to log things according to our debug_level */
 	setlogmask(LOG_UPTO(LOG_DEBUG));
 	openlog("lwsts", wss->syslog_options, LOG_DAEMON);
-
+#endif
 	/* tell the library what debug level to emit and to send it to syslog */
 	lws_set_log_level(wss->debug_level, lwsl_emit_syslog);
-#endif
-	lwsl_notice("libwebsockets echo test - "
-			"(C) Copyright 2010-2013 Andy Green <andy@warmcat.com> - "
-			"licensed under LGPL2.1\n");
+	lwsl_notice("libwebsockets test server - license LGPL2.1+SLE\n");
+        lwsl_notice("(C) Copyright 2010-2016 Andy Green <andy@warmcat.com>\n");
 #ifndef LWS_NO_CLIENT
 	if (wss->client) {
 		lwsl_notice("Running in client mode\n");
@@ -1154,17 +1150,16 @@ int WSServer::heart(WSServer* wss) {
 	wss->info.port = wss->listen_port;
 	wss->info.iface = strlen(wss->interface) > 0 ? wss->interface : NULL;
 	wss->info.protocols = wss->protocols;
-#ifndef LWS_NO_EXTENSIONS
 	wss->info.extensions = lws_get_internal_extensions();
-#endif
 	if (wss->use_ssl && !wss->client) {
-		wss->info.ssl_cert_filepath = LOCAL_RESOURCE_PATH"/libwebsockets-test-server.pem";
-		wss->info.ssl_private_key_filepath = LOCAL_RESOURCE_PATH"/libwebsockets-test-server.key.pem";
+		wss->info.ssl_cert_filepath = config["sslCert"];
+		wss->info.ssl_private_key_filepath = config["sslKey"];
 	}
 	wss->info.gid = -1;
 	wss->info.uid = -1;
-	wss->info.options = wss->opts | LWS_SERVER_OPTION_VALIDATE_UTF8;
-
+	wss->info.options = wss->opts | LWS_SERVER_OPTION_VALIDATE_UTF8 
+				| LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT 
+				| LWS_SERVER_OPTION_VALIDATE_UTF8;
 	wss->info.max_http_header_pool = 16;
 	wss->info.extensions = exts;
 	wss->info.timeout_secs = 5;
@@ -1181,6 +1176,9 @@ int WSServer::heart(WSServer* wss) {
 			       "!DHE-RSA-AES256-SHA256:"
 			       "!AES256-GCM-SHA384:"
 			       "!AES256-SHA256";
+	if(wss->use_ssl)
+		/* redirect guys coming on http */
+                wss->info.options |= LWS_SERVER_OPTION_REDIRECT_HTTP_TO_HTTPS;
 	wss->context = lws_create_context(&wss->info);
 
 	if (wss->context == NULL) {
@@ -1205,11 +1203,9 @@ int WSServer::heart(WSServer* wss) {
 	while (n >= 0 && !force_exit && (duration == 0 || duration > (time(NULL) -
 			starttime))) {
 #ifndef LWS_NO_CLIENT
-		struct timeval tv;
-
 		if (wss->client) {
-			gettimeofday(&tv, NULL);
-
+			struct timeval tv;
+                	gettimeofday(&tv, NULL);
 			if (((unsigned int) tv.tv_usec - wss->oldus) > (unsigned int) wss->rate_us) {
 				lws_callback_on_writable_all_protocol(&wss->protocols[0]);
 				wss->oldus = tv.tv_usec;

@@ -1,0 +1,12 @@
+[submodule "ferrybase"]
+	path = ferrybase
+	url = https://necktwi@github.com/necktwi/ferrybase.git
+[submodule "logger"]
+	path = logger
+	url = https://necktwi@github.com/necktwi/logger.git
+[submodule "FFJSON"]
+	path = FFJSON
+	url = https://necktwi@github.com/necktwi/FFJSON.git
+[submodule "libwebsockets"]
+	path = libwebsockets
+	url = https://necktwi@github.com/necktwi/libwebsockets.git

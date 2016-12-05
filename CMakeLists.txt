@@ -11,6 +11,10 @@ configure_file (
     "${PROJECT_SOURCE_DIR}/config.h.in"
     "${PROJECT_BINARY_DIR}/config.h"
     )
+configure_file (
+    "${PROJECT_SOURCE_DIR}/config.json"
+    "${PROJECT_BINARY_DIR}/config.json"
+    )
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 # Mac OS X specific code
 SET(macOS ON)
@@ -26,7 +30,15 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
 set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${GCC_COVERAGE_LINK_FLAGS}")
 file(GLOB HEADERS *.h)
 file(GLOB SOURCES *.cpp)
-include_directories(${PROJECT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_INSTALL_FULL_INCLUDEDIR}/${Umbrella})
+include_directories(${PROJECT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+include_directories (${PROJECT_SOURCE_DIR}/ferrybase ${PROJECT_BINARY_DIR}/ferrybase)
+add_subdirectory(ferrybase)
+include_directories(${PROJECT_SOURCE_DIR}/logger ${PROJECT_BINARY_DIR}/logger)
+add_subdirectory(logger)
+include_directories (${PROJECT_SOURCE_DIR}/FFJSON ${PROJECT_BINARY_DIR}/FFJSON)
+add_subdirectory(FFJSON)
+include_directories(${PROJECT_SOURCE_DIR}/libwebsockets/lib ${PROJECT_BINARY_DIR}/libwebsockets)
+add_subdirectory(libwebsockets)
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 target_link_libraries(${PROJECT_NAME} websockets FFJSON logger ferrybase pthread ssl crypto)
 set_target_properties(${PROJECT_NAME}
