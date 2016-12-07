@@ -67,6 +67,7 @@ char crl_path[1024];
 #include <ferrybase/Socket.h>
 #include <iostream>
 #include <malloc.h>
+#include <functional>
 
 using namespace std;
 
@@ -231,6 +232,7 @@ int WSServer::callback_http(struct lws *wsi,
 	int n, m;
 	unsigned char *p;
 	char other_headers[1024];
+    unsigned char *end, *start;
 	static unsigned char buffer[4096];
 	struct stat stat_buf;
 	struct per_session_data__http *pss =
@@ -249,13 +251,55 @@ int WSServer::callback_http(struct lws *wsi,
 		case LWS_CALLBACK_HTTP:
 		{
 
-			dump_handshake_info(wsi);
+			lwsl_info("lws_http_serve: %s\n",in);
+
+            dump_handshake_info(wsi);
 
 			if (len < 1) {
 				lws_return_http_status(wsi,
 						HTTP_STATUS_BAD_REQUEST, NULL);
-				return -1;
+                goto try_to_reuse;
 			}
+#ifndef LWS_NO_CLIENT
+                if (!strncmp(in, "/proxytest", 10)) {
+                        struct lws_client_connect_info i;
+                        char *rootpath = "/";
+                        const char *p = (const char *)in;
+
+                        if (lws_get_child(wsi))
+                                break;
+
+                        pss->client_finished = 0;
+                        memset(&i,0, sizeof(i));
+                        i.context = lws_get_context(wsi);
+                        i.address = "git.libwebsockets.org";
+                        i.port = 80;
+                        i.ssl_connection = 0;
+                        if (p[10])
+                                i.path = (char *)in + 10;
+                        else
+                                i.path = rootpath;
+                        i.host = "git.libwebsockets.org";
+                        i.origin = NULL;
+                        i.method = "GET";
+                        i.parent_wsi = wsi;
+                        i.uri_replace_from = "git.libwebsockets.org/";
+                        i.uri_replace_to = "/proxytest/";
+                        if (!lws_client_connect_via_info(&i)) {
+                                lwsl_err("proxy connect fail\n");
+                                break;
+                        }
+
+
+
+                        break;
+                }
+#endif
+			/* if a legal POST URL, let it continue and accept data */
+	                if (lws_hdr_total_length(wsi, WSI_TOKEN_POST_URI))
+        	                return 0;
+
+
 			map<string, string> cookies;
 			int cookies_len = lws_hdr_total_length(wsi, WSI_TOKEN_HTTP_COOKIE);
 			if (cookies_len) {
@@ -299,10 +343,11 @@ int WSServer::callback_http(struct lws *wsi,
 			if (cookies.find("session_id") != cookies.end()) {
 				session_id = valid_session(stoul(cookies["session_id"]));
 			}
+            other_headers[0]='\0';
 			if (!session_id) {
 				session_id = create_session();
 				sprintf(other_headers,
-						"Set-Cookie: session_id=%u\x0d\x0a",
+						"Set-Cookie: session_id=%u;Max-Age=360000\x0d\x0a",
 						session_id);
 				ffl_debug(FPL_HTTPSERV, "session %u created", session_id);
 			}
@@ -376,26 +421,44 @@ int WSServer::callback_http(struct lws *wsi,
 			}
 
 			p = buffer+LWS_PRE;
+			end = p + sizeof(buffer) - LWS_PRE;
 			ffl_debug(FPL_HTTPSERV, "Sending %s", buf);
 
 			//pss->fd = open(buf, O_RDONLY | _O_BINARY);
 			pss->fd=lws_plat_file_open(wsi, buf, &file_len,
 				LWS_O_RDONLY);
 
-			if (pss->fd < LWS_INVALID_FILE) {
+            if (pss->fd == LWS_INVALID_FILE) {
 				ffl_debug(FPL_HTTPSERV, "unable to open file");
 				return -1;
 			}
 
-			fstat(pss->fd, &stat_buf);
+			if (lws_add_http_header_status(wsi, 200, &p, end))
+                                return 1;
+            if (lws_add_http_header_by_token(wsi, WSI_TOKEN_HTTP_SERVER,
+                            (unsigned char *)"libwebsockets",
+                            13, &p, end))
+                    return 1;
+            if (lws_add_http_header_by_token(wsi,
+                            WSI_TOKEN_HTTP_CONTENT_TYPE,
+                            (unsigned char *)mimetype,
+                            strlen(mimetype), &p, end))
+                    return 1;
+            if (lws_add_http_header_content_length(wsi,
+                                                   file_len, &p,
+                                                   end))
+                    return 1;
+			p += sprintf((char *) p, "%s", other_headers);
+			if (lws_is_ssl(wsi) && lws_add_http_header_by_name(wsi,
+                (unsigned char *) "Strict-Transport-Security:",
+                (unsigned char *)"max-age=15768000 ; includeSubDomains",
+                36, &p, end))
+                return 1;
+            if (lws_finalize_http_header(wsi, &p, end))
+                return 1;
 
-			p += sprintf((char *) p,
-					"HTTP/1.1 200 OK\x0d\x0a"
-					"Server: libwebsockets\x0d\x0a"
-					"Content-Type: %s\x0d\x0a"
-					"Content-Length: %u\x0d\x0a%s\x0d\x0a",
-					mimetype, (unsigned int) stat_buf.st_size, other_headers);
-
+			*p = '\0';
+			lwsl_info("%s\n", buffer + LWS_PRE);
 			/*
 			 * send the http headers...
 			 * this won't block since it's the first payload sent
@@ -415,14 +478,6 @@ int WSServer::callback_http(struct lws *wsi,
 			 * book us a LWS_CALLBACK_HTTP_WRITEABLE callback
 			 */
 			lws_callback_on_writable(wsi);
-
-
-			/*
-			 * notice that the sending of the file completes asynchronously,
-			 * we'll get a LWS_CALLBACK_HTTP_FILE_COMPLETION callback when
-			 * it's done
-			 */
-
 			break;
 		}
 
@@ -456,13 +511,28 @@ int WSServer::callback_http(struct lws *wsi,
 			delete ansobj;
 sendJSONPayload:
 			ffl_debug(FPL_HTTPSERV, "%s", pss->payload->c_str());
-			string header =
-					"HTTP/1.1 200 OK\x0d\x0a"
-					"Server: libwebsockets\x0d\x0a"
-					"Content-Type: application/json\x0d\x0a"
-					"Content-Length: " +
-					to_string((unsigned int) pss->payload->length()) +
-					"\x0d\x0a\x0d\x0a";
+
+			if (lws_add_http_header_status(wsi, 200, &p, end))
+                                return 1;
+            if (lws_add_http_header_by_token(wsi, WSI_TOKEN_HTTP_SERVER,
+                            (unsigned char *)"libwebsockets",
+                            13, &p, end))
+                    return 1;
+            if (lws_add_http_header_by_token(wsi,
+                            WSI_TOKEN_HTTP_CONTENT_TYPE,
+                            (unsigned char *)mimetype,
+                            strlen(mimetype), &p, end))
+                    return 1;
+            if (lws_add_http_header_content_length(wsi,
+                                                   file_len, &p,
+                                                   end))
+                    return 1;
+            if (lws_finalize_http_header(wsi, &p, end))
+                    return 1;
+
+            *p = '\0';
+            lwsl_info("%s\n", buffer + LWS_PRE);
+
 			/*
 			 * send the http headers...
 			 * this won't block since it's the first payload sent
@@ -470,13 +540,14 @@ sendJSONPayload:
 			 * (too small for partial)
 			 */
 
-			m = header.length();
-			n = lws_write(wsi, (unsigned char*) header.c_str(),
-					m, LWS_WRITE_HTTP);
-			if (n < 0) {
+			n = lws_write(wsi, buffer + LWS_PRE,
+                                      p - (buffer + LWS_PRE),
+                                      LWS_WRITE_HTTP_HEADERS);
+                        if (n < 0) {
+                                lws_plat_file_close(wsi, pss->fd);
 				delete pss->payload;
-				return -1;
-			}
+                                return -1;
+                        }
 			pss->offset = pss->payload->c_str();
 			/*
 			 * book us a LWS_CALLBACK_HTTP_WRITEABLE callback
@@ -1026,69 +1097,69 @@ static const struct lws_extension exts[] = {
 	},
 	{ NULL, NULL, NULL /* terminator */ }
 };
-WSServer::WSServer(WSServerArgs* args) {
-	port = args->port;
-	use_ssl = 0;
-	char interface_name[128] = "";
-#ifndef WIN32
-	syslog_options = LOG_PID | LOG_PERROR;
+WSServer::WSServer(
+    const char* pcHostName,
+    int iDebugLevel,
+    int iPort,
+    int iSecurePort,
+    const char* pcSSLCertFilePath,
+    const char* pcSSLPrivKeyFilePath,
+    bool bDaemonize,
+    int iRateUs,
+    const char* pcInterface,
+    const char* pcClient,
+    int iOpts,
+#ifndef LWS_NO_CLIENT
+    const char* pcAddress,
+    unsigned int uiOldus,
+    struct lws* pWSI,
 #endif
-#ifndef LWS_NO_DAEMONIZE
-        int daemonize = 0;
+    int iSysLogOptions
+):
+    m_iDebugLevel(iDebugLevel),
+    m_iPort(iPort),
+    m_iSecurePort(iSecurePort),
+    m_bDaemonize(bDaemonize),
+    m_iRateUs(iRateUs),
+    m_iOpts(iOpts),
+#ifndef LWS_NO_CLIENT
+    m_uiOldus(uiOldus),
+    m_pWSI(pWSI),
+#endif
+    m_iSysLogOptions(iSysLogOptions)
+{
+    strcpy(m_pcHostName,pcHostName);
+    strcpy(m_pcSSLCertFilePath,pcSSLCertFilePath);
+    strcpy(m_pcSSLPrivKeyFilePath,pcSSLPrivKeyFilePath);
+    strcpy(m_pcInterface,pcInterface);
+#ifndef LWS_NO_CLIENT
+    strcpy(m_pcClient,pcClient);
+    strcpy(m_pcAddress,pcAddress);
+#endif
+#ifndef WIN32
+    m_iSysLogOptions = LOG_PID | LOG_PERROR;
 #endif
 #ifndef LWS_NO_CLIENT
-	rate_us = 250000;
+    m_iRateUs = 250000;
 #endif
-
-#ifndef LWS_NO_DAEMONIZE
-	daemonize = 0;
-#endif
-
-	memset(&info, 0, sizeof info);
-
+    memset(&m_Info, 0, sizeof m_Info);
 #ifndef LWS_NO_CLIENT
 	lwsl_notice("Built to support client operations\n");
 #endif
 #ifndef LWS_NO_SERVER
 	lwsl_notice("Built to support server operations\n");
 #endif
-	client = 0;
-	interface[0] = '\0';
 #ifndef LWS_NO_CLIENT
 #endif
 
-#ifndef LWS_NO_DAEMONIZE
-	if (args->daemonize) {
-		daemonize = 1;
-#ifndef WIN32
-		syslog_options &= ~LOG_PERROR;
-#endif
-	}
-#endif
 #ifndef LWS_NO_CLIENT
-	if (strlen(args->client) > 0) {
-		client = 1;
-		strcpy(address, args->client);
-		port = 80;
+    if (*m_pcClient) {
+        strcpy(m_pcAddress, m_pcClient);
+        m_iPort = 80;
 	}
-	if (args->rate_us != 0) {
-		rate_us = args->rate_us * 1000;
-	}
+    m_iRateUs = m_iRateUs * 1000;
 #endif
-	debug_level = args->debug_level;
-	use_ssl = config["useSSL"]; /* 1 = take care about cert verification, 2 = allow anything */
-	if (strlen(args->intreface) > 0) {
-		strncpy(interface, args->intreface, sizeof interface);
-		interface[(sizeof interface) - 1] = '\0';
-	}
-	//memset(this->protocols, 0, 2 * sizeof (struct lws_protocols));
-	//    this->protocols[0].callback = &WSServer::callback_echo;
-	//    this->protocols[0].name = "default";
-	//    this->protocols[0].per_session_data_size = sizeof (struct per_session_data__fairplay);
-	//    this->protocols[1].name = NULL;
-	//    this->protocols[1].callback = NULL;
-	//    this->protocols[1].per_session_data_size = 0;
-	this->heartThread = new thread(&WSServer::heart, this);
+    this->heartThread = new thread(&WSServer::heart, this);
 }
 
 WSServer::~WSServer() {
@@ -1099,24 +1170,9 @@ WSServer::~WSServer() {
 FFJSON WSServer::models(FFJSON::OBJECT);
 
 int WSServer::heart(WSServer* wss) {
-	int n = 0;
-	//                fprintf(stderr, "Usage: libwebsockets-test-echo "
-	//                        "[--ssl] "
-#ifndef LWS_NO_CLIENT
-	//                        "[--client <remote ads>] "
-	//                        "[--ratems <ms>] "
-#endif
-	//                        "[--port=<p>] "
-	//                        "[-d <log bitfield>]\n");
-	//                exit(1);
-
+    int n,N = 0;
 #ifndef LWS_NO_DAEMONIZE
-	/*
-	 * normally lock path would be /var/lock/lwsts or similar, to
-	 * simplify getting started without having to take care about
-	 * permissions or running as root, set to /tmp/.lwsts-lock
-	 */
-	if (!wss->client && wss->daemonize && lws_daemonize("/tmp/.lwstecho-lock")) {
+    if (!*wss->m_pcClient && wss->m_bDaemonize && lws_daemonize("/tmp/.lwstecho-lock")) {
 		fprintf(stderr, "Failed to daemonize\n");
 		return 1;
 	}
@@ -1125,77 +1181,82 @@ int WSServer::heart(WSServer* wss) {
 #ifndef _WIN32
 	/* we will only try to log things according to our debug_level */
 	setlogmask(LOG_UPTO(LOG_DEBUG));
-	openlog("lwsts", wss->syslog_options, LOG_DAEMON);
+    openlog("lwsts", wss->m_iSysLogOptions, LOG_DAEMON);
 #endif
 	/* tell the library what debug level to emit and to send it to syslog */
-	lws_set_log_level(wss->debug_level, lwsl_emit_syslog);
+    lws_set_log_level(wss->m_iDebugLevel, lwsl_emit_syslog);
 	lwsl_notice("libwebsockets test server - license LGPL2.1+SLE\n");
-        lwsl_notice("(C) Copyright 2010-2016 Andy Green <andy@warmcat.com>\n");
+    lwsl_notice("(C) Copyright 2010-2016 Andy Green <andy@warmcat.com>\n");
 #ifndef LWS_NO_CLIENT
-	if (wss->client) {
+    if (*wss->m_pcClient) {
 		lwsl_notice("Running in client mode\n");
-		wss->listen_port = CONTEXT_PORT_NO_LISTEN;
-		if (wss->use_ssl)
-			wss->use_ssl = 2;
+        wss->m_iPort = CONTEXT_PORT_NO_LISTEN;
 	} else {
 #endif
 #ifndef LWS_NO_SERVER
-		lwsl_notice("Running in server mode\n");
-		wss->listen_port = wss->port;
+        lwsl_notice("Running in server mode\n");
 #endif
 #ifndef LWS_NO_CLIENT
 	}
 #endif
-
-	wss->info.port = wss->listen_port;
-	wss->info.iface = strlen(wss->interface) > 0 ? wss->interface : NULL;
-	wss->info.protocols = wss->protocols;
-	wss->info.extensions = lws_get_internal_extensions();
-	if (wss->use_ssl && !wss->client) {
-		wss->info.ssl_cert_filepath = config["sslCert"];
-		wss->info.ssl_private_key_filepath = config["sslKey"];
-	}
-	wss->info.gid = -1;
-	wss->info.uid = -1;
-	wss->info.options = wss->opts | LWS_SERVER_OPTION_VALIDATE_UTF8 
+    wss->m_Info.vhost_name=wss->m_pcHostName;
+    wss->m_Info.port = wss->m_iPort;
+    wss->m_Info.iface = *wss->m_pcInterface ? wss->m_pcInterface : NULL;
+    wss->m_Info.protocols = wss->protocols;
+    wss->m_Info.extensions = lws_get_internal_extensions();
+    wss->m_Info.gid = -1;
+    wss->m_Info.uid = -1;
+    wss->m_Info.options = wss->m_iOpts | LWS_SERVER_OPTION_VALIDATE_UTF8
 				| LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT 
 				| LWS_SERVER_OPTION_VALIDATE_UTF8;
-	wss->info.max_http_header_pool = 16;
-	wss->info.extensions = exts;
-	wss->info.timeout_secs = 5;
-	wss->info.ssl_cipher_list = "ECDHE-ECDSA-AES256-GCM-SHA384:"
-			       "ECDHE-RSA-AES256-GCM-SHA384:"
-			       "DHE-RSA-AES256-GCM-SHA384:"
-			       "ECDHE-RSA-AES256-SHA384:"
-			       "HIGH:!aNULL:!eNULL:!EXPORT:"
-			       "!DES:!MD5:!PSK:!RC4:!HMAC_SHA1:"
-			       "!SHA1:!DHE-RSA-AES128-GCM-SHA256:"
-			       "!DHE-RSA-AES128-SHA256:"
-			       "!AES128-GCM-SHA256:"
-			       "!AES128-SHA256:"
-			       "!DHE-RSA-AES256-SHA256:"
-			       "!AES256-GCM-SHA384:"
-			       "!AES256-SHA256";
-	if(wss->use_ssl)
-		/* redirect guys coming on http */
-                wss->info.options |= LWS_SERVER_OPTION_REDIRECT_HTTP_TO_HTTPS;
-	wss->context = lws_create_context(&wss->info);
-
-	if (wss->context == NULL) {
-		lwsl_err("libwebsocket init failed\n");
-		return -1;
-	}
-
+    wss->m_Info.max_http_header_pool = 16;
+    wss->m_Info.extensions = exts;
+    wss->m_Info.timeout_secs = 5;
+    wss->m_pContext = lws_create_context(&wss->m_Info);
+    if (wss->m_pContext==NULL) {
+        lwsl_err("libwebsocket init failed\n");
+        return -1;
+    }
+    if(wss->m_iSecurePort
 #ifndef LWS_NO_CLIENT
-	if (wss->client) {
-		lwsl_notice("Client connecting to %s:%u....\n", wss->address, wss->port);
+            && !*wss->m_pcClient
+#endif
+     ){
+        wss->m_SecureInfo=wss->m_Info;
+        wss->m_SecureInfo.port=wss->m_iSecurePort;
+        wss->m_SecureInfo.ssl_cipher_list = "ECDHE-ECDSA-AES256-GCM-SHA384:"
+                       "ECDHE-RSA-AES256-GCM-SHA384:"
+                       "DHE-RSA-AES256-GCM-SHA384:"
+                       "ECDHE-RSA-AES256-SHA384:"
+                       "HIGH:!aNULL:!eNULL:!EXPORT:"
+                       "!DES:!MD5:!PSK:!RC4:!HMAC_SHA1:"
+                       "!SHA1:!DHE-RSA-AES128-GCM-SHA256:"
+                       "!DHE-RSA-AES128-SHA256:"
+                       "!AES128-GCM-SHA256:"
+                       "!AES128-SHA256:"
+                       "!DHE-RSA-AES256-SHA256:"
+                       "!AES256-GCM-SHA384:"
+                       "!AES256-SHA256";
+
+        //wss->m_SecureInfo.options |= LWS_SERVER_OPTION_REDIRECT_HTTP_TO_HTTPS;
+        wss->m_SecureInfo.ssl_cert_filepath = wss->m_pcSSLCertFilePath;
+        wss->m_SecureInfo.ssl_private_key_filepath = wss->m_pcSSLPrivKeyFilePath;
+        wss->m_pSecureContext = lws_create_context(&wss->m_SecureInfo);
+        if (wss->m_pSecureContext == NULL) {
+            lwsl_err("libwebsocket init failed\n");
+            return -1;
+        }
+    }
+#ifndef LWS_NO_CLIENT
+    if (*wss->m_pcClient) {
+        lwsl_notice("Client connecting to %s:%u....\n", wss->m_pcAddress, wss->m_iPort);
 		/* we are in client mode */
-		wss->wsi = lws_client_connect(wss->context, wss->address, wss->port, wss->use_ssl, "/", wss->address, "origin", NULL, -1);
-		if (!wss->wsi) {
-			lwsl_err("Client failed to connect to %s:%u\n", wss->address, wss->port);
+        wss->m_pWSI = lws_client_connect(wss->pContext, wss->m_pCAddress, wss->iPort, (bool)wss->iSecurePort, "/", wss->m_pcAddress, "origin", NULL, -1);
+        if (!wss->m_pWSI) {
+            lwsl_err("Client failed to connect to %s:%u\n", wss->m_pcAddress, wss->m_iPort);
 			goto bail;
 		}
-		lwsl_notice("Client connected to %s:%u\n", wss->address, wss->port);
+        lwsl_notice("Client connected to %s:%u\n", wss->m_pcAddress, wss->m_iPort);
 	}
 #endif
 	signal(SIGINT, sighandler);
@@ -1203,12 +1264,12 @@ int WSServer::heart(WSServer* wss) {
 	while (n >= 0 && !force_exit && (duration == 0 || duration > (time(NULL) -
 			starttime))) {
 #ifndef LWS_NO_CLIENT
-		if (wss->client) {
+        if (*wss->pcClient) {
 			struct timeval tv;
                 	gettimeofday(&tv, NULL);
-			if (((unsigned int) tv.tv_usec - wss->oldus) > (unsigned int) wss->rate_us) {
+            if (((unsigned int) tv.tv_usec - wss->m_uiOldUs) > (unsigned int) wss->m_iRateUs) {
 				lws_callback_on_writable_all_protocol(&wss->protocols[0]);
-				wss->oldus = tv.tv_usec;
+                wss->uiOldUs = tv.tv_usec;
 			}
 		}
 #endif
@@ -1235,15 +1296,19 @@ int WSServer::heart(WSServer* wss) {
 			}
 			new_pck_chk = false;
 		}
-		n = lws_service(wss->context, 10);
+        n = lws_service(wss->m_pContext, 10);
+        if(wss->m_pSecureContext){
+            N = lws_service(wss->m_pSecureContext,10);
+            if(N<0)break;
+        }
 	}
 	force_exit = 1;
 #ifndef LWS_NO_CLIENT
 bail:
 #endif
-	lws_context_destroy(wss->context);
-
-	lwsl_notice("libwebsockets-test-echo exited cleanly\n");
+    lws_context_destroy(wss->m_pContext);
+    lws_context_destroy(wss->m_pSecureContext);
+    lwsl_notice("ferryfair exited cleanly\n");
 #ifdef WIN32
 #else
 	closelog();

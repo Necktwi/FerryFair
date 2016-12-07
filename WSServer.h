@@ -9,7 +9,7 @@
 #define WSSERVER_H
 
 #define MAX_ECHO_PAYLOAD 1024
-
+#define LWS_NO_CLIENT
 
 #include "FerryStream.h"
 #include <libwebsockets.h>
@@ -19,6 +19,8 @@
 #include <list>
 #include <thread>
 
+using namespace std;
+using namespace placeholders;
 class WSServer {
 public:
 
@@ -34,22 +36,46 @@ public:
 		PROTOCOL_HTTP = 0,
 		PROTOCOL_FFJSON
 	};
-	bool daemonize;
-	int client;
-	int rate_us;
-	int debug_level;
-	int use_ssl;
-	int port;
-	char interface[128];
-	int syslog_options;
-	int listen_port;
-	struct lws_context_creation_info info;
-	int opts = 0;
-	struct lws_context *context;
+    WSServer(
+            const char* pcHostName,
+            int iDebugLevel=15,
+            int iPort=8080,
+            int iSecurePort=0,
+            const char* pcSSLCertFilePath="",
+            const char* pcSSLPrivKeyFilePath="",
+            bool bDaemonize=false,
+            int iRateUs=0,
+            const char* pcInterface="",
+            const char* pcClient="",
+            int iOpts=0,
 #ifndef LWS_NO_CLIENT
-	char address[256];
+            const char* pcAddress="",
+            unsigned int uiOldus = 0,
+            struct lws* pWSI=NULL,
+#endif
+            int iSysLogOptions=0
+    );
+    virtual ~WSServer();
+    char m_pcHostName[256];
+    int m_iRateUs;
+    int m_iDebugLevel;
+    int m_iPort;
+    int m_iSecurePort;
+    bool m_bDaemonize;
+    char m_pcSSLCertFilePath[256];
+    char m_pcSSLPrivKeyFilePath[256];
+    char m_pcClient[256];
+    char m_pcInterface[128];
+    int m_iOpts;
+    int m_iSysLogOptions;
+    struct lws_context_creation_info m_Info;
+    struct lws_context_creation_info m_SecureInfo;
+    struct lws_context* m_pContext;
+    struct lws_context* m_pSecureContext;
+#ifndef LWS_NO_CLIENT
+    char m_pcAddress[256];
 	unsigned int oldus = 0;
-	struct lws *wsi;
+    struct lws* m_pWSI;
 #endif
 
 	class Exception : std::exception {
@@ -119,25 +145,11 @@ public:
 		std::string* payload;
 	};
 
-	struct WSServerArgs {
-		bool daemonize;
-		char client[20];
-		int rate_us;
-		int debug_level;
-		int use_ssl;
-		int port;
-		char intreface[20];
-	};
-
-	WSServer(WSServerArgs* args);
-
-	virtual ~WSServer();
-
 	lws_protocols protocols[3] = {
 		/* first protocol must always be HTTP handler */
 		{
 			"http-only", /* name */
-			WSServer::callback_http, /* callback */
+            WSServer::callback_http, /* callback */
 			sizeof (struct per_session_data__http), /* per_session_data_size */
 			0, /* max frame size / rx buffer */
 		},
@@ -151,11 +163,11 @@ public:
 	};
 
 private:
-	static int heart(WSServer* wss);
+    static int heart(WSServer* wss);
 	int static callbackFairPlayWS(struct lws *wsi,
 			enum lws_callback_reasons reason,
 			void *user, void *in, size_t len);
-	static int callback_http(struct lws *wsi,
+    static int callback_http(struct lws *wsi,
 			enum lws_callback_reasons reason,
 			void *user, void *in, size_t len);
 	static std::map<unsigned int, user_session*> user_sessions;

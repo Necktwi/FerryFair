@@ -313,12 +313,14 @@ int run() {
 	ServerSocket* ss = NULL;
 	debug = 1;
 	b64_hmt = base64_encode((const unsigned char*) JPEGImage::StdHuffmanTable, 420, (size_t*) & b64_hmt_l);
-	WSServer::WSServerArgs ws_server_args;
-	memset(&ws_server_args, 0, sizeof (WSServer::WSServerArgs));
-	//ws_server_args.debug_level = 65535;
-	ws_server_args.debug_level = config["lwsDebug"];
-	ws_server_args.port=config["HTTPPort"];
-	WSServer* wss = new WSServer(&ws_server_args);
+    WSServer* wss = new WSServer(
+        config["hostName"],
+        config["lwsDebug"],
+        config["HTTPPort"],
+        config["HTTPSPort"],
+        config["sslCert"],
+        config["sslKey"]
+    );
 	try {
 		ss = new ServerSocket(port);
 	} catch (SocketException e) {

@@ -1,6 +1,7 @@
 {
 	"name": "FairPlay configuration file",
 	"homeFolder": "/home/ubuntu/workspace/www",
+	"hostName": "www.ferryfair.com",
 	"port": 9271,
 	"bootup": true,
 	"internetTestURL": "www.google.com",
@@ -43,8 +44,7 @@
 	},
     	"HTTPPort": 80,
 	"HttpUserSessionTimeout": 600,
-	"useSSL": 1,
-	"sslCert": "/etc/letsencrypt/live/ferryfair.com/cert.pem",
+    "sslCert": "/etc/letsencrypt/live/ferryfair.com/cert.pem",
 	"sslKey": "/etc/letsencrypt/live/ferryfair.com/privkey.pem",
 	"help": {
 		"homeFolder": "Its folder where FairPlay server looks for and stores all the data required.",
