@@ -1104,6 +1104,7 @@ WSServer::WSServer(
     int iSecurePort,
     const char* pcSSLCertFilePath,
     const char* pcSSLPrivKeyFilePath,
+    const char* pcSSLCAFilePath,
     bool bDaemonize,
     int iRateUs,
     const char* pcInterface,
@@ -1131,6 +1132,7 @@ WSServer::WSServer(
     strcpy(m_pcHostName,pcHostName);
     strcpy(m_pcSSLCertFilePath,pcSSLCertFilePath);
     strcpy(m_pcSSLPrivKeyFilePath,pcSSLPrivKeyFilePath);
+    strcpy(m_pcSSLCAFilePath,pcSSLPrivKeyFilePath);
     strcpy(m_pcInterface,pcInterface);
 #ifndef LWS_NO_CLIENT
     strcpy(m_pcClient,pcClient);
@@ -1241,6 +1243,7 @@ int WSServer::heart(WSServer* wss) {
         //wss->m_SecureInfo.options |= LWS_SERVER_OPTION_REDIRECT_HTTP_TO_HTTPS;
         wss->m_SecureInfo.ssl_cert_filepath = wss->m_pcSSLCertFilePath;
         wss->m_SecureInfo.ssl_private_key_filepath = wss->m_pcSSLPrivKeyFilePath;
+        wss->m_SecureInfo.ssl_ca_filepath = wss->m_pcSSLCAFilePath;
         wss->m_pSecureContext = lws_create_context(&wss->m_SecureInfo);
         if (wss->m_pSecureContext == NULL) {
             lwsl_err("libwebsocket init failed\n");

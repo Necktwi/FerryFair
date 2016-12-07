@@ -319,7 +319,8 @@ int run() {
         config["HTTPPort"],
         config["HTTPSPort"],
         config["sslCert"],
-        config["sslKey"]
+        config["sslKey"],
+        config["sslCA"]
     );
 	try {
 		ss = new ServerSocket(port);

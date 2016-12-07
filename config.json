@@ -44,8 +44,9 @@
 	},
     	"HTTPPort": 80,
 	"HttpUserSessionTimeout": 600,
-    "sslCert": "/etc/letsencrypt/live/ferryfair.com/cert.pem",
+    	"sslCert": "/etc/letsencrypt/live/ferryfair.com/cert.pem",
 	"sslKey": "/etc/letsencrypt/live/ferryfair.com/privkey.pem",
+	"sslCA": "/etc/letsencrypt/live/ferryfair.com/fullchain.pem",
 	"help": {
 		"homeFolder": "Its folder where FairPlay server looks for and stores all the data required.",
 		"port": "Its the port on which FairPlay server runs.",

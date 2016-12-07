@@ -43,6 +43,7 @@ public:
             int iSecurePort=0,
             const char* pcSSLCertFilePath="",
             const char* pcSSLPrivKeyFilePath="",
+            const char* pcSSLCAFilePath="",
             bool bDaemonize=false,
             int iRateUs=0,
             const char* pcInterface="",
@@ -64,6 +65,7 @@ public:
     bool m_bDaemonize;
     char m_pcSSLCertFilePath[256];
     char m_pcSSLPrivKeyFilePath[256];
+    char m_pcSSLCAFilePath[256];
     char m_pcClient[256];
     char m_pcInterface[128];
     int m_iOpts;
