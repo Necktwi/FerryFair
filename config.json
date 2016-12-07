@@ -27,7 +27,9 @@
 	",
 	"logLevel": [16, 8, 4, 1],
 
-	"lwsDebug": 65535,	
+	"#lwsDebug1": 65535,
+	"#lwsDebug":15,	
+	"lwsDebug": 7,
 	"virtualWebHosts": {
 		"fairplay": {
 			"rootdir": "/home/ubuntu/workspace/fairplay"
@@ -43,6 +45,7 @@
 		}
 	},
     	"HTTPPort": 80,
+	"HTTPSPort": 443,
 	"HttpUserSessionTimeout": 600,
     	"sslCert": "/etc/letsencrypt/live/ferryfair.com/cert.pem",
 	"sslKey": "/etc/letsencrypt/live/ferryfair.com/privkey.pem",

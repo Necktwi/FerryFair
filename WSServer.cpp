@@ -354,6 +354,7 @@ int WSServer::callback_http(struct lws *wsi,
 			ffl_debug(FPL_HTTPSERV, "session: %u", session_id);
 			lws_hdr_copy(wsi, buf, sizeof buf, WSI_TOKEN_HOST);
 			string connection(buf);
+            domainname=(const char*)buf;
 			int dnamenail = -1;
 			dnamenail = connection.find('.');
 			ffl_debug(FPL_HTTPSERV, "connection: %s, domainname: %s", buf,
@@ -402,28 +403,53 @@ int WSServer::callback_http(struct lws *wsi,
 
 			strcpy(buf, lResourcePath.c_str());
 			strncat((char*) buf, (const char*) in, sizeof (buf) - lResourcePath.length());
-			char* pExtNail = strchr(buf, '.');
-                        if (((const char*) in)[len - 1] == '/') {
-                                strcat(buf, "index.html");
-                        }
-                        else if(!pExtNail){
-                                strcat(buf, "/index.html");
-                        }
-                        buf[sizeof (buf) - 1] = '\0';
+            buf[sizeof (buf) - 1] = '\0';
 
-			/* refuse to serve files we don't understand */
-			mimetype = get_mimetype(buf);
-			if (!mimetype) {
-				lwsl_err("Unknown mimetype for %s\n", buf);
-				lws_return_http_status(wsi,
-						HTTP_STATUS_UNSUPPORTED_MEDIA_TYPE, NULL);
-				return -1;
-			}
+            p = buffer+LWS_PRE;
+            end = p + sizeof(buffer) - LWS_PRE;
+            ffl_debug(FPL_HTTPSERV, "Sending %s", buf);
 
-			p = buffer+LWS_PRE;
-			end = p + sizeof(buffer) - LWS_PRE;
-			ffl_debug(FPL_HTTPSERV, "Sending %s", buf);
+            char* pExtNail = strchr(buf, '.');
+            if (((const char*) in)[len - 1] == '/') {
+                    strcat(buf, "index.html");
+            }
+            else if(!pExtNail){
+                if (lws_add_http_header_status(wsi, 301, &p, end))
+                    return 1;
+                string location;
+                if (lws_is_ssl(wsi))
+                    location = "https://";
+                else
+                    location = "http://";
+                location += domainname + (const char*)in;
+                location += "/index.html";
+                if(lws_add_http_header_by_name(wsi,
+                                (unsigned char *) "Location:",
+                                (unsigned char *)location.c_str(),
+                                location.length(), &p, end))
+                    return 1;
+                if (lws_finalize_http_header(wsi, &p, end))
+                    return 1;
 
+                *p = '\0';
+                lwsl_info("%s\n", buffer + LWS_PRE);
+                n = lws_write(wsi, buffer+LWS_PRE,
+                        p - (buffer+LWS_PRE), LWS_WRITE_HTTP_HEADERS);
+
+                if (n < 0) {
+                    return -1;
+                }
+                goto try_to_reuse;
+                //strcat(buf, "/index.html");
+            }
+            /* refuse to serve files we don't understand */
+            mimetype = get_mimetype(buf);
+            if (!mimetype) {
+                lwsl_err("Unknown mimetype for %s\n", buf);
+                lws_return_http_status(wsi,
+                        HTTP_STATUS_UNSUPPORTED_MEDIA_TYPE, NULL);
+                return -1;
+            }
 			//pss->fd = open(buf, O_RDONLY | _O_BINARY);
 			pss->fd=lws_plat_file_open(wsi, buf, &file_len,
 				LWS_O_RDONLY);
