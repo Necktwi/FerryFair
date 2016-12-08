@@ -1187,72 +1187,27 @@ WSServer::WSServer(
 	}
     m_iRateUs = m_iRateUs * 1000;
 #endif
-    this->heartThread = new thread(&WSServer::heart, this);
-}
-
-WSServer::~WSServer() {
-	heartThread->join();
-	delete heartThread;
-}
-
-FFJSON WSServer::models(FFJSON::OBJECT);
-
-int WSServer::heart(WSServer* wss) {
-    int n,N = 0;
-#ifndef LWS_NO_DAEMONIZE
-    if (!*wss->m_pcClient && wss->m_bDaemonize && lws_daemonize("/tmp/.lwstecho-lock")) {
-		fprintf(stderr, "Failed to daemonize\n");
-		return 1;
-	}
-#endif
-
-#ifndef _WIN32
-	/* we will only try to log things according to our debug_level */
-	setlogmask(LOG_UPTO(LOG_DEBUG));
-    openlog("lwsts", wss->m_iSysLogOptions, LOG_DAEMON);
-#endif
-	/* tell the library what debug level to emit and to send it to syslog */
-    lws_set_log_level(wss->m_iDebugLevel, lwsl_emit_syslog);
-	lwsl_notice("libwebsockets test server - license LGPL2.1+SLE\n");
-    lwsl_notice("(C) Copyright 2010-2016 Andy Green <andy@warmcat.com>\n");
+    m_Info.vhost_name=m_pcHostName;
+    m_Info.port = m_iPort;
+    m_Info.iface = *m_pcInterface ? m_pcInterface : NULL;
+    m_Info.protocols = protocols;
+    m_Info.extensions = lws_get_internal_extensions();
+    m_Info.gid = -1;
+    m_Info.uid = -1;
+    m_Info.options = m_iOpts | LWS_SERVER_OPTION_VALIDATE_UTF8
+                | LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT
+                | LWS_SERVER_OPTION_VALIDATE_UTF8;
+    m_Info.max_http_header_pool = 16;
+    m_Info.extensions = exts;
+    m_Info.timeout_secs = 5;
+    if(m_iSecurePort
 #ifndef LWS_NO_CLIENT
-    if (*wss->m_pcClient) {
-		lwsl_notice("Running in client mode\n");
-        wss->m_iPort = CONTEXT_PORT_NO_LISTEN;
-	} else {
-#endif
-#ifndef LWS_NO_SERVER
-        lwsl_notice("Running in server mode\n");
-#endif
-#ifndef LWS_NO_CLIENT
-	}
-#endif
-    wss->m_Info.vhost_name=wss->m_pcHostName;
-    wss->m_Info.port = wss->m_iPort;
-    wss->m_Info.iface = *wss->m_pcInterface ? wss->m_pcInterface : NULL;
-    wss->m_Info.protocols = wss->protocols;
-    wss->m_Info.extensions = lws_get_internal_extensions();
-    wss->m_Info.gid = -1;
-    wss->m_Info.uid = -1;
-    wss->m_Info.options = wss->m_iOpts | LWS_SERVER_OPTION_VALIDATE_UTF8
-				| LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT 
-				| LWS_SERVER_OPTION_VALIDATE_UTF8;
-    wss->m_Info.max_http_header_pool = 16;
-    wss->m_Info.extensions = exts;
-    wss->m_Info.timeout_secs = 5;
-    wss->m_pContext = lws_create_context(&wss->m_Info);
-    if (wss->m_pContext==NULL) {
-        lwsl_err("libwebsocket init failed\n");
-        return -1;
-    }
-    if(wss->m_iSecurePort
-#ifndef LWS_NO_CLIENT
-            && !*wss->m_pcClient
+            && !*m_pcClient
 #endif
      ){
-        wss->m_SecureInfo=wss->m_Info;
-        wss->m_SecureInfo.port=wss->m_iSecurePort;
-        wss->m_SecureInfo.ssl_cipher_list = "ECDHE-ECDSA-AES256-GCM-SHA384:"
+        m_SecureInfo=m_Info;
+        m_SecureInfo.port=m_iSecurePort;
+        m_SecureInfo.ssl_cipher_list = "ECDHE-ECDSA-AES256-GCM-SHA384:"
                        "ECDHE-RSA-AES256-GCM-SHA384:"
                        "DHE-RSA-AES256-GCM-SHA384:"
                        "ECDHE-RSA-AES256-SHA384:"
@@ -1266,26 +1221,78 @@ int WSServer::heart(WSServer* wss) {
                        "!AES256-GCM-SHA384:"
                        "!AES256-SHA256";
 
-        //wss->m_SecureInfo.options |= LWS_SERVER_OPTION_REDIRECT_HTTP_TO_HTTPS;
-        wss->m_SecureInfo.ssl_cert_filepath = wss->m_pcSSLCertFilePath;
-        wss->m_SecureInfo.ssl_private_key_filepath = wss->m_pcSSLPrivKeyFilePath;
-        wss->m_SecureInfo.ssl_ca_filepath = wss->m_pcSSLCAFilePath;
-        wss->m_pSecureContext = lws_create_context(&wss->m_SecureInfo);
-        if (wss->m_pSecureContext == NULL) {
+        //m_SecureInfo.options |= LWS_SERVER_OPTION_REDIRECT_HTTP_TO_HTTPS;
+        m_SecureInfo.ssl_cert_filepath = m_pcSSLCertFilePath;
+        m_SecureInfo.ssl_private_key_filepath = m_pcSSLPrivKeyFilePath;
+        m_SecureInfo.ssl_ca_filepath = m_pcSSLCAFilePath;
+
+    }
+    heartThread = new thread(bind(&WSServer::heart,this));
+}
+
+WSServer::~WSServer() {
+    heartThread->join();
+	delete heartThread;
+}
+
+FFJSON WSServer::models(FFJSON::OBJECT);
+
+int WSServer::heart() {
+    int n=0,N = 0;
+#ifndef LWS_NO_DAEMONIZE
+    if (!*m_pcClient && m_bDaemonize && lws_daemonize("/tmp/.lwstecho-lock")) {
+		fprintf(stderr, "Failed to daemonize\n");
+		return 1;
+	}
+#endif
+
+#ifndef _WIN32
+	/* we will only try to log things according to our debug_level */
+	setlogmask(LOG_UPTO(LOG_DEBUG));
+    openlog("lwsts", m_iSysLogOptions, LOG_DAEMON);
+#endif
+	/* tell the library what debug level to emit and to send it to syslog */
+    lws_set_log_level(m_iDebugLevel, lwsl_emit_syslog);
+	lwsl_notice("libwebsockets test server - license LGPL2.1+SLE\n");
+    lwsl_notice("(C) Copyright 2010-2016 Andy Green <andy@warmcat.com>\n");
+#ifndef LWS_NO_CLIENT
+    if (*m_pcClient) {
+		lwsl_notice("Running in client mode\n");
+        m_iPort = CONTEXT_PORT_NO_LISTEN;
+	} else {
+#endif
+#ifndef LWS_NO_SERVER
+        lwsl_notice("Running in server mode\n");
+#endif
+#ifndef LWS_NO_CLIENT
+	}
+#endif
+    m_pContext = lws_create_context(&m_Info);
+    if (m_pContext==NULL) {
+        lwsl_err("libwebsocket init failed\n");
+        return -1;
+    }
+    if(m_iSecurePort
+#ifndef LWS_NO_CLIENT
+            && !*m_pcClient
+#endif
+     ){
+        m_pSecureContext = lws_create_context(&m_SecureInfo);
+        if (m_pSecureContext == NULL) {
             lwsl_err("libwebsocket init failed\n");
             return -1;
         }
     }
 #ifndef LWS_NO_CLIENT
-    if (*wss->m_pcClient) {
-        lwsl_notice("Client connecting to %s:%u....\n", wss->m_pcAddress, wss->m_iPort);
+    if (*m_pcClient) {
+        lwsl_notice("Client connecting to %s:%u....\n", m_pcAddress, m_iPort);
 		/* we are in client mode */
-        wss->m_pWSI = lws_client_connect(wss->pContext, wss->m_pCAddress, wss->iPort, (bool)wss->iSecurePort, "/", wss->m_pcAddress, "origin", NULL, -1);
-        if (!wss->m_pWSI) {
-            lwsl_err("Client failed to connect to %s:%u\n", wss->m_pcAddress, wss->m_iPort);
+        m_pWSI = lws_client_connect(pContext, m_pCAddress, iPort, (bool)iSecurePort, "/", m_pcAddress, "origin", NULL, -1);
+        if (!m_pWSI) {
+            lwsl_err("Client failed to connect to %s:%u\n", m_pcAddress, m_iPort);
 			goto bail;
 		}
-        lwsl_notice("Client connected to %s:%u\n", wss->m_pcAddress, wss->m_iPort);
+        lwsl_notice("Client connected to %s:%u\n", m_pcAddress, m_iPort);
 	}
 #endif
 	signal(SIGINT, sighandler);
@@ -1293,12 +1300,12 @@ int WSServer::heart(WSServer* wss) {
 	while (n >= 0 && !force_exit && (duration == 0 || duration > (time(NULL) -
 			starttime))) {
 #ifndef LWS_NO_CLIENT
-        if (*wss->pcClient) {
+        if (*pcClient) {
 			struct timeval tv;
                 	gettimeofday(&tv, NULL);
-            if (((unsigned int) tv.tv_usec - wss->m_uiOldUs) > (unsigned int) wss->m_iRateUs) {
-				lws_callback_on_writable_all_protocol(&wss->protocols[0]);
-                wss->uiOldUs = tv.tv_usec;
+            if (((unsigned int) tv.tv_usec - m_uiOldUs) > (unsigned int) m_iRateUs) {
+                lws_callback_on_writable_all_protocol(&protocols[0]);
+                uiOldUs = tv.tv_usec;
 			}
 		}
 #endif
@@ -1325,9 +1332,9 @@ int WSServer::heart(WSServer* wss) {
 			}
 			new_pck_chk = false;
 		}
-        n = lws_service(wss->m_pContext, 10);
-        if(wss->m_pSecureContext){
-            N = lws_service(wss->m_pSecureContext,10);
+        n = lws_service(m_pContext, 10);
+        if(m_pSecureContext){
+            N = lws_service(m_pSecureContext,10);
             if(N<0)break;
         }
 	}
@@ -1335,8 +1342,8 @@ int WSServer::heart(WSServer* wss) {
 #ifndef LWS_NO_CLIENT
 bail:
 #endif
-    lws_context_destroy(wss->m_pContext);
-    lws_context_destroy(wss->m_pSecureContext);
+    lws_context_destroy(m_pContext);
+    lws_context_destroy(m_pSecureContext);
     lwsl_notice("ferryfair exited cleanly\n");
 #ifdef WIN32
 #else
