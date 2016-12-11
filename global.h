@@ -32,6 +32,7 @@ extern bool new_pck_chk;
 extern int force_exit;
 extern char* resource_path;
 extern int debug;
+extern int stdinfd;
 extern int stderrfd;
 extern int stdoutfd;
 extern FFJSON config;

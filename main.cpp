@@ -69,7 +69,15 @@ FFJSON config;
 string hostname;
 string domainname;
 unsigned int duration = 0;
+int ferr = 0;
 int run();
+
+void groomLogFile() {
+    if (ferr > 0)close(ferr);
+    struct stat statbuf;
+    int stat_r = stat(logFile.c_str(), &statbuf);
+    ferr = open(logFile.c_str(), O_WRONLY | ((stat_r == -1 || statbuf.st_size > 5000000) ? (O_CREAT | O_TRUNC) : O_APPEND));
+}
 
 void ferryStreamFuneral(int stream_path) {
 }
@@ -110,8 +118,6 @@ void stopRunningProcess() {
 		}
 	}
 }
-
-int ferr;
 
 int readConfig() {
 	ffl_notice(FPL_MAIN, "ConfigFile: %s", configFile.c_str());
@@ -309,7 +315,12 @@ void configure() {
 unsigned int starttime = time(NULL);
 
 int run() {
-	port = config["port"];
+    groomLogFile();
+    if (runMode.compare("daemon") == 0) {
+        dup2(ferr, 2);
+        dup2(2, 1);
+    }
+    port = config["port"];
 	ServerSocket* ss = NULL;
 	debug = 1;
 	b64_hmt = base64_encode((const unsigned char*) JPEGImage::StdHuffmanTable, 420, (size_t*) & b64_hmt_l);
@@ -355,7 +366,11 @@ int run() {
 }
 
 int main(int argc, char** argv) {
-	const char* const short_options = "cdf:hirs:t:ux";
+    groomLogFile();
+    stdinfd = dup(0);
+    stdoutfd = dup(1);
+    stderrfd = dup(2);
+    const char* const short_options = "cdf:hirs:t:ux";
 	string opt;
 	const struct option long_options[] = {
 		{"configure", 0, NULL, 'c'},

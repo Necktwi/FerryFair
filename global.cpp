@@ -22,6 +22,7 @@ uint16_t packBufSize = 60;
 std::string ferrymedia_store_dir = "/var/ferrymedia_store/";
 int force_exit = 0;
 int debug = 0;
+int stdinfd = -1;
 int stderrfd = -1;
 int stdoutfd = -1;
 int init_path_id = 0;
