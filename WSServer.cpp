@@ -387,6 +387,7 @@ int WSServer::callback_http(struct lws *wsi,
             }
             if(models[pss->vhost]["indexFile"]){
                 sIndexFile=(const char*)models[pss->vhost]["indexFile"];
+                ffl_debug(FPL_HTTPSERV, "indexFile: %s", sIndexFile.c_str());
             }
             
             // exit if there is an attempt to access parent directory

@@ -146,6 +146,8 @@ int readConfig() {
 		} else {
 			ff_log_level = config["logLevel"];
 		}
+        fflAllowedType =ff_log_type;
+        fflAllowedLevel=ff_log_level;
 	} catch (FFJSON::Exception e) {
 		ffl_err(FPL_MAIN, "Reading configuration failed. Please check the configuration file");
 		ffl_debug(FPL_MAIN, "%s", e.what());
