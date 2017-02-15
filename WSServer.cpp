@@ -244,6 +244,7 @@ int WSServer::callback_http(struct lws *wsi,
     const char *mimetype;
     FFJSON ans;
     FFJSON* ansobj;
+    string sIndexFile="index.html";
     unsigned long file_len, amount, sent;
     
 #ifdef EXTERNAL_POLL
@@ -384,6 +385,9 @@ int WSServer::callback_http(struct lws *wsi,
                     models[pss->vhost].init(str);
                 }
             }
+            if(models[pss->vhost]["indexFile"]){
+                sIndexFile=models[pss->vhost]["indexFile"];
+            }
             
             // exit if there is an attempt to access parent directory
             if (strstr((char*) in, "/..")) {
@@ -412,14 +416,9 @@ int WSServer::callback_http(struct lws *wsi,
             end = p + sizeof(buffer) - LWS_PRE;
             ffl_debug(FPL_HTTPSERV, "Sending %s", buf);
             
-            if (strstr((const char*)buf, ".php")){
-                pss->payload=new string(getStdoutFromCommand(string("php ")+buf));
-                goto sendJSONPayload;
-            }
-            
             char* pExtNail = strchr(buf, '.');
             if (((const char*) in)[len - 1] == '/') {
-                strcat(buf, "index.html");
+                strcat(buf, sIndexFile.c_str());
             }
             else if(!pExtNail){
                 if (lws_add_http_header_status(wsi, 301, &p, end))
@@ -450,6 +449,7 @@ int WSServer::callback_http(struct lws *wsi,
                 goto try_to_reuse;
                 //strcat(buf, "/index.html");
             }
+            
             /* refuse to serve files we don't understand */
             mimetype = get_mimetype(buf);
             if (!mimetype) {
@@ -458,6 +458,11 @@ int WSServer::callback_http(struct lws *wsi,
                                        HTTP_STATUS_UNSUPPORTED_MEDIA_TYPE, NULL);
                 return -1;
             }
+            if (strcmp(mimetype, "text/x-php")==0){
+                pss->payload=new string(getStdoutFromCommand(string("php ")+buf));
+                goto sendJSONPayload;
+            }
+            
             //pss->fd = open(buf, O_RDONLY | _O_BINARY);
             pss->fd=lws_plat_file_open(wsi, buf, &file_len,
                                        LWS_O_RDONLY);
