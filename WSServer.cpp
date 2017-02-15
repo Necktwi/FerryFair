@@ -460,6 +460,7 @@ int WSServer::callback_http(struct lws *wsi,
             }
             if (strcmp(mimetype, "text/x-php")==0){
                 pss->payload=new string(getStdoutFromCommand(string("php ")+buf));
+                ffl_debug(FPL_HTTPSERV, "%s", pss->payload->c_str());
                 goto sendJSONPayload;
             }
             
