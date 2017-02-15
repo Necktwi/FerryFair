@@ -63,11 +63,11 @@ public:
     int m_iPort;
     int m_iSecurePort;
     bool m_bDaemonize;
-    char m_pcSSLCertFilePath[256];
-    char m_pcSSLPrivKeyFilePath[256];
-    char m_pcSSLCAFilePath[256];
-    char m_pcClient[256];
-    char m_pcInterface[128];
+    char m_pcSSLCertFilePath[256]="";
+    char m_pcSSLPrivKeyFilePath[256]="";
+    char m_pcSSLCAFilePath[256]="";
+    char m_pcClient[256]="";
+    char m_pcInterface[128]="";
     int m_iOpts;
     int m_iSysLogOptions;
     struct lws_context_creation_info m_Info;

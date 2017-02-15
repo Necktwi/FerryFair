@@ -1,6 +1,6 @@
 {
 	"name": "FairPlay configuration file",
-	"homeFolder": "/home/ubuntu/workspace/www",
+	"homeFolder": "/home/gowtham/workspace/www",
 	"hostName": "www.ferryfair.com",
 	"port": 9271,
 	"bootup": true,
@@ -32,16 +32,19 @@
 	"lwsDebug": 7,
 	"virtualWebHosts": {
 		"fairplay": {
-			"rootdir": "/home/ubuntu/workspace/fairplay"
+			"rootdir": "/home/gowtham/workspace/fairplay"
 		},
 		"deb": {
-			"rootdir": "/home/ubuntu/workspace/deb"
+			"rootdir": "/home/gowtham/workspace/deb"
 		},
 		"www": {
-			"rootdir": "/home/ubuntu/workspace/www"
+			"rootdir": "/home/gowtham/workspace/www"
 		},
 		"underconstruction": {
-			"rootdir": "/home/ubuntu/workspace/w3"
+			"rootdir": "/home/gowtham/workspace/w3"
+		},
+		"rosy": {
+			"rootdir": "/home/rosy/wrokspace/rosy"
 		}
 	},
     	"HTTPPort": 80,
