@@ -461,6 +461,7 @@ int WSServer::callback_http(struct lws *wsi,
                 return -1;
             }
             if (strcmp(mimetype, "text/x-php")==0){
+                cout << "Parsing php" << endl;
                 pss->payload=new string(getStdoutFromCommand(string("php ")+buf));
                 ffl_debug(FPL_HTTPSERV, "%s", pss->payload->c_str());
                 cout << *pss->payload << endl;
