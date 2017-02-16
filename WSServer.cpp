@@ -455,6 +455,8 @@ int WSServer::callback_http(struct lws *wsi,
             int ihttpport = config["virtualWebHosts"][pss->vhost]["redirectHTTPPortTo"];
             int ihttpsport = config["virtualWebHosts"][pss->vhost]["redirectHTTPSPortTo"];
             if((ihttpport&&!lws_is_ssl(wsi)) || (ihttpsport&&lws_is_ssl(wsi))){
+                if (lws_add_http_header_status(wsi, 301, &p, end))
+                    return 1;
                 if (lws_is_ssl(wsi)) {
                     location = "https://";
                     location += domainname + ":" + to_string(ihttpsport) + (const char*)in;
