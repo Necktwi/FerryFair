@@ -171,7 +171,7 @@ const char * get_mimetype(const char *file) {
         return "text/html";
     
     if (!strcmp(&file[n - 4], ".php"))
-        return "text/x-php";
+        return "text/html";
     
     if (!strcmp(&file[n - 3], ".js"))
         return "text/javascript";
