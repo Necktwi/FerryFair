@@ -452,6 +452,36 @@ int WSServer::callback_http(struct lws *wsi,
                 //strcat(buf, "/index.html");
             }
             
+            int ihttpport = config["virtualWebHosts"][pss->vhost]["redirectHTTPPortTo"];
+            int ihttpsport = config["virtualWebHosts"][pss->vhost]["redirectHTTPSPortTo"];
+            if((ihttpport&&!lws_is_ssl(wsi)) || (ihttpsport&&lws_is_ssl(wsi))){
+                if (lws_is_ssl(wsi)) {
+                    location = "https://";
+                    location += domainname + ":" + to_string(ihttpsport) + (const char*)in;
+                }else{
+                    location = "http://";
+                    location += domainname + ":" + to_string(ihttpport) + (const char*)in;
+                }
+                if(lws_add_http_header_by_name(wsi,
+                                               (unsigned char *) "Location:",
+                                               (unsigned char *)location.c_str(),
+                                               location.length(), &p, end))
+                    return 1;
+                if (lws_finalize_http_header(wsi, &p, end))
+                    return 1;
+                
+                *p = '\0';
+                lwsl_info("%s\n", buffer + LWS_PRE);
+                n = lws_write(wsi, buffer+LWS_PRE,
+                              p - (buffer+LWS_PRE), LWS_WRITE_HTTP_HEADERS);
+                
+                if (n < 0) {
+                    return -1;
+                }
+                goto try_to_reuse;
+
+            }
+            
             /* refuse to serve files we don't understand */
             mimetype = get_mimetype(buf);
             if (!mimetype) {
