@@ -461,12 +461,11 @@ int WSServer::callback_http(struct lws *wsi,
                 return -1;
             }
             if (strcmp(mimetype, "text/x-php")==0){
-                cout << "Parsing php" << endl;
-                pss->payload=new string(getStdoutFromCommand(string("php ")+buf));
-                ffl_debug(FPL_HTTPSERV, "%s", pss->payload->c_str());
-                cout << *pss->payload << endl;
-                goto sendJSONPayload;
-            }
+                string sPHPCMD("php ");
+                sPHPCMD+=buf;
+                pss->payload=new string(getStdoutFromCommand(sPHPCMD));
+                file_len = pss->payload->length();
+            } else{
             
             //pss->fd = open(buf, O_RDONLY | _O_BINARY);
             pss->fd=lws_plat_file_open(wsi, buf, &file_len,
@@ -476,7 +475,7 @@ int WSServer::callback_http(struct lws *wsi,
                 ffl_debug(FPL_HTTPSERV, "unable to open file");
                 return -1;
             }
-            
+            }
             if (lws_add_http_header_status(wsi, 200, &p, end))
                 return 1;
             if (lws_add_http_header_by_token(wsi, WSI_TOKEN_HTTP_SERVER,
@@ -611,7 +610,7 @@ int WSServer::callback_http(struct lws *wsi,
             lwsl_info("LWS_CALLBACK_HTTP_WRITEABLE\n");
             
             
-            if (pss->fd == LWS_INVALID_FILE)
+            if (pss->fd == LWS_INVALID_FILE && !pss->payload)
                 goto try_to_reuse;
             /*
              * we can send more of whatever it is we were sending
@@ -631,8 +630,15 @@ int WSServer::callback_http(struct lws *wsi,
                 /* he couldn't handle that much */
                     n = m;
                 
+                if(pss->fd){
                 n = lws_plat_file_read(wsi, pss->fd,
                                        &amount, buffer + LWS_PRE, n);
+                }else{
+                    n= pss->payload->length()>n?n:pss->payload->length();
+                    strncpy(buffer + LWS_PRE, pss->payload->c_str(), n)
+                    *pss->payload = pss->payload->substr(n);
+                    amount = n;
+                }
                 /* problem reading, close conn */
                 if (n < 0){
                     lwsl_err("problem reading file\n");
@@ -663,8 +669,12 @@ int WSServer::callback_http(struct lws *wsi,
             break;
         flushbail:
         penultimate:
+            if(pss->fd){
             lws_plat_file_close(wsi, pss->fd);
             pss->fd = LWS_INVALID_FILE;
+            }else {
+                delete pss->payload;
+            }
             goto try_to_reuse;
             
             
