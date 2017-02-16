@@ -635,7 +635,7 @@ int WSServer::callback_http(struct lws *wsi,
                                        &amount, buffer + LWS_PRE, n);
                 }else{
                     n= pss->payload->length()>n?n:pss->payload->length();
-                    strncpy((char*)(buffer + LWS_PRE), pss->payload->c_str(), n)
+                    strncpy((char*)(buffer + LWS_PRE), pss->payload->c_str(), n);
                     pss->payload->assign(pss->payload->substr(n));
                     amount = n;
                 }
