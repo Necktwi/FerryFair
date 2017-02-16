@@ -419,13 +419,13 @@ int WSServer::callback_http(struct lws *wsi,
             ffl_debug(FPL_HTTPSERV, "Sending %s", buf);
             
             char* pExtNail = strchr(buf, '.');
+            string location;
             if (((const char*) in)[len - 1] == '/') {
                 strcat(buf, sIndexFile.c_str());
             }
             else if(!pExtNail){
                 if (lws_add_http_header_status(wsi, 301, &p, end))
                     return 1;
-                string location;
                 if (lws_is_ssl(wsi))
                     location = "https://";
                 else
