@@ -505,6 +505,7 @@ int WSServer::callback_http(struct lws *wsi,
             } else{
             
             //pss->fd = open(buf, O_RDONLY | _O_BINARY);
+                cout << "opening: "<< buf << endl;
             pss->fd=lws_plat_file_open(wsi, buf, &file_len,
                                        LWS_O_RDONLY);
             
