@@ -419,7 +419,7 @@ int WSServer::callback_http(struct lws *wsi,
             p = buffer+LWS_PRE;
             end = p + sizeof(buffer) - LWS_PRE;
             ffl_debug(FPL_HTTPSERV, "Sending %s", buf);
-            
+            cout << buf << endl;
             char* pExtNail = strchr(buf, '.');
             string location;
             if (((const char*) in)[len - 1] == '/') {
@@ -689,6 +689,7 @@ int WSServer::callback_http(struct lws *wsi,
                  * care about pre and postamble
                  */
                 m = lws_write(wsi, buffer + LWS_PRE, n, LWS_WRITE_HTTP);
+                cout << "sent " << m << endl;
                 if (m < 0){
                     lwsl_err("write failed\n");
                     /* write failed, close conn */
