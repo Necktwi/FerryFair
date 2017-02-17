@@ -390,7 +390,7 @@ int WSServer::callback_http(struct lws *wsi,
             if(models[pss->vhost]["indexFile"]){
                 sIndexFile=(const char*)models[pss->vhost]["indexFile"];
                 ffl_debug(FPL_HTTPSERV, "indexFile: %s", sIndexFile.c_str());
-                cout << sIndexFile << endl;
+                cout << "sIndexFile: " << sIndexFile << endl;
             }
             
             // exit if there is an attempt to access parent directory
@@ -434,6 +434,7 @@ int WSServer::callback_http(struct lws *wsi,
                     location = "http://";
                 location += domainname + (const char*)in;
                 location += "/index.html";
+                cout << location << endl;
                 if(lws_add_http_header_by_name(wsi,
                                                (unsigned char *) "Location:",
                                                (unsigned char *)location.c_str(),
