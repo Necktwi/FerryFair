@@ -370,6 +370,7 @@ int WSServer::callback_http(struct lws *wsi,
                 strncpy(pss->vhost, vhost.c_str(), vhost.length());
                 pss->vhost[vhost.length()] = '\0';
             }
+            cout << vhost << endl;
             string lResourcePath;
             if (!config["virtualWebHosts"][pss->vhost])
                 strncpy(pss->vhost, "www", 4);
