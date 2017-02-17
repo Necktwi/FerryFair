@@ -49,7 +49,8 @@
 		"mail": {
 			"rootdir": "/usr/share/squirrelmail",
 			"redirectHTTPPortTo": 8080,
-			"redirectHTTPSPortTo": 4430
+			"redirectHTTPSPortTo": 4430,
+			"toHTTPS": true
 		}
 	},
     	"HTTPPort": 80,

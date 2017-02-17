@@ -454,15 +454,16 @@ int WSServer::callback_http(struct lws *wsi,
             
             int ihttpport = config["virtualWebHosts"][pss->vhost]["redirectHTTPPortTo"];
             int ihttpsport = config["virtualWebHosts"][pss->vhost]["redirectHTTPSPortTo"];
-            if((ihttpport&&!lws_is_ssl(wsi)) || (ihttpsport&&lws_is_ssl(wsi))){
+            bool bToHTTPS = config["virtualWebHosts"][pss->vhost]["toHTTPS"];
+            if(((ihttpport||bToHTTPS)&&!lws_is_ssl(wsi)) || (ihttpsport&&lws_is_ssl(wsi))){
                 if (lws_add_http_header_status(wsi, 301, &p, end))
                     return 1;
                 if (lws_is_ssl(wsi)) {
                     location = "https://";
                     location += domainname + ":" + to_string(ihttpsport) + (const char*)in;
                 }else{
-                    location = "http://";
-                    location += domainname + ":" + to_string(ihttpport) + (const char*)in;
+                    location = bToHTTPS?"https://":"http://";
+                    location += domainname + ":" + to_string(bToHTTPS?ihttpsport:ihttpport) + (const char*)in;
                 }
                 cout << location << endl;
                 if(lws_add_http_header_by_name(wsi,
