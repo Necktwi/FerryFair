@@ -513,6 +513,7 @@ int WSServer::callback_http(struct lws *wsi,
                 return -1;
             }
             }
+            cout <<"reading: "<<buf << endl;
             if (lws_add_http_header_status(wsi, 200, &p, end))
                 return 1;
             if (lws_add_http_header_by_token(wsi, WSI_TOKEN_HTTP_SERVER,
