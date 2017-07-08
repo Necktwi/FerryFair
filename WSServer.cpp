@@ -432,7 +432,7 @@ int WSServer::callback_http(struct lws *wsi,
                     location = "http://";
                 struct stat st;
                 location += domainname + (const char*)in;
-                if(stat(location.c_str(),&st) == 0)
+                if(stat(buf,&st) == 0)
                     if(st.st_mode & S_IFDIR == 0)
                         location += "/index.html";
                     else
@@ -489,7 +489,7 @@ int WSServer::callback_http(struct lws *wsi,
                 goto try_to_reuse;
 
             }
-            
+            ffl_debug(FPL_HTTPSERV, "Location: %s", location.c_str());
             /* refuse to serve files we don't understand */
             mimetype = get_mimetype(buf);
             if (!mimetype && pExtNail) {
