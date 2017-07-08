@@ -47,11 +47,18 @@
 			"rootdir": "/home/rosy/workspace/rosy"
 		},
 		"mail": {
-			"rootdir": "/usr/share/squirrelmail",
+			"rootdir": "/usr/share/roundcubemail",
 			"redirectHTTPPortTo": 8080,
 			"redirectHTTPSPortTo": 4430,
 			"toHTTPS": true
-		}
+		},
+		"squirrelmail": {
+                        "rootdir": "/usr/share/squirrelmail",
+                        "redirectHTTPPortTo": 8080,
+                        "redirectHTTPSPortTo": 4430,
+                        "toHTTPS": true
+                }
+
 	},
     	"HTTPPort": 80,
 	"HTTPSPort": 443,
