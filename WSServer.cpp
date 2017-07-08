@@ -421,7 +421,7 @@ int WSServer::callback_http(struct lws *wsi,
             ffl_debug(FPL_HTTPSERV, "Sending %s", buf);
             cout << buf << endl;
             char* pExtNail = strrchr(buf, '.');
-            if(*(pExtNail-1)=='/')pExtNail=null;
+            if(*(pExtNail-1)=='/')pExtNail=nullptr;
             string location;
             if (((const char*) in)[len - 1] == '/') {
                 strcat(buf, sIndexFile.c_str());
