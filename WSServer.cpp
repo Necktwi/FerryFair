@@ -420,7 +420,8 @@ int WSServer::callback_http(struct lws *wsi,
             end = p + sizeof(buffer) - LWS_PRE;
             ffl_debug(FPL_HTTPSERV, "Sending %s", buf);
             cout << buf << endl;
-            char* pExtNail = strchr(buf, '.');
+            char* pExtNail = strrchr(buf, '.');
+            if(*(pExtNail-1)=='/')pExtNail=null;
             string location;
             if (((const char*) in)[len - 1] == '/') {
                 strcat(buf, sIndexFile.c_str());
@@ -432,8 +433,11 @@ int WSServer::callback_http(struct lws *wsi,
                     location = "https://";
                 else
                     location = "http://";
+                struct stat st;
                 location += domainname + (const char*)in;
-                location += "/index.html";
+                if(stat(location.c_str(),&st) == 0)
+                    if(st.st_mode & S_IFDIR == 0)
+                        location += "/index.html";
                 cout << location << endl;
                 if(lws_add_http_header_by_name(wsi,
                                                (unsigned char *) "Location:",
@@ -491,7 +495,7 @@ int WSServer::callback_http(struct lws *wsi,
             
             /* refuse to serve files we don't understand */
             mimetype = get_mimetype(buf);
-            if (!mimetype) {
+            if (!mimetype && pExtNail) {
                 lwsl_err("Unknown mimetype for %s\n", buf);
                 lws_return_http_status(wsi,
                                        HTTP_STATUS_UNSUPPORTED_MEDIA_TYPE, NULL);
