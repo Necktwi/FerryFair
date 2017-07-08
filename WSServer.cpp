@@ -490,11 +490,16 @@ int WSServer::callback_http(struct lws *wsi,
             ffl_debug(FPL_HTTPSERV, "Location: %s", location.c_str());
             /* refuse to serve files we don't understand */
             mimetype = get_mimetype(buf);
-            if (!mimetype && pExtNail) {
-                lwsl_err("Unknown mimetype for %s\n", buf);
-                lws_return_http_status(wsi,
-                                       HTTP_STATUS_UNSUPPORTED_MEDIA_TYPE, NULL);
-                return -1;
+            if (!mimetype) {
+                if(!pExtNail){
+                    mimetype = "text/plain";
+                }
+                else {
+                    lwsl_err("Unknown mimetype for %s\n", buf);
+                    lws_return_http_status(wsi,
+                                           HTTP_STATUS_UNSUPPORTED_MEDIA_TYPE, NULL);
+                    return -1;
+                }
             }
             if (strcmp(mimetype, "text/x-php")==0){
                 string sPHPCMD("php ");
