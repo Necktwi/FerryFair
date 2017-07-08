@@ -122,8 +122,8 @@ void stopRunningProcess() {
 int readConfig() {
 	ffl_notice(FPL_MAIN, "ConfigFile: %s", configFile.c_str());
         std::ifstream t(configFile);
-    ffl_notice(FPL_MAIN, "fflAllowedType: %08X, fflAllowedLevel: %08X", (unsigned int)fflAllowedType, 
-	std::string str((std::istreambuf_iterator<char>(t)),
+    ffl_notice(FPL_MAIN, "fflAllowedType: %08X, fflAllowedLevel: %08X", (unsigned int)fflAllowedType, (unsigned int)fflAllowedLevel);
+    std::string str((std::istreambuf_iterator<char>(t)),
 			std::istreambuf_iterator<char>());
 	try {
 		config.init(str);
@@ -147,7 +147,8 @@ int readConfig() {
 		} else {
 			ff_log_level = config["logLevel"];
 		}
-        ffl_notice(FPL_MAIN, "fflAllowedType: %08X, fflAllowedLevel: %08X", (unsigned int)fflAllowedType, fflAllowedType =(FF_LOG_TYPE)ff_log_type;
+        ffl_notice(FPL_MAIN, "fflAllowedType: %08X, fflAllowedLevel: %08X", (unsigned int)fflAllowedType, (unsigned int)fflAllowedLevel);
+        fflAllowedType =(FF_LOG_TYPE)ff_log_type;
         fflAllowedLevel=ff_log_level;
         ffl_notice(FPL_MAIN, "fflAllowedType: %08X, fflAllowedLevel: %08X", (unsigned int)fflAllowedType, (unsigned int)fflAllowedLevel);
 	} catch (FFJSON::Exception e) {
