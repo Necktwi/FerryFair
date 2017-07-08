@@ -369,7 +369,6 @@ int WSServer::callback_http(struct lws *wsi,
                 ffl_debug(FPL_HTTPSERV, "vhost: %s", vhost.c_str());
                 strncpy(pss->vhost, vhost.c_str(), vhost.length());
                 pss->vhost[vhost.length()] = '\0';
-                cout << vhost << endl;
             }
             
             string lResourcePath;
@@ -390,7 +389,6 @@ int WSServer::callback_http(struct lws *wsi,
             if(models[pss->vhost]["indexFile"]){
                 sIndexFile=(const char*)models[pss->vhost]["indexFile"];
                 ffl_debug(FPL_HTTPSERV, "indexFile: %s", sIndexFile.c_str());
-                cout << "sIndexFile: " << sIndexFile << endl;
             }
             
             // exit if there is an attempt to access parent directory
@@ -419,7 +417,6 @@ int WSServer::callback_http(struct lws *wsi,
             p = buffer+LWS_PRE;
             end = p + sizeof(buffer) - LWS_PRE;
             ffl_debug(FPL_HTTPSERV, "Sending %s", buf);
-            cout << buf << endl;
             char* pExtNail = strrchr(buf, '.');
             if(pExtNail && *(pExtNail-1)=='/')pExtNail=nullptr;
             string location;
@@ -438,7 +435,8 @@ int WSServer::callback_http(struct lws *wsi,
                 if(stat(location.c_str(),&st) == 0)
                     if(st.st_mode & S_IFDIR == 0)
                         location += "/index.html";
-                cout << location << endl;
+                    else
+                        goto endofextnail;
                 if(lws_add_http_header_by_name(wsi,
                                                (unsigned char *) "Location:",
                                                (unsigned char *)location.c_str(),
@@ -458,7 +456,7 @@ int WSServer::callback_http(struct lws *wsi,
                 goto try_to_reuse;
                 //strcat(buf, "/index.html");
             }
-            
+        endofextnail:
             int ihttpport = config["virtualWebHosts"][pss->vhost]["redirectHTTPPortTo"];
             int ihttpsport = config["virtualWebHosts"][pss->vhost]["redirectHTTPSPortTo"];
             bool bToHTTPS = config["virtualWebHosts"][pss->vhost]["toHTTPS"];
@@ -472,7 +470,6 @@ int WSServer::callback_http(struct lws *wsi,
                     location = bToHTTPS?"https://":"http://";
                     location += domainname + ":" + to_string(bToHTTPS?ihttpsport:ihttpport) + (const char*)in;
                 }
-                cout << location << endl;
                 if(lws_add_http_header_by_name(wsi,
                                                (unsigned char *) "Location:",
                                                (unsigned char *)location.c_str(),
@@ -509,7 +506,6 @@ int WSServer::callback_http(struct lws *wsi,
             } else{
             
                 //pss->fd = open(buf, O_RDONLY | _O_BINARY);
-                cout << "opening: "<< buf << endl;
                 pss->fd=lws_plat_file_open(wsi, buf, &file_len,
                                            LWS_O_RDONLY);
                 
@@ -518,7 +514,6 @@ int WSServer::callback_http(struct lws *wsi,
                     return -1;
                 }
             }
-            cout <<"reading: "<<buf << endl;
             if (lws_add_http_header_status(wsi, 200, &p, end))
                 return 1;
             if (lws_add_http_header_by_token(wsi, WSI_TOKEN_HTTP_SERVER,
@@ -696,7 +691,6 @@ int WSServer::callback_http(struct lws *wsi,
                  * care about pre and postamble
                  */
                 m = lws_write(wsi, buffer + LWS_PRE, n, LWS_WRITE_HTTP);
-                cout << "sent " << m << endl;
                 if (m < 0){
                     lwsl_err("write failed\n");
                     /* write failed, close conn */
