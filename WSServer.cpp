@@ -413,7 +413,6 @@ int WSServer::callback_http(struct lws *wsi,
             strcpy(buf, lResourcePath.c_str());
             strncat((char*) buf, (const char*) in, sizeof (buf) - lResourcePath.length());
             buf[sizeof (buf) - 1] = '\0';
-            ffl_debug(FPL_HTTPSERV, "File: %s", buf);
             p = buffer+LWS_PRE;
             end = p + sizeof(buffer) - LWS_PRE;
             ffl_debug(FPL_HTTPSERV, "Sending %s", buf);
@@ -432,8 +431,8 @@ int WSServer::callback_http(struct lws *wsi,
                     location = "http://";
                 struct stat st;
                 location += domainname + (const char*)in;
-                if(stat(buf,&st) == 0)
-                    if(st.st_mode & S_IFDIR == 0)
+                if(stat(buf, &st) == 0)
+                    if(!S_ISDIR(st.st_mode))
                         goto endofextnail;
                 location += "/index.html";
                 if(lws_add_http_header_by_name(wsi,
