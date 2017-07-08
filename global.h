@@ -9,12 +9,14 @@
 #define	GLOBAL_H
 
 #define NELEMS(x)  (sizeof(x) / sizeof(x[0]))
+#define INIT_LOGGER
 
 #include <FFJSON.h>
 #include <string>
 #include <map>
 #include <list>
 #include <libwebsockets.h>
+
 
 extern std::map<std::string, unsigned int> path_id_map;
 extern std::map<int, std::string> id_path_map;

@@ -508,15 +508,15 @@ int WSServer::callback_http(struct lws *wsi,
                 file_len = pss->payload->length();
             } else{
             
-            //pss->fd = open(buf, O_RDONLY | _O_BINARY);
+                //pss->fd = open(buf, O_RDONLY | _O_BINARY);
                 cout << "opening: "<< buf << endl;
-            pss->fd=lws_plat_file_open(wsi, buf, &file_len,
-                                       LWS_O_RDONLY);
-            
-            if (pss->fd == LWS_INVALID_FILE) {
-                ffl_debug(FPL_HTTPSERV, "unable to open file");
-                return -1;
-            }
+                pss->fd=lws_plat_file_open(wsi, buf, &file_len,
+                                           LWS_O_RDONLY);
+                
+                if (pss->fd == LWS_INVALID_FILE) {
+                    ffl_debug(FPL_HTTPSERV, "unable to open file");
+                    return -1;
+                }
             }
             cout <<"reading: "<<buf << endl;
             if (lws_add_http_header_status(wsi, 200, &p, end))

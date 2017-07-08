@@ -5,10 +5,10 @@
  * Created on 24 November, 2013, 12:25 AM
  */
 
+#include "global.h"
 #include "config.h"
 #include "WSServer.h"
 #include "FerryStream.h"
-#include "global.h"
 #include <ferrybase/ServerSocket.h>
 #include <ferrybase/SocketException.h>
 #include <ferrybase/mystdlib.h>
