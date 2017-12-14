@@ -15,8 +15,7 @@
 libav_output_files/
 ferrymediacapture1/
 dist/
-build/
-buildQt/
+build*/
 
 nbproject/private/
 build/
