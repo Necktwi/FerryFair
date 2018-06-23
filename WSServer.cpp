@@ -171,7 +171,7 @@ const char * get_mimetype(const char *file) {
         return "text/html";
     
     if (!strcmp(&file[n - 4], ".php"))
-        return "text/x-php";
+        return "text/html";
     
     if (!strcmp(&file[n - 3], ".js"))
         return "text/javascript";
@@ -370,6 +370,7 @@ int WSServer::callback_http(struct lws *wsi,
                 strncpy(pss->vhost, vhost.c_str(), vhost.length());
                 pss->vhost[vhost.length()] = '\0';
             }
+            
             string lResourcePath;
             if (!config["virtualWebHosts"][pss->vhost])
                 strncpy(pss->vhost, "www", 4);
@@ -386,7 +387,8 @@ int WSServer::callback_http(struct lws *wsi,
                 }
             }
             if(models[pss->vhost]["indexFile"]){
-                sIndexFile=models[pss->vhost]["indexFile"];
+                sIndexFile=(const char*)models[pss->vhost]["indexFile"];
+                ffl_debug(FPL_HTTPSERV, "indexFile: %s", sIndexFile.c_str());
             }
             
             // exit if there is an attempt to access parent directory
@@ -411,24 +413,27 @@ int WSServer::callback_http(struct lws *wsi,
             strcpy(buf, lResourcePath.c_str());
             strncat((char*) buf, (const char*) in, sizeof (buf) - lResourcePath.length());
             buf[sizeof (buf) - 1] = '\0';
-            
             p = buffer+LWS_PRE;
             end = p + sizeof(buffer) - LWS_PRE;
             ffl_debug(FPL_HTTPSERV, "Sending %s", buf);
-            
-            char* pExtNail = strchr(buf, '.');
+            char* pExtNail = strrchr(buf, '.');
+            if(pExtNail && *(pExtNail-1)=='/')pExtNail=nullptr;
+            string location;
             if (((const char*) in)[len - 1] == '/') {
                 strcat(buf, sIndexFile.c_str());
             }
             else if(!pExtNail){
                 if (lws_add_http_header_status(wsi, 301, &p, end))
                     return 1;
-                string location;
                 if (lws_is_ssl(wsi))
                     location = "https://";
                 else
                     location = "http://";
+                struct stat st;
                 location += domainname + (const char*)in;
+                if(stat(buf, &st) == 0)
+                    if(!S_ISDIR(st.st_mode))
+                        goto endofextnail;
                 location += "/index.html";
                 if(lws_add_http_header_by_name(wsi,
                                                (unsigned char *) "Location:",
@@ -449,29 +454,69 @@ int WSServer::callback_http(struct lws *wsi,
                 goto try_to_reuse;
                 //strcat(buf, "/index.html");
             }
-            
+        endofextnail:
+            int ihttpport = config["virtualWebHosts"][pss->vhost]["redirectHTTPPortTo"];
+            int ihttpsport = config["virtualWebHosts"][pss->vhost]["redirectHTTPSPortTo"];
+            bool bToHTTPS = config["virtualWebHosts"][pss->vhost]["toHTTPS"];
+            if(((ihttpport||bToHTTPS)&&!lws_is_ssl(wsi)) || (ihttpsport&&lws_is_ssl(wsi))){
+                if (lws_add_http_header_status(wsi, 301, &p, end))
+                    return 1;
+                if (lws_is_ssl(wsi)) {
+                    location = "https://";
+                    location += domainname + ":" + to_string(ihttpsport) + (const char*)in;
+                }else{
+                    location = bToHTTPS?"https://":"http://";
+                    location += domainname + ":" + to_string(bToHTTPS?ihttpsport:ihttpport) + (const char*)in;
+                }
+                if(lws_add_http_header_by_name(wsi,
+                                               (unsigned char *) "Location:",
+                                               (unsigned char *)location.c_str(),
+                                               location.length(), &p, end))
+                    return 1;
+                if (lws_finalize_http_header(wsi, &p, end))
+                    return 1;
+                
+                *p = '\0';
+                lwsl_info("%s\n", buffer + LWS_PRE);
+                n = lws_write(wsi, buffer+LWS_PRE,
+                              p - (buffer+LWS_PRE), LWS_WRITE_HTTP_HEADERS);
+                
+                if (n < 0) {
+                    return -1;
+                }
+                goto try_to_reuse;
+
+            }
+            ffl_debug(FPL_HTTPSERV, "Location: %s", location.c_str());
             /* refuse to serve files we don't understand */
             mimetype = get_mimetype(buf);
             if (!mimetype) {
-                lwsl_err("Unknown mimetype for %s\n", buf);
-                lws_return_http_status(wsi,
-                                       HTTP_STATUS_UNSUPPORTED_MEDIA_TYPE, NULL);
-                return -1;
+                if(!pExtNail){
+                    mimetype = "text/plain";
+                }
+                else {
+                    lwsl_err("Unknown mimetype for %s\n", buf);
+                    lws_return_http_status(wsi,
+                                           HTTP_STATUS_UNSUPPORTED_MEDIA_TYPE, NULL);
+                    return -1;
+                }
             }
             if (strcmp(mimetype, "text/x-php")==0){
-                pss->payload=new string(getStdoutFromCommand(string("php ")+buf));
-                goto sendJSONPayload;
+                string sPHPCMD("php ");
+                sPHPCMD+=buf;
+                pss->payload=new string(getStdoutFromCommand(sPHPCMD));
+                file_len = pss->payload->length();
+            } else{
+            
+                //pss->fd = open(buf, O_RDONLY | _O_BINARY);
+                pss->fd=lws_plat_file_open(wsi, buf, &file_len,
+                                           LWS_O_RDONLY);
+                
+                if (pss->fd == LWS_INVALID_FILE) {
+                    ffl_debug(FPL_HTTPSERV, "unable to open file");
+                    return -1;
+                }
             }
-            
-            //pss->fd = open(buf, O_RDONLY | _O_BINARY);
-            pss->fd=lws_plat_file_open(wsi, buf, &file_len,
-                                       LWS_O_RDONLY);
-            
-            if (pss->fd == LWS_INVALID_FILE) {
-                ffl_debug(FPL_HTTPSERV, "unable to open file");
-                return -1;
-            }
-            
             if (lws_add_http_header_status(wsi, 200, &p, end))
                 return 1;
             if (lws_add_http_header_by_token(wsi, WSI_TOKEN_HTTP_SERVER,
@@ -606,7 +651,7 @@ int WSServer::callback_http(struct lws *wsi,
             lwsl_info("LWS_CALLBACK_HTTP_WRITEABLE\n");
             
             
-            if (pss->fd == LWS_INVALID_FILE)
+            if (pss->fd == LWS_INVALID_FILE && !pss->payload)
                 goto try_to_reuse;
             /*
              * we can send more of whatever it is we were sending
@@ -626,8 +671,15 @@ int WSServer::callback_http(struct lws *wsi,
                 /* he couldn't handle that much */
                     n = m;
                 
+                if(pss->fd){
                 n = lws_plat_file_read(wsi, pss->fd,
                                        &amount, buffer + LWS_PRE, n);
+                }else{
+                    n= pss->payload->length()>n?n:pss->payload->length();
+                    strncpy((char*)(buffer + LWS_PRE), pss->payload->c_str(), n);
+                    pss->payload->assign(pss->payload->substr(n));
+                    amount = n;
+                }
                 /* problem reading, close conn */
                 if (n < 0){
                     lwsl_err("problem reading file\n");
@@ -658,8 +710,12 @@ int WSServer::callback_http(struct lws *wsi,
             break;
         flushbail:
         penultimate:
+            if(pss->fd){
             lws_plat_file_close(wsi, pss->fd);
             pss->fd = LWS_INVALID_FILE;
+            }else {
+                delete pss->payload;
+            }
             goto try_to_reuse;
             
             

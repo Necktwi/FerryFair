@@ -16,6 +16,10 @@ libav_output_files/
 ferrymediacapture1/
 dist/
 build*/
+<<<<<<< HEAD
+=======
+build/
+>>>>>>> ec5552092132e3bb54ea706b0b212dd6f4549a5e
 
 nbproject/private/
 build/
@@ -25,7 +29,3 @@ nbdist/
 nbactions.xml
 nb-configuration.xml
 *.user
-
-# macOS
-**/.DS_Store
-**/._*
