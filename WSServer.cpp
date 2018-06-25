@@ -66,7 +66,11 @@ char crl_path[1024];
 #include <ferrybase/mystdlib.h>
 #include <ferrybase/Socket.h>
 #include <iostream>
+#if defined(__APPLE__)
+#include <stdlib.h>
+#else
 #include <malloc.h>
+#endif
 #include <functional>
 
 using namespace std;
