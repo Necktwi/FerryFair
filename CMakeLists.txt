@@ -76,10 +76,11 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase")
          "${CMAKE_CURRENT_SOURCE_DIR}/../ferrbase/build/$(ConfigurationName)")
       link_directories(
          "${CMAKE_CURRENT_SOURCE_DIR}/../logger/build/$(ConfigurationName)")
+      link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/build/$(\
+         ConfigurationName)")
       link_directories(
-         "${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/build/$(ConfigurationName)")
-      link_directories(
-         "${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets/build/$(ConfigurationName)")
+         "${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets/build/$(\
+            ConfigurationName)")
    else ()
       link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../ferrbase/build/")
       link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../logger/build/")
