@@ -52,9 +52,7 @@ char crl_path[1024];
 #include <string>
 #include <sys/stat.h>
 
-#ifdef CMAKE_BUILD
 #include "lws_config.h"
-#endif
 
 #include "FerryStream.h"
 #include "global.h"
@@ -76,6 +74,7 @@ using namespace std;
 char *resource_path = LOCAL_RESOURCE_PATH;
 
 FFJSON HTTPModel;
+struct lws_plat_file_ops fops_plat;
 
 bool validate_path_l(std::string& p) {
     FFJSON::trimWhites(p);
@@ -710,10 +709,10 @@ int WSServer::callback_http(struct lws *wsi,
             break;
         flushbail:
         penultimate:
-            if(pss->fd){
-            lws_plat_file_close(wsi, pss->fd);
-            pss->fd = LWS_INVALID_FILE;
-            }else {
+            if (pss->fd) {
+                lws_plat_file_close(wsi, pss->fd);
+                pss->fd = LWS_INVALID_FILE;
+            } else {
                 delete pss->payload;
             }
             goto try_to_reuse;
