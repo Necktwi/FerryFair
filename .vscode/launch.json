@@ -1,0 +1,53 @@
+
+{
+   "version": "0.2.0",
+   "configurations": [{
+      "name": "C++ Launch",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceRoot}/build/ferryfair",
+      "miDebuggerServerAddress": "pi.local:9091",
+      "args": ["-s", "normal"],
+      "stopAtEntry": false,
+      "cwd": "${workspaceRoot}",
+      "environment": [],
+      "externalConsole": true,
+      "linux": {
+        "MIMode": "gdb"
+      },
+      "osx": {
+        "MIMode": "gdb"
+      },
+      "windows": {
+        "MIMode": "gdb"
+      },
+      "setupCommands": [{
+         "text": "set gnutarget elf32-littlearm"
+      }, {
+         "description": "Enable pretty-printing for gdb",
+         "text": "-enable-pretty-printing",
+         "ignoreFailures": true
+     }]
+   }],
+   "tasks": [
+      {
+         "label": "startGdbServer",
+         "type": "shell",
+         "isBackground": false,
+         "suppressTaskName": true,
+         "osx": {
+             "command": "ssh",
+             "args": ["pi.local", "cd Workspace/ferryfair/build && cmake .. && make"],
+             "isShellCommand": true,
+             "showOutput": "always",
+             "echoCommand": true
+         },
+         "group": {
+            "kind": "build",
+            "isDefault": true
+        }
+      }
+   ]
+ }
+ 
+ 

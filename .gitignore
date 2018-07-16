@@ -15,17 +15,18 @@
 libav_output_files/
 ferrymediacapture1/
 dist/
-build*/
-build/
+**/build*/
+**/Build/
 
 nbproject/private/
 build/
-nbbuild/
 dist/
 nbdist/
-nbactions.xml
-nb-configuration.xml
 *.user
 
 # CMake
 **/CMakeLists.txt.user
+
+# macOS
+**/._*
+**/.DS*

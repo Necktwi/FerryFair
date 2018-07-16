@@ -177,7 +177,9 @@ void FerryStream::heart(FerryStream* fs) {
 			}
 			try {
 				FFJSON* media_pack = new FFJSON(truebuffer);
-				if (media_pack->isType(FFJSON::OBJ_TYPE::OBJECT) && &(*media_pack)["ferryframes"] != NULL) {
+				if (media_pack ->isType (FFJSON::OBJ_TYPE::OBJECT) &&
+               ((&(*media_pack)["ferryframes"]) != NULL)
+            ) {
 					ofstream offpmpack;
 					offpmpack.open("offpmpack.json");
 					offpmpack << truebuffer;
