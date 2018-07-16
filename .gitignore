@@ -30,3 +30,4 @@ nbdist/
 # macOS
 **/._*
 **/.DS*
+**/*.xcodeproj/xcuserdata/
