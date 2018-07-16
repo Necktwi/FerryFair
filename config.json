@@ -52,7 +52,13 @@
 			"redirectHTTPSPortTo": 4430,
 			"toHTTPS": true
 		},
-		"squirrelmail": {
+		"roundcube": {
+                        "rootdir": "/usr/share/roundcubemail.bkp",
+                        "redirectHTTPPortTo": 8080,
+                        "redirectHTTPSPortTo": 4430,
+                        "toHTTPS": true
+                },
+                "squirrelmail": {
                         "rootdir": "/usr/share/squirrelmail",
                         "redirectHTTPPortTo": 8080,
                         "redirectHTTPSPortTo": 4430,
