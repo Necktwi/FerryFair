@@ -1,6 +1,6 @@
 {
 	"name": "FairPlay configuration file",
-	"homeFolder": "/home/gowtham/workspace/www",
+	"homeFolder": "/home/gowtham/Workspace/WWW",
 	"hostName": "www.ferryfair.com",
 	"port": 9271,
 	"bootup": true,
@@ -32,19 +32,19 @@
 	"lwsDebug": 7,
 	"virtualWebHosts": {
 		"fairplay": {
-			"rootdir": "/home/gowtham/workspace/fairplay"
+			"rootdir": "/home/gowtham/Workspace/fairplay"
 		},
 		"deb": {
-			"rootdir": "/home/gowtham/workspace/deb"
+			"rootdir": "/home/gowtham/Workspace/deb"
 		},
 		"www": {
-			"rootdir": "/home/gowtham/workspace/www"
+			"rootdir": "/home/gowtham/Workspace/WWW"
 		},
 		"underconstruction": {
-			"rootdir": "/home/gowtham/workspace/w3"
+			"rootdir": "/home/gowtham/Workspace/W3"
 		},
 		"rosy": {
-			"rootdir": "/home/rosy/workspace/rosy"
+			"rootdir": "/home/gowtham/Workspace/rosy"
 		},
 		"mail": {
 			"rootdir": "/usr/share/roundcubemail",
@@ -52,18 +52,24 @@
 			"redirectHTTPSPortTo": 4430,
 			"toHTTPS": true
 		},
-		"squirrelmail": {
-                        "rootdir": "/usr/share/squirrelmail",
-                        "redirectHTTPPortTo": 8080,
-                        "redirectHTTPSPortTo": 4430,
-                        "toHTTPS": true
-                }
+		"roundcube": {
+         "rootdir": "/usr/share/roundcubemail.bkp",
+         "redirectHTTPPortTo": 8080,
+         "redirectHTTPSPortTo": 4430,
+         "toHTTPS": true
+      },
+      "squirrelmail": {
+         "rootdir": "/usr/share/squirrelmail",
+         "redirectHTTPPortTo": 8080,
+         "redirectHTTPSPortTo": 4430,
+         "toHTTPS": true
+      }
 
 	},
-    	"HTTPPort": 80,
+   "HTTPPort": 80,
 	"HTTPSPort": 443,
 	"HttpUserSessionTimeout": 600,
-    	"sslCert": "/etc/letsencrypt/live/ferryfair.com/cert.pem",
+   "sslCert": "/etc/letsencrypt/live/ferryfair.com/cert.pem",
 	"sslKey": "/etc/letsencrypt/live/ferryfair.com/privkey.pem",
 	"sslCA": "/etc/letsencrypt/live/ferryfair.com/fullchain.pem",
 	"help": {

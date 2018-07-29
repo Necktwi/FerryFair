@@ -1,15 +1,16 @@
-// the configured options and settings for Tutorial
 #ifndef CONFIG_H
 #define CONFIG_H
+
 #define @PROJECT_NAME@_VERSION_MAJOR @VERSION_MAJOR@
 #define @PROJECT_NAME@_VERSION_MINOR @VERSION_MINOR@
 #define APP_NAME "@PROJECT_NAME@"
 #define CONFIG_INSTALL_DIR "@CMAKE_INSTALL_FULL_SYSCONFDIR@"
 
 #if defined(_WIN64) || defined(_WIN32)
-#define DLLExport   __declspec( dllexport )
+    #define DLLExport   __declspec( dllexport )
 #else
-#define DLLExport
+    #define DLLExport
 #endif
 #define _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING
+
 #endif //CONFIG_H

@@ -4,25 +4,38 @@
 # Tab size is 3. Right margin is 80 characters away.
 # 
 # ©FerryFair
-
+                                                                                
 cmake_minimum_required (VERSION 3.5)
 include(GNUInstallDirs)
-project (ferryfair)
+project (FerryFair)
 message ("Generating build procedure for ${PROJECT_NAME} ...")
+
+add_definitions(-DFOO)
+
+message ("Extropolating build type ...")
+string (REPLACE ${CMAKE_CURRENT_SOURCE_DIR} "" SRC_RLTV_BLD_DIR
+   ${PROJECT_BINARY_DIR}
+)
+message ("SRC_RLTV_BLD_DIR: ${SRC_RLTV_BLD_DIR}")
+string (REPLACE "/Build" "" BUILD_TARGET ${SRC_RLTV_BLD_DIR})
+if (${SRC_RLTV_BLD_DIR})
+   string (REPLACE "/build" "" BUILD_TARGET ${BUILD_TARGET})
+endif ()
+message ("BUILD_TARGET: ${BUILD_TARGET}")
 
 if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON")
    message ("Using development sources.")
    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON 
-      ${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/build)
+      ${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/Build${BUILD_TARGET})
    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets 
-      ${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets/build)
+      ${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets/Build${BUILD_TARGET})
    if (NOT TARGET logger)
       add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../logger 
-         ${CMAKE_CURRENT_SOURCE_DIR}/../logger/build)
+         ${CMAKE_CURRENT_SOURCE_DIR}/../logger/Build${BUILD_TARGET})
    endif ()
    if (NOT TARGET ferrybase)
       add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase 
-         ${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase/build)
+         ${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase/Build${BUILD_TARGET})
    endif ()
 endif ()
 IF (DEFINED _DEBUG)
@@ -56,36 +69,36 @@ ENDIF()
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
 set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} 
    ${GCC_COVERAGE_LINK_FLAGS}")
-file(GLOB HEADERS *.h)
-file(GLOB SOURCES *.cpp)
+file(GLOB HEADERS [a-zA-Z0-9_]*.h)
+file(GLOB SOURCES [a-zA-Z0-9_]*.cpp)
 list(APPEND HEADERS "config.h.in" ${PROJECT_BINARY_DIR}/config.h)
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase")
    include_directories(${PROJECT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
    include_directories (${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase 
-      ${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase/build 
+      ${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase/Build${BUILD_TARGET} 
       ${CMAKE_CURRENT_SOURCE_DIR}/..)
    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../logger 
-      ${CMAKE_CURRENT_SOURCE_DIR}/../logger/build)
+      ${CMAKE_CURRENT_SOURCE_DIR}/../logger/Build${BUILD_TARGET})
    include_directories (${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON 
-      ${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/build)
+      ${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/Build${BUILD_TARGET})
    include_directories (${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets/lib
-      ${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets/build)
+      ${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets/Build${BUILD_TARGET})
    if(CMAKE_CONFIGURATION_TYPES)
       message("Linking corresponding to the Configuration Name")
       link_directories(
-         "${CMAKE_CURRENT_SOURCE_DIR}/../ferrbase/build/$(ConfigurationName)")
+         "${CMAKE_CURRENT_SOURCE_DIR}/../ferrbase/Build${BUILD_TARGET}/$(ConfigurationName)")
       link_directories(
-         "${CMAKE_CURRENT_SOURCE_DIR}/../logger/build/$(ConfigurationName)")
-      link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/build/$(\
+         "${CMAKE_CURRENT_SOURCE_DIR}/../logger/Build${BUILD_TARGET}/$(ConfigurationName)")
+      link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/Build${BUILD_TARGET}/$(\
          ConfigurationName)")
       link_directories(
-         "${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets/build/$(\
+         "${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets/Build${BUILD_TARGET}/$(\
             ConfigurationName)")
    else ()
-      link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../ferrbase/build/")
-      link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../logger/build/")
-      link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/build/")
-      link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets/build/")
+      link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../ferrbase/Build${BUILD_TARGET}/")
+      link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../logger/Build${BUILD_TARGET}/")
+      link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/Build${BUILD_TARGET}/")
+      link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets/Build${BUILD_TARGET}/")
    endif ()
 else()
    include_directories(${PROJECT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} 

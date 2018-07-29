@@ -1,0 +1,271 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 50;
+	objects = {
+
+/* Begin PBXFileReference section */
+		6506AB7220FEDA650095D128 /* CMakeSettings.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = CMakeSettings.json; sourceTree = "<group>"; };
+		65595C4D20F09D3000043C8E /* global.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = global.h; sourceTree = "<group>"; };
+		65595C4E20F09D3000043C8E /* FerryStream.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = FerryStream.cpp; sourceTree = "<group>"; };
+		65595C4F20F09D3000043C8E /* output.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = output.txt; sourceTree = "<group>"; };
+		65595C5020F09D3100043C8E /* libwebsockets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = libwebsockets; sourceTree = "<group>"; };
+		65595C5120F09D3100043C8E /* ferrybase */ = {isa = PBXFileReference; lastKnownFileType = folder; path = ferrybase; sourceTree = "<group>"; };
+		65595C5220F09D3200043C8E /* global.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = global.cpp; sourceTree = "<group>"; };
+		65595C5320F09D3200043C8E /* FFJSON */ = {isa = PBXFileReference; lastKnownFileType = folder; path = FFJSON; sourceTree = "<group>"; };
+		65595C5420F09D3300043C8E /* output.ffjson */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = output.ffjson; sourceTree = "<group>"; };
+		65595C5520F09D3400043C8E /* FerryStream.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FerryStream.h; sourceTree = "<group>"; };
+		65595C5620F09D3400043C8E /* CMakeLists.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
+		65595C5720F09D3400043C8E /* init.override */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = init.override; sourceTree = "<group>"; };
+		65595C5820F09D3500043C8E /* Makefile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
+		65595C5920F09D3500043C8E /* WSServer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WSServer.cpp; sourceTree = "<group>"; };
+		65595C5A20F09D3600043C8E /* init.conf */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = init.conf; sourceTree = "<group>"; };
+		65595C5B20F09D3600043C8E /* init.d */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.dtrace; path = init.d; sourceTree = "<group>"; };
+		65595C5C20F09D3600043C8E /* config.h.in */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = config.h.in; sourceTree = "<group>"; };
+		65595C5D20F09D3700043C8E /* config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = config.json; sourceTree = "<group>"; };
+		65595C5E20F09D3700043C8E /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		65595C5F20F09D3700043C8E /* logger */ = {isa = PBXFileReference; lastKnownFileType = folder; path = logger; sourceTree = "<group>"; };
+		65595C6020F09D3800043C8E /* WSServer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WSServer.h; sourceTree = "<group>"; };
+		65595C6120F09D3800043C8E /* tests */ = {isa = PBXFileReference; lastKnownFileType = folder; path = tests; sourceTree = "<group>"; };
+		65595C6220F09D3900043C8E /* b64HT.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = b64HT.txt; sourceTree = "<group>"; };
+		65595C6320F09D3900043C8E /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		65595C3F20F06B6500043C8E = {
+			isa = PBXGroup;
+			children = (
+				6506AB7220FEDA650095D128 /* CMakeSettings.json */,
+				65595C6220F09D3900043C8E /* b64HT.txt */,
+				65595C5620F09D3400043C8E /* CMakeLists.txt */,
+				65595C5C20F09D3600043C8E /* config.h.in */,
+				65595C5D20F09D3700043C8E /* config.json */,
+				65595C5120F09D3100043C8E /* ferrybase */,
+				65595C4E20F09D3000043C8E /* FerryStream.cpp */,
+				65595C5520F09D3400043C8E /* FerryStream.h */,
+				65595C5320F09D3200043C8E /* FFJSON */,
+				65595C5220F09D3200043C8E /* global.cpp */,
+				65595C4D20F09D3000043C8E /* global.h */,
+				65595C5A20F09D3600043C8E /* init.conf */,
+				65595C5B20F09D3600043C8E /* init.d */,
+				65595C5720F09D3400043C8E /* init.override */,
+				65595C5020F09D3100043C8E /* libwebsockets */,
+				65595C5F20F09D3700043C8E /* logger */,
+				65595C6320F09D3900043C8E /* main.cpp */,
+				65595C5820F09D3500043C8E /* Makefile */,
+				65595C5420F09D3300043C8E /* output.ffjson */,
+				65595C4F20F09D3000043C8E /* output.txt */,
+				65595C5E20F09D3700043C8E /* README.md */,
+				65595C6120F09D3800043C8E /* tests */,
+				65595C5920F09D3500043C8E /* WSServer.cpp */,
+				65595C6020F09D3800043C8E /* WSServer.h */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXLegacyTarget section */
+		65595C4420F06B6500043C8E /* ferryfair */ = {
+			isa = PBXLegacyTarget;
+			buildArgumentsString = "pi.local \"cd /Users/gowtham/Workspace/ferryfair/build && cmake .. && make\"";
+			buildConfigurationList = 65595C4720F06B6500043C8E /* Build configuration list for PBXLegacyTarget "ferryfair" */;
+			buildPhases = (
+			);
+			buildToolPath = /usr/bin/ssh;
+			buildWorkingDirectory = /Users/gowtham/Workspace/ferryfair/build;
+			dependencies = (
+			);
+			name = ferryfair;
+			passBuildSettingsInEnvironment = 1;
+			productName = ferryfair;
+		};
+/* End PBXLegacyTarget section */
+
+/* Begin PBXProject section */
+		65595C4020F06B6500043C8E /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 1000;
+				ORGANIZATIONNAME = ferryfair;
+				TargetAttributes = {
+					65595C4420F06B6500043C8E = {
+						CreatedOnToolsVersion = 10.0;
+					};
+				};
+			};
+			buildConfigurationList = 65595C4320F06B6500043C8E /* Build configuration list for PBXProject "ferryfair" */;
+			compatibilityVersion = "Xcode 9.3";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = 65595C3F20F06B6500043C8E;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				65595C4420F06B6500043C8E /* ferryfair */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin XCBuildConfiguration section */
+		65595C4520F06B6500043C8E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+			};
+			name = Debug;
+		};
+		65595C4620F06B6500043C8E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+			};
+			name = Release;
+		};
+		65595C4820F06B6500043C8E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUILD_OPTIONS = "";
+				CODE_SIGN_STYLE = Automatic;
+				DEBUGGING_SYMBOLS = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 92458GN43Z;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		65595C4920F06B6500043C8E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUILD_OPTIONS = "";
+				CODE_SIGN_STYLE = Automatic;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 92458GN43Z;
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		65595C4320F06B6500043C8E /* Build configuration list for PBXProject "ferryfair" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				65595C4520F06B6500043C8E /* Debug */,
+				65595C4620F06B6500043C8E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		65595C4720F06B6500043C8E /* Build configuration list for PBXLegacyTarget "ferryfair" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				65595C4820F06B6500043C8E /* Debug */,
+				65595C4920F06B6500043C8E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 65595C4020F06B6500043C8E /* Project object */;
+}
