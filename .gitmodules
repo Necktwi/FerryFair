@@ -7,6 +7,3 @@
 [submodule "FFJSON"]
 	path = FFJSON
 	url = https://necktwi@github.com/necktwi/FFJSON.git
-[submodule "libwebsockets"]
-	path = libwebsockets
-	url = https://necktwi@github.com/necktwi/libwebsockets.git

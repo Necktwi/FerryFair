@@ -1,6 +1,6 @@
 /*
  * Gowtham Kudupudi 24/11/2013
- * ©FerryFair
+ * Â©FerryFair
  */
                                                                                 
 #include "global.h"

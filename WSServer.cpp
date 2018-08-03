@@ -1,6 +1,6 @@
 /*
  * Gowtham Kudupudi 2018/07/26
- * ©FerryFair
+ * Â©FerryFair
  */
 
 //#if defined(LWS_USE_POLARSSL)
@@ -1224,7 +1224,6 @@ WSServer::WSServer (
    m_Info.port = m_iPort;
    m_Info.iface = *m_pcInterface ? m_pcInterface : NULL;
    m_Info.protocols = protocols;
-   m_Info.extensions = lws_get_internal_extensions();
    m_Info.gid = -1;
    m_Info.uid = -1;
    m_Info.options = m_iOpts | LWS_SERVER_OPTION_VALIDATE_UTF8
