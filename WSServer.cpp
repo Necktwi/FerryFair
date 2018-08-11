@@ -52,11 +52,26 @@ using namespace std;
 
 #define LWS_NO_CLIENT
 
-FFJSON HTTPModel;
-struct lws_plat_file_ops fops_plat;
+FFJSON            HTTPModel;
+int               close_testing;
+int               max_poll_elements;
+#ifdef EXTERNAL_POLL
+lws_pollfd*       pollfds;
+int*              fd_lookup;
+int               count_pollfds;
+#endif
+volatile int      force_exit = 0, dynamic_vhost_enable = 0;
+lws_vhost*        dynamic_vhost;
+lws_context*      context;
+lws_plat_file_ops fops_plat;
+static int        test_options;
 
-bool validate_path_l(std::string& p) {
-   FFJSON::trimWhites(p);
+#if defined(LWS_WITH_TLS) && defined(LWS_HAVE_SSL_CTX_set1_param)
+char crl_path[1024] = "";
+#endif
+
+bool validate_path_l (std::string& p) {
+   FFJSON::trimWhites (p);
    if (p.length() > 0) {
       return true;
    }
@@ -200,38 +215,41 @@ unsigned int WSServer::valid_session(unsigned int session_id) {
 map<unsigned int, WSServer::user_session*> WSServer::user_sessions;
 unsigned int WSServer::session_count = 0;
 
-int WSServer::callback_http(struct lws *wsi,
-                            enum lws_callback_reasons reason, void *user,
-                            void *in, size_t len) {
+int WSServer::callback_http (
+   struct lws *wsi,
+   enum lws_callback_reasons reason,
+   void* user,
+   void* in, size_t len
+) {
 #if 0
    char client_name[128];
    char client_ip[128];
 #endif
-   char buf[256];
-   char b64[64];
-   struct timeval tv;
-   int n, m;
-   unsigned char *p;
-   char other_headers[1024];
-   unsigned char *end, *start;
+   char                 buf[1024];
+   char                 b64[64];
+   struct timeval       tv;
+   int                  n = 0, m = 0, hlen = 0;
+   unsigned char*       p;
+   char                 other_headers[1024];
+   unsigned char*       end, *start;
    static unsigned char buffer[4096];
-   struct stat stat_buf;
-   struct per_session_data__http *pss =
-   (struct per_session_data__http *) user;
-   int session_id = 0;
-   const char *mimetype;
-   FFJSON ans;
-   FFJSON* ansobj;
-   string sIndexFile="index.html";
-   unsigned long file_len, amount, sent;
+   struct stat          stat_buf;
+   int            session_id = 0;
+   const char*    mimetype;
+   FFJSON         ans;
+   FFJSON*        ansobj;
+   string         sIndexFile = "index.html";
+   unsigned long  file_len, amount, sent;
+   struct per_session_data__http*   pss =
+   (struct per_session_data__http*) user;
    
 #ifdef EXTERNAL_POLL
-   struct lws_pollargs *pa = (struct lws_pollargs *) in;
+   struct lws_pollargs* pa = (struct lws_pollargs *) in;
 #endif
    
    switch (reason) {
       case LWS_CALLBACK_HTTP: {
-         lwsl_info ("lws_http_serve: %s\n",in);
+         lwsl_info ("lws_http_serve: %s\n", in);
          dump_handshake_info (wsi);
          if (len < 1) {
             lws_return_http_status (

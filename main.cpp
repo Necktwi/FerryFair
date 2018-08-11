@@ -7,6 +7,7 @@
 #include "config.h"
 #include "WSServer.h"
 #include "FerryStream.h"
+#include "Authentication.h"
 #include <ferrybase/ServerSocket.h>
 #include <ferrybase/SocketException.h>
 #include <ferrybase/mystdlib.h>
@@ -385,6 +386,12 @@ int run() {
 }
 
 int main(int argc, char** argv) {
+   Authentication_ Authentication("gowtham", "tornshoees");
+   if (Authentication .is_valid()) {
+      cout << "Authorized" << endl;
+   } else {
+      cout << "Unauthorized" << endl;
+   }
    groomLogFile();
    stdinfd = dup(0);
    stdoutfd = dup(1);

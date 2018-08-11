@@ -8,13 +8,12 @@
 
 /* Begin PBXFileReference section */
 		6506AB7220FEDA650095D128 /* CMakeSettings.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = CMakeSettings.json; sourceTree = "<group>"; };
+		6542265C21198D820045041B /* Authentication.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Authentication.cpp; sourceTree = "<group>"; };
+		6542265D21198D820045041B /* Authentication.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Authentication.h; sourceTree = "<group>"; };
 		65595C4D20F09D3000043C8E /* global.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = global.h; sourceTree = "<group>"; };
 		65595C4E20F09D3000043C8E /* FerryStream.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = FerryStream.cpp; sourceTree = "<group>"; };
 		65595C4F20F09D3000043C8E /* output.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = output.txt; sourceTree = "<group>"; };
-		65595C5020F09D3100043C8E /* libwebsockets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = libwebsockets; sourceTree = "<group>"; };
-		65595C5120F09D3100043C8E /* ferrybase */ = {isa = PBXFileReference; lastKnownFileType = folder; path = ferrybase; sourceTree = "<group>"; };
 		65595C5220F09D3200043C8E /* global.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = global.cpp; sourceTree = "<group>"; };
-		65595C5320F09D3200043C8E /* FFJSON */ = {isa = PBXFileReference; lastKnownFileType = folder; path = FFJSON; sourceTree = "<group>"; };
 		65595C5420F09D3300043C8E /* output.ffjson */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = output.ffjson; sourceTree = "<group>"; };
 		65595C5520F09D3400043C8E /* FerryStream.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FerryStream.h; sourceTree = "<group>"; };
 		65595C5620F09D3400043C8E /* CMakeLists.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
@@ -26,33 +25,38 @@
 		65595C5C20F09D3600043C8E /* config.h.in */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = config.h.in; sourceTree = "<group>"; };
 		65595C5D20F09D3700043C8E /* config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = config.json; sourceTree = "<group>"; };
 		65595C5E20F09D3700043C8E /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
-		65595C5F20F09D3700043C8E /* logger */ = {isa = PBXFileReference; lastKnownFileType = folder; path = logger; sourceTree = "<group>"; };
 		65595C6020F09D3800043C8E /* WSServer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WSServer.h; sourceTree = "<group>"; };
 		65595C6120F09D3800043C8E /* tests */ = {isa = PBXFileReference; lastKnownFileType = folder; path = tests; sourceTree = "<group>"; };
 		65595C6220F09D3900043C8E /* b64HT.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = b64HT.txt; sourceTree = "<group>"; };
 		65595C6320F09D3900043C8E /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		658D6BA6211EA0D200537894 /* ferrybase */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ferrybase; path = ../ferrybase; sourceTree = "<group>"; };
+		658D6BA7211EA2D600537894 /* logger */ = {isa = PBXFileReference; lastKnownFileType = folder; name = logger; path = ../logger; sourceTree = "<group>"; };
+		658D6BA8211EA30B00537894 /* FFJSON */ = {isa = PBXFileReference; lastKnownFileType = folder; name = FFJSON; path = ../FFJSON; sourceTree = "<group>"; };
+		658D6BCB211EA36500537894 /* libwebsockets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = libwebsockets; path = ../libwebsockets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
 		65595C3F20F06B6500043C8E = {
 			isa = PBXGroup;
 			children = (
+				658D6BA8211EA30B00537894 /* FFJSON */,
+				658D6BA7211EA2D600537894 /* logger */,
+				658D6BCB211EA36500537894 /* libwebsockets */,
+				658D6BA6211EA0D200537894 /* ferrybase */,
+				6542265C21198D820045041B /* Authentication.cpp */,
+				6542265D21198D820045041B /* Authentication.h */,
 				6506AB7220FEDA650095D128 /* CMakeSettings.json */,
 				65595C6220F09D3900043C8E /* b64HT.txt */,
 				65595C5620F09D3400043C8E /* CMakeLists.txt */,
 				65595C5C20F09D3600043C8E /* config.h.in */,
 				65595C5D20F09D3700043C8E /* config.json */,
-				65595C5120F09D3100043C8E /* ferrybase */,
 				65595C4E20F09D3000043C8E /* FerryStream.cpp */,
 				65595C5520F09D3400043C8E /* FerryStream.h */,
-				65595C5320F09D3200043C8E /* FFJSON */,
 				65595C5220F09D3200043C8E /* global.cpp */,
 				65595C4D20F09D3000043C8E /* global.h */,
 				65595C5A20F09D3600043C8E /* init.conf */,
 				65595C5B20F09D3600043C8E /* init.d */,
 				65595C5720F09D3400043C8E /* init.override */,
-				65595C5020F09D3100043C8E /* libwebsockets */,
-				65595C5F20F09D3700043C8E /* logger */,
 				65595C6320F09D3900043C8E /* main.cpp */,
 				65595C5820F09D3500043C8E /* Makefile */,
 				65595C5420F09D3300043C8E /* output.ffjson */,
@@ -67,19 +71,19 @@
 /* End PBXGroup section */
 
 /* Begin PBXLegacyTarget section */
-		65595C4420F06B6500043C8E /* ferryfair */ = {
+		65595C4420F06B6500043C8E /* FerryFair */ = {
 			isa = PBXLegacyTarget;
-			buildArgumentsString = "pi.local \"cd /Users/gowtham/Workspace/ferryfair/build && cmake .. && make\"";
-			buildConfigurationList = 65595C4720F06B6500043C8E /* Build configuration list for PBXLegacyTarget "ferryfair" */;
+			buildArgumentsString = "pi.local \"cd /Users/gowtham/Workspace/FerryFair/build && cmake .. && make\"";
+			buildConfigurationList = 65595C4720F06B6500043C8E /* Build configuration list for PBXLegacyTarget "FerryFair" */;
 			buildPhases = (
 			);
 			buildToolPath = /usr/bin/ssh;
-			buildWorkingDirectory = /Users/gowtham/Workspace/ferryfair/build;
+			buildWorkingDirectory = /Users/gowtham/Workspace/FerryFair/build;
 			dependencies = (
 			);
-			name = ferryfair;
+			name = FerryFair;
 			passBuildSettingsInEnvironment = 1;
-			productName = ferryfair;
+			productName = FerryFair;
 		};
 /* End PBXLegacyTarget section */
 
@@ -88,14 +92,14 @@
 			isa = PBXProject;
 			attributes = {
 				LastUpgradeCheck = 1000;
-				ORGANIZATIONNAME = ferryfair;
+				ORGANIZATIONNAME = FerryFair;
 				TargetAttributes = {
 					65595C4420F06B6500043C8E = {
 						CreatedOnToolsVersion = 10.0;
 					};
 				};
 			};
-			buildConfigurationList = 65595C4320F06B6500043C8E /* Build configuration list for PBXProject "ferryfair" */;
+			buildConfigurationList = 65595C4320F06B6500043C8E /* Build configuration list for PBXProject "FerryFair" */;
 			compatibilityVersion = "Xcode 9.3";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -106,7 +110,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				65595C4420F06B6500043C8E /* ferryfair */,
+				65595C4420F06B6500043C8E /* FerryFair */,
 			);
 		};
 /* End PBXProject section */
@@ -247,7 +251,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		65595C4320F06B6500043C8E /* Build configuration list for PBXProject "ferryfair" */ = {
+		65595C4320F06B6500043C8E /* Build configuration list for PBXProject "FerryFair" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				65595C4520F06B6500043C8E /* Debug */,
@@ -256,7 +260,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		65595C4720F06B6500043C8E /* Build configuration list for PBXLegacyTarget "ferryfair" */ = {
+		65595C4720F06B6500043C8E /* Build configuration list for PBXLegacyTarget "FerryFair" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				65595C4820F06B6500043C8E /* Debug */,
