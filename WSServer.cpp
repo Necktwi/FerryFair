@@ -13,8 +13,8 @@
 //#endif
 //#endif
 //#endif
-char crl_path[1024];
 
+#include <libwebsockets.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -38,7 +38,6 @@ char crl_path[1024];
 #include "FerryStream.h"
 #include "global.h"
 #include "WSServer.h"
-#include <libwebsockets.h>
 #include <ferrybase/JPEGImage.h>
 #include <FFJSON.h>
 #include <logger.h>
@@ -60,11 +59,12 @@ lws_pollfd*       pollfds;
 int*              fd_lookup;
 int               count_pollfds;
 #endif
-volatile int      force_exit = 0, dynamic_vhost_enable = 0;
-lws_vhost*        dynamic_vhost;
-lws_context*      context;
-lws_plat_file_ops fops_plat;
+volatile int      dynamic_vhost_enable = 0;
 static int        test_options;
+struct lws_vhost*        dynamic_vhost;
+struct lws_context*      context;
+struct lws_plat_file_ops fops_plat;
+struct lws_plat_file_ops secure_fops_plat;
 
 #if defined(LWS_WITH_TLS) && defined(LWS_HAVE_SSL_CTX_set1_param)
 char crl_path[1024] = "";
@@ -498,13 +498,13 @@ int WSServer::callback_http (
          } else{
             
             //pss->fd = open(buf, O_RDONLY | _O_BINARY);
-            pss->fd=lws_plat_file_open(wsi, buf, &file_len,
-                                       LWS_O_RDONLY);
+            //pss->fd=lws_plat_file_open(wsi, buf, &file_len,
+            //                           LWS_O_RDONLY);
             
-            if (pss->fd == LWS_INVALID_FILE) {
-               ffl_debug(FPL_HTTPSERV, "unable to open file");
-               return -1;
-            }
+            //if (pss->fd == LWS_INVALID_FILE) {
+            //   ffl_debug(FPL_HTTPSERV, "unable to open file");
+            //   return -1;
+            //}
          }
          if (lws_add_http_header_status(wsi, 200, &p, end))
          return 1;
@@ -545,7 +545,7 @@ int WSServer::callback_http (
                        p - (buffer+LWS_PRE), LWS_WRITE_HTTP_HEADERS);
          
          if (n < 0) {
-            lws_plat_file_close(wsi, pss->fd);
+            //lws_plat_file_close(wsi, pss->fd);
             return -1;
          }
          
@@ -619,7 +619,7 @@ int WSServer::callback_http (
                        p - (buffer + LWS_PRE),
                        LWS_WRITE_HTTP_HEADERS);
          if (n < 0) {
-            lws_plat_file_close(wsi, pss->fd);
+            //lws_plat_file_close(wsi, pss->fd);
             delete pss->payload;
             return -1;
          }
@@ -663,8 +663,8 @@ int WSServer::callback_http (
             n = m;
             
             if(pss->fd){
-               n = lws_plat_file_read(wsi, pss->fd,
-                                      &amount, buffer + LWS_PRE, n);
+               //n = lws_plat_file_read(wsi, pss->fd,
+               //                       &amount, buffer + LWS_PRE, n);
             }else{
                n= pss->payload->length()>n?n:pss->payload->length();
                strncpy((char*)(buffer + LWS_PRE), pss->payload->c_str(), n);
@@ -702,7 +702,7 @@ int WSServer::callback_http (
       flushbail:
       penultimate:
          if (pss->fd) {
-            lws_plat_file_close(wsi, pss->fd);
+            //lws_plat_file_close(wsi, pss->fd);
             pss->fd = LWS_INVALID_FILE;
          } else {
             delete pss->payload;
@@ -714,7 +714,7 @@ int WSServer::callback_http (
          if (pss->payload != NULL) {
             delete pss->payload;
          }
-         lws_plat_file_close(wsi, pss->fd);
+         //lws_plat_file_close(wsi, pss->fd);
          return -1;
       }
       /*
@@ -1147,7 +1147,45 @@ int WSServer::callbackFairPlayWS (
    return 0;
 }
 
-void sighandler(int sig) {
+static lws_fop_fd_t fops_open (
+   const struct lws_plat_file_ops* fops, const char* vfs_path,
+   const char* vpath, lws_fop_flags_t* flags
+) {
+   lws_fop_fd_t fop_fd;
+
+   /* call through to original platform implementation */
+   fop_fd = fops_plat .open (fops, vfs_path, vpath, flags);
+
+   if (fop_fd)
+      lwsl_info ("%s: opening %s, ret %p, len %lu\n", __func__,
+         vfs_path, fop_fd, (long)lws_vfs_get_length(fop_fd)
+      );
+   else
+      lwsl_info ("%s: open %s failed\n", __func__, vfs_path);
+
+   return fop_fd;
+}
+
+static lws_fop_fd_t secure_fops_open (
+   const struct lws_plat_file_ops* fops, const char* vfs_path,
+   const char* vpath, lws_fop_flags_t* flags
+) {
+   lws_fop_fd_t fop_fd;
+
+   /* call through to original platform implementation */
+   fop_fd = fops_plat .open (fops, vfs_path, vpath, flags);
+
+   if (fop_fd)
+      lwsl_info ("%s: opening %s, ret %p, len %lu\n", __func__,
+         vfs_path, fop_fd, (long)lws_vfs_get_length(fop_fd)
+      );
+   else
+      lwsl_info ("%s: open %s failed\n", __func__, vfs_path);
+
+   return fop_fd;
+}
+
+void sighandler (int sig) {
    if (force_exit != 1) {
       force_exit = 1;
    } else {
@@ -1323,17 +1361,22 @@ int WSServer::heart() {
       lwsl_err("libwebsocket init failed\n");
       return -1;
    }
-   if(m_iSecurePort
+   if (m_iSecurePort
 #ifndef LWS_NO_CLIENT
       && !*m_pcClient
 #endif
-      ){
+   ) {
       m_pSecureContext = lws_create_context(&m_SecureInfo);
       if (m_pSecureContext == NULL) {
          lwsl_err("libwebsocket init failed\n");
          return -1;
       }
    }
+   fops_plat = *(lws_get_fops(m_pContext));
+   lws_get_fops(m_pContext)->open = fops_open;
+   secure_fops_plat = *(lws_get_fops(m_pSecureContext));
+   lws_get_fops(m_pSecureContext)->open = secure_fops_open;
+   
 #ifndef LWS_NO_CLIENT
    if (*m_pcClient) {
       lwsl_notice("Client connecting to %s:%u....\n", m_pcAddress, m_iPort);
