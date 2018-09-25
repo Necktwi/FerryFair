@@ -1,8 +1,6 @@
-/*
- * Gowtham Kudupudi 24/11/2013
+/* Gowtham Kudupudi 24/11/2013
  * ©FerryFair
- */
-                                                                                
+ * */                                                                          
 #include "global.h"
 #include "config.h"
 #include "WSServer.h"
@@ -36,9 +34,8 @@
 
 using namespace std;
 
-/**
- * enabled log level
- */
+/* enabled log level
+ * */
 
  //int ff_log_type = FFL_ERR | FFL_WARN | FFL_NOTICE | FFL_DEBUG;
  //unsigned int ff_log_level = FPL_FPORT | FPL_WSSERV | FPL_HTTPSERV | FPL_MAIN
@@ -69,17 +66,20 @@ string hostname;
 string domainname;
 unsigned int duration = 0;
 int ferr = 0;
-int run();
+int run ();
 
-void groomLogFile() {
-   if (ferr > 0)close(ferr);
+void groomLogFile () {
+   if (ferr > 0)
+      close(ferr);
    struct stat statbuf;
    int stat_r = stat(logFile.c_str(), &statbuf);
-   ferr = open(logFile.c_str(), O_WRONLY | ((stat_r == -1 || statbuf.st_size > 5000000) ? (O_CREAT | O_TRUNC) : O_APPEND));
+   ferr = open (
+      logFile.c_str(), O_WRONLY | (stat_r == -1 || statbuf.st_size > 5000000) ?
+      (O_CREAT | O_TRUNC) : O_APPEND, 0600
+   );
 }
 
-void ferryStreamFuneral(int stream_path) {
-}
+void ferryStreamFuneral (int stream_path) {}
 int next_option;
 
 void print_usage(FILE* stream, int exit_code, char* program_name) {
@@ -157,12 +157,17 @@ int readConfig() {
       ffl_debug(FPL_MAIN, "%s", e.what());
       return -1;
    }
-   std::ifstream hfile("/etc/hostname", ios::ate | ios::in);
-   hfile.seekg(ios::end);
+   std::ifstream hfile ("/etc/hostname", ios::ate | ios::in);
+   if (!hfile .is_open()) {
+      ffl_err (0, "/etc/hostname not found.");
+      exit (-1);
+   }   
+   hfile. seekg(ios::end);
    string hostn;
-   hostn.reserve(hfile.tellg());
-   hfile.seekg(ios::beg);
-   hostn.assign((std::istreambuf_iterator<char>(hfile)), std::istreambuf_iterator<char>());
+   hostn .reserve (hfile .tellg ());
+   hfile .seekg (ios::beg);
+   hostn .assign ((std ::istreambuf_iterator<char> (hfile)),
+                  std::istreambuf_iterator<char>());
    FFJSON::trimWhites(hostn);
    int dnail = hostn.find('.');
    if (dnail != string::npos) {
@@ -331,7 +336,7 @@ void configure() {
 
 unsigned int starttime = time(NULL);
 
-int run() {
+int run () {
    groomLogFile();
    if (runMode.compare("daemon") == 0) {
       dup2(ferr, 2);
@@ -385,20 +390,20 @@ int run() {
    return 0;
 }
 
-int main(int argc, char** argv) {
-   Authentication_ Authentication("gowtham", "tornshoees");
+int main (int argc, char** argv) {
+   Authentication_ Authentication ("gowtham", "tornshoees");
    if (Authentication .is_valid()) {
       cout << "Authorized" << endl;
    } else {
       cout << "Unauthorized" << endl;
    }
-   groomLogFile();
-   stdinfd = dup(0);
-   stdoutfd = dup(1);
-   stderrfd = dup(2);
+   groomLogFile ();
+   stdinfd = dup (0);
+   stdoutfd = dup (1);
+   stderrfd = dup (2);
    const char* const short_options = "cdf:hirs:t:ux";
    string opt;
-   const struct option long_options[] = {
+   const struct option long_options [] = {
       {"configure", 0, NULL, 'c'},
       {"config-file", 1, NULL, 'f'},
       {"update", 0, NULL, 'd'},
@@ -413,8 +418,9 @@ int main(int argc, char** argv) {
    };
    struct stat st;
    configFile = "config.json";
-   if (stat(configFile.c_str(), &st) == -1) {
-      configFile = string(CONFIG_INSTALL_DIR) + "/" + string(APP_NAME) + ".json";
+   if (stat (configFile.c_str(), &st) == -1) {
+      configFile = string (CONFIG_INSTALL_DIR) + "/" + string (APP_NAME) +
+         ".json";
    }
    do {
       next_option = getopt_long(argc, argv, short_options, long_options,

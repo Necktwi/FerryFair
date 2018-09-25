@@ -1,7 +1,6 @@
-/*
- * Gowtham Kudupudi 06/08/2018
+/* Gowtham Kudupudi 06/08/2018
  * ©FerryFair
- */
+ * */
 
 #ifndef Authuntication_h
 #define Authuntication_h
