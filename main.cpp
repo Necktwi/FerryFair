@@ -12,7 +12,9 @@
 #include <ferrybase/myconverters.h>
 #include <FFJSON.h>
 #include <logger.h>
+#ifdef LIBWEBSOCKETS
 #include <libwebsockets.h>
+#endif
 #include <linux/prctl.h>
 #include <cstdlib>
 #include <string>
@@ -45,7 +47,9 @@ using namespace std;
 
 int child_exit_status = 0;
 int port = 0;
+#ifdef LIBWEBSOCKETS
 std::map<lws*, WSServer::per_session_data__fairplay*> wsi_psdf_map;
+#endif
 std::string configFile;
 string recordsFolder = "/var/" APP_NAME "records/";
 string logFile = "/var/log/" APP_NAME ".log";

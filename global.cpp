@@ -2,8 +2,7 @@
 #include <ferrybase/mystdlib.h>
 #include <logger.h>
 #include <string>
-#include <list>
-#include <libwebsockets.h>
+#include <list>                                 \
 #include <FFJSON.h>
 #include <mutex>
 
@@ -12,8 +11,10 @@ std::map<int, std::string> id_path_map;
 std::map<int, std::list<FFJSON*>*> path_packs_map;
 std::map<FFJSON*, std::string*> pack_string_map;
 std::map<int, bool> packs_to_send;
+#ifdef LIBWEBSOCKETS
 std::map<lws*, int> wsi_path_map;
 std::map<int, std::list<lws*>*> path_wsi_map;
+#endif
 
 char* b64_hmt = NULL;
 int b64_hmt_l = 0;
@@ -34,7 +35,9 @@ int init_path(std::string path) {
 		path_id_map[path] = ++init_path_id;
 		id_path_map[init_path_id] = path;
 		path_packs_map[init_path_id] = new std::list<FFJSON*>();
-		path_wsi_map[init_path_id] = new std::list<lws*>();
+#ifdef LIBWEBSOCKETS
+      path_wsi_map[init_path_id] = new std::list<lws*>();
+#endif
 	}
 	ipMutex.unlock();
 	return path_id_map[path];
@@ -56,9 +59,11 @@ void terminate_path(int path) {
 			k++;
 		}
 		delete j->second;
-		delete path_wsi_map[i->first];
+#ifdef LIBWEBSOCKETS
+      delete path_wsi_map[i->first];
 		path_wsi_map.erase(i->first);
-		path_packs_map.erase(j);
+#endif
+      path_packs_map.erase(j);
 		path_id_map.erase(i->second);
 		id_path_map.erase(i);
 	}
@@ -80,9 +85,11 @@ void terminate_all_paths() {
 			k++;
 		}
 		delete j->second;
-		delete path_wsi_map[i->first];
-		path_packs_map.erase(j);
+#ifdef LIBWEBSOCKETS
+      delete path_wsi_map[i->first];
 		path_wsi_map.erase(i->first);
+#endif                                          \
+      path_packs_map.erase(j);
 		i++;
 		path_id_map.erase(l->second);
 		id_path_map.erase(l);

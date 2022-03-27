@@ -30,12 +30,6 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON")
          ${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/Build${BUILD_TARGET}
       )
    endif ()
-   if (NOT TARGET libwebsockets)
-      add_subdirectory (
-         ${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets
-         ${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets/Build${BUILD_TARGET}
-      )
-   endif ()
    if (NOT TARGET logger)
       add_subdirectory (
          ${CMAKE_CURRENT_SOURCE_DIR}/../logger
@@ -100,10 +94,6 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase")
       ${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON
       ${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/Build${BUILD_TARGET}
    )
-   include_directories (
-      ${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets/lib
-      ${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets/Build${BUILD_TARGET}
-   )
    if (CMAKE_CONFIGURATION_TYPES)
       message ("Linking corresponding to the Configuration Name")
       set (BLD_DIR "Build${BUILD_TARGET}/$(ConfigurationName)")
@@ -116,17 +106,11 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase")
       link_directories (
          "${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/${BLD_DIR}"
       )
-      link_directories (
-         "${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets/${BLD_DIR}"
-      )
    else ()
       set (BLD_DIR "Build${BUILD_TARGET}/")
       link_directories ("${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase/${BLD_DIR}")
       link_directories ("${CMAKE_CURRENT_SOURCE_DIR}/../logger/${BLD_DIR}")
       link_directories ("${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/${BLD_DIR}")
-      link_directories (
-         "${CMAKE_CURRENT_SOURCE_DIR}/../libwebsockets/${BLD_DIR}"
-      )
    endif ()
 else ()
    include_directories (
@@ -153,7 +137,7 @@ else ()
 endif ()
 
 target_link_libraries (
-   ${PROJECT_NAME} websockets FFJSON logger ferrybase ssl crypto pthread pam
+   ${PROJECT_NAME} FFJSON logger ferrybase ssl crypto pthread pam
 )
 set_target_properties (
    ${PROJECT_NAME}

@@ -14,7 +14,6 @@
 //#endif
 //#endif
 
-#include <libwebsockets.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -33,7 +32,11 @@
 #include <string>
 #include <sys/stat.h>
 
+#ifdef LIBWEBSOCKETS
 #include "lws_config.h"
+#else
+#include "mongoose.h"
+#endif
 
 #include "FerryStream.h"
 #include "global.h"
@@ -49,6 +52,7 @@
 
 using namespace std;
 
+#ifdef LIBWEBSOCKETS
 #define LWS_NO_CLIENT
 
 FFJSON            HTTPModel;
@@ -1444,5 +1448,35 @@ bail:
    closelog();
 #endif
 }
-
+#endif
+static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
+  struct mg_http_serve_opts opts = {
+     .root_dir = "/home/Necktwi/workspace/WWW"
+  };   // Serve local dir
+  if (ev == MG_EV_HTTP_MSG)
+     mg_http_serve_dir(c, (mg_http_message*)ev_data, &opts);
+}
+WSServer::WSServer (
+   const char* pcHostName, int iDebugLevel,
+   int iPort, int iSecurePort, const char* pcSSLCertFilePath,
+   const char* pcSSLPrivKeyFilePath, const char* pcSSLCAFilePath,
+   bool bDaemonize, int iRateUs, const char* pcInterface,
+   const char* pcClient, int iOpts,
+   #ifndef LWS_NO_CLIENT
+      const char* pcAddress, unsigned int uiOldus,
+   #ifdef LIBWEBSOCKETS
+   struct lws* pWSI,
+   #endif
+   #endif
+   int iSysLogOptions
+) 
+{
+   struct mg_mgr mgr;   
+   mg_mgr_init(&mgr);
+   mg_http_listen(&mgr, "0.0.0.0:80", fn, NULL);
+   for (;;) mg_mgr_poll(&mgr, 1000);
+}
+WSServer::~WSServer () {
+   
+}
 //string WSServer::per_session_data__http::vhost();

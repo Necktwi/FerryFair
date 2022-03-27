@@ -7,7 +7,9 @@
 
 #include "FerryStream.h"
 #include "global.h"
-#include <libwebsockets.h>
+#ifdef LIBWEBSOCKETS
+   #include <libwebsockets.h>
+#endif
 #include <ferrybase/ServerSocket.h>
 #include <ferrybase/SocketException.h>
 #include <ferrybase/mystdlib.h>

@@ -15,16 +15,19 @@
 #include <string>
 #include <map>
 #include <list>
+#ifdef LIBWEBSOCKETS
 #include <libwebsockets.h>
-
+#endif
 
 extern std::map<std::string, unsigned int> path_id_map;
 extern std::map<int, std::string> id_path_map;
 extern std::map<int, std::list<FFJSON*>*> path_packs_map;
 extern std::map<FFJSON*, std::string*> pack_string_map;
 extern std::map<int, bool> packs_to_send;
-extern std::map<lws*, int> wsi_path_map;
-extern std::map<int, std::list<lws*>*> path_wsi_map;
+#ifdef LIBWEBSOCKETS
+   extern std::map<lws*, int> wsi_path_map;
+   extern std::map<int, std::list<lws*>*> path_wsi_map;
+#endif
 
 extern char* b64_hmt;
 extern int b64_hmt_l;

@@ -12,7 +12,9 @@
 #define LWS_NO_CLIENT
 
 #include "FerryStream.h"
+#ifdef LIBWEBSOCKETS
 #include <libwebsockets.h>
+#endif
 #include <FFJSON.h>
 #include <string>
 #include <map>
@@ -21,8 +23,10 @@
 
 using namespace std;
 using namespace placeholders;
+
 class WSServer {
 public:
+#ifdef LIBWEBSOCKETS
 
 	enum FraggleStates {
 		FRAGSTATE_INIT_PCK,
@@ -36,7 +40,9 @@ public:
 		PROTOCOL_HTTP = 0,
 		PROTOCOL_FFJSON
 	};
-    WSServer(
+#endif
+   
+   WSServer(
             const char* pcHostName,
             int iDebugLevel=15,
             int iPort=8080,
@@ -52,12 +58,15 @@ public:
 #ifndef LWS_NO_CLIENT
             const char* pcAddress="",
             unsigned int uiOldus = 0,
+#ifdef LIBWEBSOCKETS
             struct lws* pWSI=NULL,
+#endif
 #endif
             int iSysLogOptions=0
     );
     virtual ~WSServer();
-    char m_pcHostName[256];
+#ifdef LIBWEBSOCKETS
+   char m_pcHostName[256];
     int m_iRateUs;
     int m_iDebugLevel;
     int m_iPort;
@@ -178,5 +187,6 @@ private:
 	static unsigned int valid_session(unsigned int session_id);
 	std::thread* heartThread;
 	static FFJSON models;
+#endif
 };
 #endif /* WSSERVER_H */
