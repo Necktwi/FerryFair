@@ -30,7 +30,9 @@
 #include <list>
 #include <signal.h>
 #include <sys/wait.h>
+#ifdef __GLIBC__
 #include <sys/prctl.h>
+#endif
 #include <sys/stat.h>
 #include <getopt.h>
 

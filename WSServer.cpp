@@ -1450,7 +1450,22 @@ bail:
 }
 #endif
 static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
-  struct mg_http_serve_opts opts = {
+   struct mg_http_serve_opts opts = {
+     .root_dir = "/home/Necktwi/workspace/WWW"
+  };   // Serve local dir
+  if (ev == MG_EV_HTTP_MSG)
+     mg_http_serve_dir(c, (mg_http_message*)ev_data, &opts);
+}
+static void fn_tls(struct mg_connection *c, int ev, void *ev_data,
+                   void *fn_data) {
+   if (ev == MG_EV_ACCEPT) {
+      struct mg_tls_opts opts = {
+         .cert = "/etc/letsencrypt/live/ferryfair.com/cert.pem",
+         .certkey = "/etc/letsencrypt/live/ferryfair.com/privkey.pem"
+      };
+      mg_tls_init(c, &opts);
+   }
+   struct mg_http_serve_opts opts = {
      .root_dir = "/home/Necktwi/workspace/WWW"
   };   // Serve local dir
   if (ev == MG_EV_HTTP_MSG)
@@ -1471,8 +1486,9 @@ WSServer::WSServer (
    int iSysLogOptions
 ) 
 {
-   struct mg_mgr mgr;   
+   struct mg_mgr mgr;
    mg_mgr_init(&mgr);
+   mg_http_listen(&mgr, "0.0.0.0:443", fn_tls, NULL);
    mg_http_listen(&mgr, "0.0.0.0:80", fn, NULL);
    for (;;) mg_mgr_poll(&mgr, 1000);
 }
