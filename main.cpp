@@ -15,7 +15,9 @@
 #ifdef LIBWEBSOCKETS
 #include <libwebsockets.h>
 #endif
+#ifdef __GLIBC__
 #include <linux/prctl.h>
+#endif
 #include <cstdlib>
 #include <string>
 #include <iostream>
@@ -30,9 +32,7 @@
 #include <list>
 #include <signal.h>
 #include <sys/wait.h>
-#ifdef __GLIBC__
 #include <sys/prctl.h>
-#endif
 #include <sys/stat.h>
 #include <getopt.h>
 
