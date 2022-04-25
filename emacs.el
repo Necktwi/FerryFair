@@ -16,7 +16,7 @@
               "-DBUILD_TESTING=1"))
 (defvar MakeThreadCount 1)
 (defvar DebugTarget "FerryFair")
-(defvar TargetArguments "")
+(defvar TargetArguments "-s normal")
 (message "FerryFair emacs project loaded.")
 (provide 'FerryFair)
 ;;; emacs.el ends here

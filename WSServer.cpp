@@ -1449,15 +1449,62 @@ bail:
 #endif
 }
 #endif
+static void parseHTTPHeader (const char* uri, size_t len, FFJSON& sessionData) 
+{
+   unsigned int i=0;
+   unsigned int pairStartPin=i;
+   while(uri[i]!=NULL){
+      if(uri[i]=='\n'){
+         int k=i;
+         if(uri[i-1]=='\r')k=i-1;
+         if(pairStartPin==0){
+            int j=pairStartPin;
+            while(uri[j]!=' '){
+               ++j;
+            }
+            sessionData["path"]=string(uri,j);
+            ++j;
+            sessionData["version"]=string(uri+j,k-j);
+            
+         }else{
+            int j=pairStartPin;
+            if (k==j) return;
+            while(uri[pairStartPin]==' ')++pairStartPin;
+            while(uri[j]!=':')++j;
+            int keySize=j-pairStartPin;
+            ++j;
+            ++j;
+            sessionData[string(uri+pairStartPin,keySize)]=string(uri+j,k-j);
+         }
+         pairStartPin=i+1;
+      }
+      ++i;
+   }
+}
+
 static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
    struct mg_http_serve_opts opts = {
-     .root_dir = "/home/Necktwi/workspace/WWW"
-  };   // Serve local dir
-  if (ev == MG_EV_HTTP_MSG)
-     mg_http_serve_dir(c, (mg_http_message*)ev_data, &opts);
+      .root_dir = "/home/Necktwi/workspace/WWW"
+   };   // Serve local dir
+   if (ev == MG_EV_HTTP_MSG) {
+      struct mg_http_message* hm = (struct mg_http_message*) ev_data;
+      printf("%s\n", hm->uri);
+      FFJSON sessionData;
+      parseHTTPHeader((const char*)hm->uri.ptr, hm->uri.len, sessionData);
+      //printf("%s\n",(char*)sessionData["Referer"]);
+      if (
+         !strcmp(sessionData["Host"],"www.ferryfair.com") ||
+         !strcmp(sessionData["Host"], "127.0.0.2")
+      ) {
+         printf("Development zone.\n");
+         opts.root_dir="/home/Necktwi/workspace/WWW-development";
+      }
+      mg_http_serve_dir(c, (mg_http_message*)ev_data, &opts);
+   }
 }
 static void fn_tls(struct mg_connection *c, int ev, void *ev_data,
-                   void *fn_data) {
+                   void *fn_data
+) {
    if (ev == MG_EV_ACCEPT) {
       struct mg_tls_opts opts = {
          .cert = "/etc/letsencrypt/live/ferryfair.com/cert.pem",
