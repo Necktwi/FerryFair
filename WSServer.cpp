@@ -1482,7 +1482,9 @@ static void parseHTTPHeader (const char* uri, size_t len, FFJSON& sessionData)
    }
 }
 
-static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
+static void tls_ntls_common(struct mg_connection* c, int ev, void* ev_data,
+                            void* fn_data)
+{
    struct mg_http_serve_opts opts = {
       .root_dir = "/home/Necktwi/workspace/WWW"
    };   // Serve local dir
@@ -1502,6 +1504,9 @@ static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
       mg_http_serve_dir(c, (mg_http_message*)ev_data, &opts);
    }
 }
+static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
+   tls_ntls_common(c, ev, ev_data, fn_data);
+}
 static void fn_tls(struct mg_connection *c, int ev, void *ev_data,
                    void *fn_data
 ) {
@@ -1512,11 +1517,7 @@ static void fn_tls(struct mg_connection *c, int ev, void *ev_data,
       };
       mg_tls_init(c, &opts);
    }
-   struct mg_http_serve_opts opts = {
-     .root_dir = "/home/Necktwi/workspace/WWW"
-  };   // Serve local dir
-  if (ev == MG_EV_HTTP_MSG)
-     mg_http_serve_dir(c, (mg_http_message*)ev_data, &opts);
+   tls_ntls_common(c, ev, ev_data, fn_data);
 }
 WSServer::WSServer (
    const char* pcHostName, int iDebugLevel,
