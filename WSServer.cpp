@@ -53,7 +53,7 @@ static void parseHTTPHeader (const char* uri, size_t len, FFJSON& sessionData)
 {
    unsigned int i=0;
    unsigned int pairStartPin=i;
-   while(uri[i]!=NULL){
+   while(uri[i]!='\0'){
       if(uri[i]=='\n'){
          int k=i;
          if(uri[i-1]=='\r')k=i-1;
