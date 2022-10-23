@@ -14,6 +14,11 @@
 //#endif
 //#endif
 
+#include "global.h"
+#include "WSServer.h"
+#include "mongoose.h"
+#include "FerryStream.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -32,11 +37,7 @@
 #include <string>
 #include <sys/stat.h>
 
-#include "mongoose.h"
 
-#include "FerryStream.h"
-#include "global.h"
-#include "WSServer.h"
 #include <ferrybase/JPEGImage.h>
 #include <FFJSON.h>
 #include <logger.h>
@@ -88,8 +89,15 @@ static void tls_ntls_common(struct mg_connection* c, int ev, void* ev_data,
       .root_dir = "/home/Necktwi/workspace/WWW"
    };   // Serve local dir
    if (ev == MG_EV_HTTP_MSG) {
+      unsigned char b[4];
+      b[0] = c->rem.ip & 0xFF;
+      b[1] = (c->rem.ip >> 8) & 0xFF;
+      b[2] = (c->rem.ip >> 16) & 0xFF;
+      b[3] = (c->rem.ip >> 24) & 0xFF;
+      printf("Remote IP: %d.%d.%d.%d\n", b[0], b[1], b[2], b[3]);
       struct mg_http_message* hm = (struct mg_http_message*) ev_data;
-      printf("%s\n", hm->uri);
+      printf("hm->uri: %s\n", hm->uri);
+
       FFJSON sessionData;
       parseHTTPHeader((const char*)hm->uri.ptr, hm->uri.len, sessionData);
       //printf("%s\n",(char*)sessionData["Referer"]);
