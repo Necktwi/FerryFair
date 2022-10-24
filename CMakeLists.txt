@@ -27,19 +27,19 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON")
    if (NOT TARGET FFJSON)
       add_subdirectory (
          ${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON
-         ${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/Build${BUILD_TARGET}
+         ${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/${SRC_RLTV_BLD_DIR}
       )
    endif ()
    if (NOT TARGET logger)
       add_subdirectory (
          ${CMAKE_CURRENT_SOURCE_DIR}/../logger
-         ${CMAKE_CURRENT_SOURCE_DIR}/../logger/Build${BUILD_TARGET}
+         ${CMAKE_CURRENT_SOURCE_DIR}/../logger/${SRC_RLTV_BLD_DIR}
       )
    endif ()
    if (NOT TARGET ferrybase)
       add_subdirectory (
          ${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase
-         ${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase/Build${BUILD_TARGET}
+         ${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase/${SRC_RLTV_BLD_DIR}
       )
    endif ()
 endif ()
@@ -85,20 +85,20 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase")
    include_directories (${PROJECT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
    include_directories (
       ${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase
-      ${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase/Build${BUILD_TARGET} 
+      ${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase${BUILD_TARGET} 
       ${CMAKE_CURRENT_SOURCE_DIR}/..
    )
    include_directories (
       ${CMAKE_CURRENT_SOURCE_DIR}/../logger
-      ${CMAKE_CURRENT_SOURCE_DIR}/../logger/Build${BUILD_TARGET}
+      ${CMAKE_CURRENT_SOURCE_DIR}/../logger${BUILD_TARGET}
    )
    include_directories (
       ${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON
-      ${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/Build${BUILD_TARGET}
+      ${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON${BUILD_TARGET}
    )
    if (CMAKE_CONFIGURATION_TYPES)
       message ("Linking corresponding to the Configuration Name")
-      set (BLD_DIR "Build${BUILD_TARGET}/$(ConfigurationName)")
+      set (BLD_DIR "${BUILD_TARGET}/$(ConfigurationName)")
       link_directories (
          "${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase/${BLD_DIR}"
       )
@@ -109,7 +109,7 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase")
          "${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/${BLD_DIR}"
       )
    else ()
-      set (BLD_DIR "Build${BUILD_TARGET}/")
+      set (BLD_DIR "${BUILD_TARGET}/")
       link_directories ("${CMAKE_CURRENT_SOURCE_DIR}/../ferrybase/${BLD_DIR}")
       link_directories ("${CMAKE_CURRENT_SOURCE_DIR}/../logger/${BLD_DIR}")
       link_directories ("${CMAKE_CURRENT_SOURCE_DIR}/../FFJSON/${BLD_DIR}")

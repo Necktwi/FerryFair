@@ -111,6 +111,8 @@ static void tls_ntls_common(struct mg_connection* c, int ev, void* ev_data,
          opts.root_dir="/home/Necktwi/workspace/WWW-development";
       }
       mg_http_serve_dir(c, (mg_http_message*)ev_data, &opts);
+      if (valgrind_test)
+         force_exit=true;
    }
 }
 static void fn(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
@@ -147,7 +149,7 @@ WSServer::WSServer (
    mg_mgr_init(&mgr);
    mg_http_listen(&mgr, "0.0.0.0:443", fn_tls, NULL);
    mg_http_listen(&mgr, "0.0.0.0:80", fn, NULL);
-   for (;;) mg_mgr_poll(&mgr, 1000);
+   while (!force_exit) mg_mgr_poll(&mgr, 1000);
 }
 WSServer::~WSServer () {
    

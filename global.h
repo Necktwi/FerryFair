@@ -45,6 +45,7 @@ extern std::string hostname;
 extern std::string domainname;
 extern unsigned int duration;
 extern unsigned int starttime;
+extern bool valgrind_test;
 
 enum _fp_log_level {
 	FPL_MAIN = 1 << 0,
