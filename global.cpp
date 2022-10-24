@@ -27,7 +27,7 @@ int stdinfd = -1;
 int stderrfd = -1;
 int stdoutfd = -1;
 int init_path_id = 0;
-bool valgrind_test = true;
+bool valgrind_test = false;
 
 std::mutex ipMutex;
 
