@@ -101,7 +101,9 @@ static void tls_ntls_common(struct mg_connection* c, int ev, void* ev_data,
       FFJSON sessionData;
       parseHTTPHeader((const char*)hm->uri.ptr, hm->uri.len, sessionData);
       //printf("%s\n",(char*)sessionData["Referer"]);
-      if (
+      if (sessionData["Host"]==nullptr) {
+         return;
+      } else if (
          !strcmp(sessionData["Host"],"www.ferryfair.com") ||
          !strcmp(sessionData["Host"], "127.0.0.2")
       ) {
