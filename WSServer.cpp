@@ -59,23 +59,24 @@ static void parseHTTPHeader (const char* uri, size_t len, FFJSON& sessionData)
          if(uri[i-1]=='\r')k=i-1;
          if(pairStartPin==0){
             int j=pairStartPin;
-            while(uri[j]!=' '){
+            while(uri[j]!=' ' && j<k){
                ++j;
             }
+            if(j==k) goto line_done;
             sessionData["path"]=string(uri,j);
             ++j;
-            sessionData["version"]=string(uri+j,k-j);
-            
+            sessionData["version"]=string(uri+j,k-j);            
          }else{
             int j=pairStartPin;
-            if (k==j) return;
             while(uri[pairStartPin]==' ')++pairStartPin;
-            while(uri[j]!=':')++j;
+            while(uri[j]!=':' && j<k)++j;
+            if(j==k) goto line_done;
             int keySize=j-pairStartPin;
             ++j;
             ++j;
             sessionData[string(uri+pairStartPin,keySize)]=string(uri+j,k-j);
          }
+line_done:         
          pairStartPin=i+1;
       }
       ++i;
@@ -96,7 +97,7 @@ static void tls_ntls_common(struct mg_connection* c, int ev, void* ev_data,
       b[3] = (c->rem.ip >> 24) & 0xFF;
       printf("Remote IP: %d.%d.%d.%d\n", b[0], b[1], b[2], b[3]);
       struct mg_http_message* hm = (struct mg_http_message*) ev_data;
-      printf("hm->uri: %s\n", hm->uri);
+      printf("hm->uri:\n%s\n", hm->uri);
 
       FFJSON sessionData;
       parseHTTPHeader((const char*)hm->uri.ptr, hm->uri.len, sessionData);
