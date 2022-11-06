@@ -85,8 +85,14 @@ line_done:
    }
 }
 
-string get_subdomain(string host) {
-   return host.substr(0, host.find((const char*)config["hostname"])-1);
+string get_subdomain(const char* host) {
+   string hoststr(host);
+   if(!config["hostName"]) return string();
+   int domainpos = hoststr.find((const char*)config["hostName"]);
+   if (domainpos > 1)
+      return hoststr.substr(0, domainpos-1);
+   else
+      return string();
 }
 
 static void tls_ntls_common(struct mg_connection* c, int ev, void* ev_data,

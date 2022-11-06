@@ -32,19 +32,19 @@
 	"lwsDebug": 7,
 	"virtualWebHosts": {
 		"fairplay": {
-			"rootdir": "/home/gowtham/Workspace/fairplay"
+			"rootdir": "/home/Necktwi/Workspace/fairplay"
 		},
 		"deb": {
-			"rootdir": "/home/gowtham/Workspace/deb"
+			"rootdir": "/home/Necktwi/Workspace/deb"
 		},
 		"www": {
-			"rootdir": "/home/gowtham/Workspace/WWW"
+			"rootdir": "/home/Necktwi/Workspace/WWW"
 		},
 		"underconstruction": {
-			"rootdir": "/home/gowtham/Workspace/W3"
+			"rootdir": "/home/Necktwi/Workspace/W3"
 		},
 		"rosy": {
-			"rootdir": "/home/gowtham/Workspace/rosy"
+			"rootdir": "/home/Necktwi/Workspace/rosy"
 		},
 		"mail": {
 			"rootdir": "/usr/share/roundcubemail",
