@@ -86,7 +86,7 @@ line_done:
 }
 
 string get_subdomain(string host) {
-   return host.substr(0, host.find((const char*)config["hostname"]));
+   return host.substr(0, host.find((const char*)config["hostname"])-1);
 }
 
 static void tls_ntls_common(struct mg_connection* c, int ev, void* ev_data,
@@ -117,7 +117,9 @@ static void tls_ntls_common(struct mg_connection* c, int ev, void* ev_data,
          printf("Development zone.\n");
          opts.root_dir="/home/Necktwi/workspace/WWW-development";
       } else if (config["virtualWebHosts"][get_subdomain(sessionData["Host"])]){
-         opts.root_dir = config["virtualWebHosts"][get_subdomain(sessionData["Host"])];
+         opts.root_dir =
+            config["virtualWebHosts"][get_subdomain(sessionData["Host"])];
+         printf("Serving: %s\n", opts.root_dir);
          
       }
       
