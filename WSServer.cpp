@@ -125,10 +125,8 @@ static void tls_ntls_common(struct mg_connection* c, int ev, void* ev_data,
          opts.root_dir="/home/Necktwi/workspace/WWW-development";
       } else if (config["virtualWebHosts"][get_subdomain(sessionData["Host"])]){
          string subdomain=get_subdomain(sessionData["Host"]);
-         ffl_debug(FPL_MAIN, "subdomain: %s\n", subdomain.c_str());
-         ffl_debug(FPL_MAIN, "root_dir: %s\n", (const char*)config["virtualWebHosts"][subdomain]);
-         
-         opts.root_dir = (const char*) config["virtualWebHosts"][subdomain];
+         opts.root_dir = (const char*) config["virtualWebHosts"][subdomain]
+            ["rootdir"];
          printf("Serving: %s\n", opts.root_dir);
          
       }
