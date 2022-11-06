@@ -55,6 +55,8 @@ static void parseHTTPHeader (const char* uri, size_t len, FFJSON& sessionData)
    unsigned int pairStartPin=i;
    while(uri[i]!='\0'){
       if(uri[i]=='\n'){
+         if(uri[i-1]=='\n' || (uri[i-1]=='\r' && uri[i-2]=='\n'))return;
+         
          int k=i;
          if(uri[i-1]=='\r')k=i-1;
          if(pairStartPin==0){
@@ -81,6 +83,10 @@ line_done:
       }
       ++i;
    }
+}
+
+string get_subdomain(string host) {
+   return host.substr(0, host.find((const char*)config["hostname"]));
 }
 
 static void tls_ntls_common(struct mg_connection* c, int ev, void* ev_data,
@@ -110,8 +116,24 @@ static void tls_ntls_common(struct mg_connection* c, int ev, void* ev_data,
       ) {
          printf("Development zone.\n");
          opts.root_dir="/home/Necktwi/workspace/WWW-development";
+      } else if (config["virtualWebHosts"][get_subdomain(sessionData["Host"])]){
+         opts.root_dir = config["virtualWebHosts"][get_subdomain(sessionData["Host"])];
+         
       }
-      mg_http_serve_dir(c, (mg_http_message*)ev_data, &opts);
+      
+      if (!strcmp(sessionData["path"], "/login")) {
+         printf("login\n");
+         FFJSON body(string(hm->body.ptr, hm->body.len));
+         printf("User: %s\n", (const char*)body["username"]);
+         printf("Pass: %s\n", (const char*)body["password"]);
+         const char *headers = "content-type: text/json\r\n";
+         // Return data, up to CHUNK_SIZE elements
+         mg_http_reply(c, 200, headers, "{\"%s\":%s}",
+                       "login","true");
+      } else {   
+         mg_http_serve_dir(c, (mg_http_message*)ev_data, &opts);
+      }
+      
       if (valgrind_test)
          force_exit=true;
    }
