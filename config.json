@@ -1,6 +1,6 @@
 {
 	"name": "FairPlay configuration file",
-	"homeFolder": "/home/Necktwi/Workspace/WWW",
+	"homeFolder": "/home/Necktwi/workspace/WWW",
 	"hostName": "ferryfair.com",
 	"port": 9271,
 	"bootup": true,
@@ -32,19 +32,19 @@
 	"lwsDebug": 7,
 	"virtualWebHosts": {
 		"fairplay": {
-			"rootdir": "/home/Necktwi/Workspace/fairplay"
+			"rootdir": "/home/Necktwi/workspace/fairplay"
 		},
 		"deb": {
-			"rootdir": "/home/Necktwi/Workspace/deb"
+			"rootdir": "/home/Necktwi/workspace/deb"
 		},
 		"www": {
-			"rootdir": "/home/Necktwi/Workspace/WWW"
+			"rootdir": "/home/Necktwi/workspace/WWW"
 		},
 		"underconstruction": {
-			"rootdir": "/home/Necktwi/Workspace/W3"
+			"rootdir": "/home/Necktwi/workspace/W3"
 		},
 		"rosy": {
-			"rootdir": "/home/Necktwi/Workspace/rosy"
+			"rootdir": "/home/Necktwi/workspace/rosy"
 		},
 		"mail": {
 			"rootdir": "/usr/share/roundcubemail",

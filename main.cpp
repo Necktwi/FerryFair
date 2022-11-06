@@ -157,6 +157,8 @@ int readConfig() {
       fflAllowedType = (FF_LOG_TYPE)ff_log_type;
       fflAllowedLevel = ff_log_level;
       ffl_debug(FPL_MAIN, "fflAllowedType: %08X, fflAllowedLevel: %08X", (unsigned int)fflAllowedType, (unsigned int)fflAllowedLevel);
+      ffl_debug(FPL_MAIN, "config: %s\n", config.prettyString().c_str());
+      
    }
    catch (FFJSON::Exception e) {
       ffl_err(FPL_MAIN, "Reading configuration failed. Please check the configuration file");

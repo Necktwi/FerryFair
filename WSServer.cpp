@@ -114,6 +114,7 @@ static void tls_ntls_common(struct mg_connection* c, int ev, void* ev_data,
       FFJSON sessionData;
       parseHTTPHeader((const char*)hm->uri.ptr, hm->uri.len, sessionData);
       //printf("%s\n",(char*)sessionData["Referer"]);
+      ffl_debug(FPL_MAIN, "config: %s\n", config.prettyString().c_str());
       if (sessionData["Host"]==nullptr) {
          return;
       } else if (
