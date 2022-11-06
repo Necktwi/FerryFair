@@ -114,7 +114,7 @@ static void tls_ntls_common(struct mg_connection* c, int ev, void* ev_data,
       FFJSON sessionData;
       parseHTTPHeader((const char*)hm->uri.ptr, hm->uri.len, sessionData);
       //printf("%s\n",(char*)sessionData["Referer"]);
-      ffl_debug(FPL_MAIN, "config: %s\n", config.prettyString().c_str());
+      //ffl_debug(FPL_MAIN, "config: %s\n", config.prettyString().c_str());
       if (sessionData["Host"]==nullptr) {
          return;
       } else if (
@@ -124,8 +124,11 @@ static void tls_ntls_common(struct mg_connection* c, int ev, void* ev_data,
          printf("Development zone.\n");
          opts.root_dir="/home/Necktwi/workspace/WWW-development";
       } else if (config["virtualWebHosts"][get_subdomain(sessionData["Host"])]){
-         opts.root_dir = (const char*)
-            config["virtualWebHosts"][get_subdomain(sessionData["Host"])];
+         string subdomain=get_subdomain(sessionData["Host"]);
+         ffl_debug(FPL_MAIN, "subdomain: %s\n", subdomain.c_str());
+         ffl_debug(FPL_MAIN, "root_dir: %s\n", (const char*)config["virtualWebHosts"][subdomain]);
+         
+         opts.root_dir = (const char*) config["virtualWebHosts"][subdomain];
          printf("Serving: %s\n", opts.root_dir);
          
       }
