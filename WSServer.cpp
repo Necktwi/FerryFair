@@ -123,7 +123,7 @@ static void tls_ntls_common(struct mg_connection* c, int ev, void* ev_data,
          printf("Development zone.\n");
          opts.root_dir="/home/Necktwi/workspace/WWW-development";
       } else if (config["virtualWebHosts"][get_subdomain(sessionData["Host"])]){
-         opts.root_dir =
+         opts.root_dir = (const char*)
             config["virtualWebHosts"][get_subdomain(sessionData["Host"])];
          printf("Serving: %s\n", opts.root_dir);
          
