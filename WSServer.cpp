@@ -200,7 +200,6 @@ void mailfn (
 void tls_ntls_common (
    struct mg_connection* c, int ev, void* ev_data, void* fn_data
 ) {
-   printf("EV: %d\n", ev);
    struct mg_http_serve_opts opts = {
       .root_dir = (ccp)config["homeFolder"]
    };   // Serve local dir
