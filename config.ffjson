@@ -1,14 +1,14 @@
 {
 	"name": "FairPlay configuration file",
 	"homeFolder": "/home/Necktwi/workspace/WWW",
-	"hostName": "ferryfair.com",
+	"hostName": "FerryFair.com",
 	"port": 9271,
 	"bootup": true,
 	"internetTestURL": "www.google.com",
 	"corpNWGW": "127.0.0.1",
 	"#logType": "
-		One can specify type of log to print in this field. It takes additive values 
-		of following to print combination of them. 
+		One can specify type of log to print in this field. It takes additive
+		values of following to print combination of them. 
 			Errors=1,
 			Warnings=2,
 			Notices=4,
@@ -17,8 +17,8 @@
 	"logType": [8, 4, 2, 1],
 	
 	"#logLevel": "
-		One can specify level of log to print in this fild. It takes additive values of 
-		following to print combination of them. 
+		One can specify level of log to print in this fild. It takes additive
+		values of following to print combination of them. 
 			Main=1,
 			Fstream_heart=2,
 			ws_Server=4,
@@ -38,10 +38,16 @@
 			"rootdir": "/home/Necktwi/workspace/deb"
 		},
 		"www": {
-			"rootdir": "/home/Necktwi/workspace/WWW"
+			"rootdir": "/home/Necktwi/workspace/WWW",
+         "users": file:///home/Necktwi/workspcae/WWW/users.ffjson
 		},
 		"underconstruction": {
-			"rootdir": "/home/Necktwi/workspace/W3"
+			"rootdir": "/home/Necktwi/workspace/WWW-development",
+         "users": file:///home/Necktwi/workspcae/WWW-development/users.ffjson
+		},
+      "127.0.0.2": {
+			"rootdir": "/home/Necktwi/workspace/WWW-development",
+         "users": file:///home/Necktwi/workspcae/WWW-development/users.ffjson
 		},
 		"rosy": {
 			"rootdir": "/home/Necktwi/workspace/rosy"
@@ -64,27 +70,35 @@
          "redirectHTTPSPortTo": 4430,
          "toHTTPS": true
       }
-
 	},
-   "HTTPPort": 80,
-	"HTTPSPort": 443,
+   "HTTPPort": 8000,
+	"HTTPSPort": 4430,
 	"HttpUserSessionTimeout": 600,
    "sslCert": "/etc/letsencrypt/live/ferryfair.com/cert.pem",
 	"sslKey": "/etc/letsencrypt/live/ferryfair.com/privkey.pem",
 	"sslCA": "/etc/letsencrypt/live/ferryfair.com/fullchain.pem",
 	"help": {
-		"homeFolder": "Its folder where FairPlay server looks for and stores all the data required.",
+		"homeFolder": "
+			Its folder where FairPlay server looks for and stores all the data
+			required.
+		",
 		"port": "Its the port on which FairPlay server runs.",
-		"bootup": "set it to true if you want FairPlay to start at system start up else set to false.",
-		"internetTestURL": "FairPlay pings this URL to test internet connectivity",
+		"bootup": "
+			set it to true if you want FairPlay to start at system start up else
+			set to false.
+		",
+		"internetTestURL": "
+			FairPlay pings this URL to test internet connectivity
+		",
 		"corpNWGW": "corporateNetworkGatway sets the gateway for this device",
 		"logType": "
-			One can specify type of log to print in this field. It takes additive values 
-			of following to print combination of them. Errors=1,Warnings=2,Notices=4,Debug=8
+			One can specify type of log to print in this field. It takes additive
+			values of following to print combination of them.
+			Errors=1,Warnings=2,Notices=4,Debug=8
 		",
 		"logLevel": "
-			One can specify level of log to print in this fild. It takes additive values of 
-			following to print combination of them. 
+			One can specify level of log to print in this fild. It takes additive
+			values of following to print combination of them. 
 				Main=1,
 				Fstream_heart=2,
 				ws_Server=4,
@@ -93,4 +107,3 @@
 		"
 	}
 }
-

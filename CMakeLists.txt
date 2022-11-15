@@ -56,8 +56,8 @@ configure_file (
    "${PROJECT_BINARY_DIR}/config.h"
 )
 configure_file (
-   "${PROJECT_SOURCE_DIR}/config.json"
-   "${PROJECT_BINARY_DIR}/config.json"
+   "${PROJECT_SOURCE_DIR}/config.ffjson"
+   "${PROJECT_BINARY_DIR}/config.ffjson"
 )
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
    set (macOS ON)
@@ -149,9 +149,9 @@ set_target_properties (
 )
 install (TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_BINDIR})
 install (
-   FILES "${PROJECT_SOURCE_DIR}/config.json"
+   FILES "${PROJECT_SOURCE_DIR}/config.ffjson"
    DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}
-   RENAME ${PROJECT_NAME}.json
+   RENAME ${PROJECT_NAME}.ffjson
 )
 install (
    FILES "${PROJECT_SOURCE_DIR}/init.conf"
