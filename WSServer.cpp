@@ -41,7 +41,7 @@
 #include <FFJSON.h>
 #include <logger.h>
 #include <ferrybase/mystdlib.h>
-#include <ferrybase/Socket.h>
+#include <ferrybase/myconverters.h>
 #include <iostream>
 #include <malloc.h>
 #include <functional>
@@ -105,7 +105,8 @@ line_done:
 string get_subdomain (const char* host) {
    string hoststr(host);
    if(!config["hostName"]) return string();
-   int domainpos = hoststr.find((ccp)config["hostName"]);
+   int domainpos =
+      hoststr.find(tolower(string((ccp)config["hostName"])).c_str());
    int portpos=hoststr.find(":");
    if (domainpos > 1)
       return hoststr.substr(0, domainpos-1);
