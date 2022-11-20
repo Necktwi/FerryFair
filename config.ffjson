@@ -43,12 +43,10 @@
 		},
 		"underconstruction": {
 			"rootdir": "/home/Necktwi/workspace/WWW-development",
-         "users": file:///home/Necktwi/workspcae/WWW-development/users.ffjson
+         "users": file:///home/Necktwi/workspcae/WWW-development/users.ffjson,
+         "rbs": file:///home/Necktwi/workspcae/WWW-development/rbs.ffjson
 		},
-      "127.0.0.2": {
-			"rootdir": "/home/Necktwi/workspace/WWW-development",
-         "users": file:///home/Necktwi/workspcae/WWW-development/users.ffjson
-		},
+      "127.0.0.2": underconstruction,
 		"rosy": {
 			"rootdir": "/home/Necktwi/workspace/rosy"
 		},

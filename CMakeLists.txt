@@ -6,8 +6,8 @@
 # ©FerryFair
                                                                                 
 cmake_minimum_required (VERSION 3.5)
+project (FerryFair CXX C)
 include (GNUInstallDirs)
-project (FerryFair)
 message ("Generating build procedure for ${PROJECT_NAME} ...")
 
 message ("Extropolating build type ...")

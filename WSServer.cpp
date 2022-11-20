@@ -45,6 +45,7 @@
 #include <iostream>
 #include <malloc.h>
 #include <functional>
+#include <chrono>
 
 typedef const char* ccp;
 using namespace std;
@@ -66,8 +67,7 @@ char mesg[128];
 bool s_quit = false;
 bool sendMail = false;
 
-static void parseHTTPHeader (const char* uri, size_t len, FFJSON& sessionData) 
-{
+static void parseHTTPHeader (const char* uri, size_t len, FFJSON& sessionData) {
    unsigned int i=0;
    unsigned int pairStartPin=i;
    while(uri[i]!='\0'){
@@ -133,13 +133,30 @@ void get_data_in_url (const char* url, FFJSON& data) {
    }
 }
 
+void get_cookies (const char* c, FFJSON& fc) {
+   unsigned i = 0;
+   unsigned pairStartPin=i;
+   string first,second;
+   while (c[i]!='\0') {
+      if(c[i]=='='){
+         while(c[pairStartPin]==' ')++pairStartPin;
+         first=string(c+pairStartPin,i-pairStartPin);
+         pairStartPin=i+1;
+      } else if (c[i+1]==';' || c[i+1]=='\0') {
+         second=string(c+pairStartPin, i+1-pairStartPin);
+         pairStartPin=i+2;
+         fc[first]=second;
+      }
+      ++i;
+   }
+}
+
 void mailfn (
    struct mg_connection *c, int ev, void *ev_data, void *fn_data
 ) {
    uint8_t *state = (uint8_t *) c->label;
    if (ev == MG_EV_OPEN) {
          // c->is_hexdumping = 1;
-      printf("ev open\n");
    } else if (ev == MG_EV_READ) {
       if (c->recv.len > 0 && c->recv.buf[c->recv.len - 1] == '\n') {
          MG_INFO(("<-- %d %s", (int) c->recv.len - 2, c->recv.buf));
@@ -210,51 +227,94 @@ void tls_ntls_common (
       b[1] = (c->rem.ip >> 8) & 0xFF;
       b[2] = (c->rem.ip >> 16) & 0xFF;
       b[3] = (c->rem.ip >> 24) & 0xFF;
-      printf("Remote IP: %d.%d.%d.%d\n", b[0], b[1], b[2], b[3]);
+      ffl_notice(FPL_HTTPSERV, "Remote IP: %d.%d.%d.%d",
+                 b[0], b[1], b[2], b[3]);
       struct mg_http_message* hm = (struct mg_http_message*) ev_data;
-      printf("hm->uri:\n%s\n", hm->uri.ptr);
-      FFJSON sessionData, vhost, user;
+      ffl_notice(FPL_HTTPSERV, "hm->uri:\n%s", hm->uri.ptr);
+      FFJSON sessionData, vhost, user, cookie, rbs;
       string subdomain;
       ccp referer=nullptr;char proto[8]="https"; int protolen=5;
-      const char* username = nullptr,* password = nullptr;
-      const char* headers = "content-type: text/json\r\n";
+      ccp username = nullptr, password = nullptr;
+      ccp headers = "content-type: text/json\r\n";
       parseHTTPHeader((ccp)hm->uri.ptr, hm->uri.len, sessionData);
-      if (sessionData["Host"]==nullptr) {
-         return;
-      } else if (
-         config["virtualWebHosts"]
-         [subdomain=get_subdomain(sessionData["Host"])]
-      ){
-         printf("subdomain: %s\n",subdomain.c_str());
+      if (sessionData["Host"]==nullptr) {return;}
+      subdomain=get_subdomain(sessionData["Host"]);
+      ffl_notice(FPL_HTTPSERV, "subdomain: %s",subdomain.c_str());
+      if (config["virtualWebHosts"][subdomain]) {
          vhost=&config["virtualWebHosts"][subdomain];
          //printf("vhost: %s\n", vhost.prettyString().c_str());
          opts.root_dir = (ccp)vhost["rootdir"];
       } else {
          vhost=&config;
       }
+      rbs=&vhost["rbs"];
+      if (sessionData["Cookie"])get_cookies(sessionData["Cookie"], cookie);
       if (!sessionData["Referer"]) goto nextproto;
       referer=sessionData["Referer"];
       protolen = strstr(referer,":") - referer;
       sprintf(proto,"%.*s",protolen,(ccp)sessionData["Referer"]);
      nextproto:
-      printf("proto: %s\n",proto);
-      printf("Serving: %s\n", opts.root_dir);
-      if (!strcmp(sessionData["path"], "/login")) {
-         printf("login\n");
+      ffl_debug(FPL_HTTPSERV, "proto: %s",proto);
+      ffl_notice(FPL_HTTPSERV, "Serving: %s", opts.root_dir);
+      if (!strcmp(sessionData["path"], "/cookie")) {               //cookie
+         ffl_notice(FPL_HTTPSERV, "cookie");
+         FFJSON inmsg(string(hm->body.ptr, hm->body.len));
+         if (inmsg["bid"]){
+            string bid;
+            if(strcmp(inmsg["bid"],"undefined")){
+               bid=(ccp)inmsg["bid"];
+               if(rbs[bid])
+                  goto gotbid;
+            }
+            bid = random_alphnuma_string();
+           bidcheck:
+            if(rbs[bid]){
+               bid=random_alphnuma_string();
+               goto bidcheck;
+            }
+            rbs[bid]["ip"]=c->rem.ip;
+           gotbid:
+            if((uint32_t)rbs[bid]["ip"]!=c->rem.ip){
+               mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "ipChanged");
+               goto done;
+            }
+            rbs[bid]["ts"]=chrono::high_resolution_clock::now();
+            if(rbs[bid]["user"]){
+               FFJSON up; up=&rbs[bid]["user"];
+               mg_http_reply(c, 200, headers, "{%Q:%Q,%Q:%Q,%Q,%Q}", "bid",
+                             bid.c_str(),"username",(ccp)up["name"], "email",
+                             (ccp)up["email"]);
+            }
+            mg_http_reply(c, 200, headers, "{%Q:%Q}", "bid", bid.c_str());
+         } else {
+            mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobid");
+         }
+      } else if (!strcmp(sessionData["path"], "/login")) {         //login
+         ffl_notice(FPL_HTTPSERV, "Login");
+         if (!cookie["bid"] || !rbs[(ccp)cookie["bid"]]) {
+            mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobid");
+            goto done;
+         }
          FFJSON body(string(hm->body.ptr, hm->body.len));
          username=body["username"];password=body["password"];
-         printf("User: %s\nPass: %s\n", username, password);
+         ffl_notice(FPL_HTTPSERV, "\nUser: %s\nPass: %s", username, password);
          user=&vhost["users"][username];
-         cout << (ccp)user["password"] << endl;
+         cout << "password:" << (ccp)user["password"] << endl;
          if (user["password"] && !user["inactive"] &&
              !strcmp(password,user["password"])
          ) {
+            rbs[(ccp)cookie["bid"]]["user"]=
+               &vhost["users"]["username"];
             mg_http_reply(c, 200, headers, "{%Q:%s}", "login","true");
          } else {
             mg_http_reply(c, 200, headers, "{%Q:%s}", "login","false");
          }
-      } else if(!strcmp(sessionData["path"], "/signup")){
+      } else if(!strcmp(sessionData["path"], "/signup")){          //signup
          ffl_notice(FPL_HTTPSERV, "Signup");
+         if (!cookie["bid"] || !rbs[(ccp)cookie["bid"]]) {
+            mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobid");
+            goto done;
+         }
          FFJSON body(string(hm->body.ptr, hm->body.len));
          username=body["username"];password=body["password"];
          ffl_debug(FPL_HTTPSERV, "User: %s\nPass: %s\nEmail: %s",
@@ -283,7 +343,7 @@ void tls_ntls_common (
          user["inactive"]=true;
          string actKey = random_alphnuma_string();
          user["activationKey"]=actKey;
-         printf("actKey: %s\n",actKey.c_str());
+         ffl_notice(FPL_HTTPSERV, "actKey: %s",actKey.c_str());
          to=user["email"];
          sprintf(subj, "User activation link");
          sprintf(mesg, "Open %s://%s/activate?user=%s&key=%s to activate %s",
@@ -304,6 +364,7 @@ void tls_ntls_common (
             mg_http_reply(c, 200, headers, "Wrong key.");
          } else if (!strcmp(user["activationKey"],data["key"])) {
             user["inactive"]=false;
+            user["name"]=username;
             mg_http_reply(c, 200, headers, "%s activated.", username);
          } else {
             mg_http_reply(c, 200, headers, "Wrong key.");
