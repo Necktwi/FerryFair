@@ -256,7 +256,8 @@ void tls_ntls_common (
      nextproto:
       ffl_debug(FPL_HTTPSERV, "proto: %s",proto);
       ffl_notice(FPL_HTTPSERV, "Serving: %s", opts.root_dir);
-      if (!strcmp(sessionData["path"], "/cookie")) {               //cookie
+      if (!strcmp(sessionData["path"], "/cookie")) {
+          //cookie
          ffl_notice(FPL_HTTPSERV, "cookie");
          FFJSON inmsg(string(hm->body.ptr, hm->body.len));
          if (inmsg["bid"]){
@@ -280,16 +281,17 @@ void tls_ntls_common (
             }
             rbs[bid]["ts"]=chrono::high_resolution_clock::now();
             if(rbs[bid]["user"]){
-               FFJSON up; up=&rbs[bid]["user"];
-               mg_http_reply(c, 200, headers, "{%Q:%Q,%Q:%Q,%Q,%Q}", "bid",
-                             bid.c_str(),"username",(ccp)up["name"], "email",
-                             (ccp)up["email"]);
+               FFJSON up; up=&vhost["users"][(ccp)rbs[bid]["user"]];
+               mg_http_reply(c, 200, headers, "{%Q:%Q,%Q:%Q,%Q:%Q,%Q:%s}",
+                             "bid", bid.c_str(),"username",(ccp)up["name"], "email", (ccp)up["email"],  "login", "true");
             }
             mg_http_reply(c, 200, headers, "{%Q:%Q}", "bid", bid.c_str());
+            config.save();
          } else {
             mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobid");
          }
-      } else if (!strcmp(sessionData["path"], "/login")) {         //login
+      } else if (!strcmp(sessionData["path"], "/login")) {
+         //login
          ffl_notice(FPL_HTTPSERV, "Login");
          if (!cookie["bid"] || !rbs[(ccp)cookie["bid"]]) {
             mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobid");
@@ -303,13 +305,14 @@ void tls_ntls_common (
          if (user["password"] && !user["inactive"] &&
              !strcmp(password,user["password"])
          ) {
-            rbs[(ccp)cookie["bid"]]["user"]=
-               &vhost["users"]["username"];
+            rbs[(ccp)cookie["bid"]]["user"]=username;
             mg_http_reply(c, 200, headers, "{%Q:%s}", "login","true");
+            config.save();
          } else {
             mg_http_reply(c, 200, headers, "{%Q:%s}", "login","false");
          }
-      } else if(!strcmp(sessionData["path"], "/signup")){          //signup
+      } else if(!strcmp(sessionData["path"], "/signup")){
+         //signup
          ffl_notice(FPL_HTTPSERV, "Signup");
          if (!cookie["bid"] || !rbs[(ccp)cookie["bid"]]) {
             mg_http_reply(c, 200, headers, "{%Q:%Q}", "error", "nobid");
@@ -339,7 +342,8 @@ void tls_ntls_common (
          }
          user["password"] = password;
          user["email"] = body["email"];
-         vhost["users"][(ccp)user["email"]]=&vhost["users"][username];
+         vhost["users"][(ccp)user["email"]].addLink(
+            &vhost["users"][username],username);
          user["inactive"]=true;
          string actKey = random_alphnuma_string();
          user["activationKey"]=actKey;
@@ -354,6 +358,7 @@ void tls_ntls_common (
             mg_mgr_poll(&mail_mgr, 100);
          s_quit=false;
          mg_http_reply(c, 200, headers, "{%Q:%d}", "actEmailSent", 2);
+         config.save();
       } else if(strstr((ccp)sessionData["path"], "/activate?")){
          FFJSON data;
          get_data_in_url(sessionData["path"], data);
@@ -366,6 +371,7 @@ void tls_ntls_common (
             user["inactive"]=false;
             user["name"]=username;
             mg_http_reply(c, 200, headers, "%s activated.", username);
+            config.save();
          } else {
             mg_http_reply(c, 200, headers, "Wrong key.");
          }
