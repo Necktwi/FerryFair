@@ -17,7 +17,7 @@
 #include "global.h"
 #include "WSServer.h"
 #include "FerryStream.h"
-
+#include "cap.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -417,6 +417,8 @@ WSServer::WSServer (
    #endif
    int iSysLogOptions
 ) {
+   cap c("gowtham", "captcha.jpg", 7, 256, 64, 32, 80, 48);
+   c.save();
    mg_mgr_init(&mgr);
    mg_mgr_init(&mail_mgr);
    char httpsport[16];

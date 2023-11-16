@@ -47,6 +47,7 @@
          "rbs": file:///home/Necktwi/workspace/WWW-development/rbs.ffjson
 		},
       "127.0.0.2": underconstruction,
+      "192.168.0.4": underconstruction,
 		"rosy": {
 			"rootdir": "/home/Necktwi/workspace/rosy"
 		},
@@ -69,8 +70,8 @@
          "toHTTPS": true
       }
 	},
-   "HTTPPort": 8000,
-	"HTTPSPort": 4430,
+   "HTTPPort": 80,
+	"HTTPSPort": 443,
 	"HttpUserSessionTimeout": 600,
    "sslCert": "/etc/letsencrypt/live/ferryfair.com/cert.pem",
 	"sslKey": "/etc/letsencrypt/live/ferryfair.com/privkey.pem",

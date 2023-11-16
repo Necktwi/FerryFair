@@ -47,6 +47,7 @@ if (DEFINED _DEBUG)
    add_definitions (-D_DEBUG=${_DEBUG})
 endif ()
 add_definitions (-DMG_ENABLE_OPENSSL=1)
+add_definitions (-Dcimg_display=0)
 
 set (VERSION_MAJOR 1)
 set (VERSION_MINOR 0)
@@ -139,7 +140,7 @@ else ()
 endif ()
 
 target_link_libraries (
-   ${PROJECT_NAME} FFJSON logger ferrybase ssl crypto pthread pam
+   ${PROJECT_NAME} FFJSON logger ferrybase ssl crypto pthread pam jpeg
 )
 set_target_properties (
    ${PROJECT_NAME}
