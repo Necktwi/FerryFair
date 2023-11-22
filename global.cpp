@@ -2,7 +2,7 @@
 #include <ferrybase/mystdlib.h>
 #include <logger.h>
 #include <string>
-#include <list>                                 \
+#include <list>
 #include <FFJSON.h>
 #include <mutex>
 
@@ -90,7 +90,7 @@ void terminate_all_paths() {
 #ifdef LIBWEBSOCKETS
       delete path_wsi_map[i->first];
 		path_wsi_map.erase(i->first);
-#endif                                          \
+#endif
       path_packs_map.erase(j);
 		i++;
 		path_id_map.erase(l->second);

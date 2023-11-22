@@ -80,8 +80,8 @@ void groomLogFile () {
    struct stat statbuf;
    int stat_r = stat(logFile.c_str(), &statbuf);
    ferr = open (
-      logFile.c_str(), O_WRONLY | (stat_r == -1 || statbuf.st_size > 5000000) ?
-      (O_CREAT | O_TRUNC) : O_APPEND, 0600
+      logFile.c_str(), O_WRONLY |
+      ((stat_r == -1 || statbuf.st_size > 5000000) ? (O_CREAT | O_TRUNC) : O_APPEND), 0600
    );
 }
 
@@ -238,19 +238,19 @@ void firstFork() {
 }
 
 int install() {
-
+   return 0;
 }
 
 int reinstall() {
-
+   return 0;
 }
 
 int uninstall() {
-
+   return 0;
 }
 
 int update() {
-
+   return 0;
 }
 
 string readConfigValue(string name) {

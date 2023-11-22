@@ -237,7 +237,7 @@ void tls_ntls_common (
       ccp username = nullptr, password = nullptr;
       ccp headers = "content-type: text/json\r\n";
       parseHTTPHeader((ccp)hm->uri.ptr, hm->uri.len, sessionData);
-      if (sessionData["Host"]==nullptr) {return;}
+      if (!sessionData["Host"]) return;
       subdomain=get_subdomain(sessionData["Host"]);
       ffl_notice(FPL_HTTPSERV, "subdomain: %s",subdomain.c_str());
       if (config["virtualWebHosts"][subdomain]) {
