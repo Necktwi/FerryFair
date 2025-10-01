@@ -1,4 +1,0 @@
-"cert": "/etc/letsencrypt/live/ferryfair.com/cert.pem",
-"key": "/etc/letsencrypt/live/ferryfair.com/privkey.pem",
-"ca": "/etc/letsencrypt/live/ferryfair.com/fullchain.pem",
-"docroot": "../WWW-development"

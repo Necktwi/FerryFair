@@ -1,0 +1,29 @@
+name: "FairPlay configuration file",
+homeFolder: "/mnt/Ganges/workspace/WWW-development",
+config: file:///mnt/Ganges/workspace/WWW-development/config.ffjson,
+cert: "/etc/letsencrypt/live/ferryfair.com/cert.pem",
+key: "/etc/letsencrypt/live/ferryfair.com/privkey.pem",
+ca: "/etc/letsencrypt/live/ferryfair.com/fullchain.pem",
+internetTestURL: "www.google.com",
+corpNWGW: "127.0.0.1",
+#logType: "
+	One can specify type of log to print in this field. It takes additive
+	values of following to print combination of them. 
+		Errors=1,
+		Warnings=2,
+		Notices=4,
+		Debug=8
+",
+#logType2: "no effect as of now. should set it in global.cpp",
+logType: [4, 3, 2, 1],
+
+#logBlks: "
+	One can specify level of log to print in this fild. It takes additive
+	values of following to print combination of them. 
+		Main=5,
+		Fstream_heart=6,
+		ws_Server=7,
+		http_server=8,
+		fport=9
+",
+logBlks: [16, 8, 4, 1],
