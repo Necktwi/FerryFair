@@ -48,12 +48,13 @@ extern unsigned int starttime;
 extern bool valgrind_test;
 extern int valgrind_count;
 
-enum _fp_log_level {
-	FPL_MAIN = 1 << 0,
-	FPL_FSTREAM_HEART = 1 << 1,
-	FPL_WSSERV = 1 << 2,
-	FPL_HTTPSERV = 1 << 3,
-	FPL_FPORT = 1 << 4,
+enum _fp_log_block {
+	FPL_MAIN = 1 << 5,
+	FPL_FSTREAM_HEART = 1 << 6,
+	FPL_WSSERV = 1 << 7,
+	FPL_HTTPSERV = 1 << 8,
+	FPL_FPORT = 1 << 9,
+   FPL_MONG = 1 << 10,
 
 	NO_NEW_LINE = 1 << 31
 };
@@ -61,5 +62,4 @@ enum _fp_log_level {
 void terminate_all_paths();
 int init_path(std::string path);
 void terminate_path(int path);
-
 #endif

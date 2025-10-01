@@ -211,9 +211,10 @@ static void parseHTTPHeader (const char* uri, size_t len,
             ++j;
             ++j;
             string keyStr(uri+pairStartPin,keySize);
-            strLower(keyStr);
+            tolower(keyStr);
             sessionData[keyStr] = string(uri+j,k-j);
-            printf("%s: %.*s\n", keyStr.c_str(), k-j, uri+j);
+            ffl_info_contnu(FPL_WSSERV,
+                            "%s: %.*s\n", keyStr.c_str(), k-j, uri+j);
          }
 line_done:
          pairStartPin=i+1;
@@ -225,8 +226,10 @@ line_done:
 string get_subdomain (const char* host) {
    string hoststr(host);
    if(!config["hostName"]) return string();
+   string chost((ccp)config["hostName"]);
+   tolower(chost);
    int domainpos =
-      hoststr.find(tolower(string((ccp)config["hostName"])).c_str());
+      hoststr.find(chost.c_str());
    int portpos=hoststr.find(":");
    if (domainpos > 1)
       return hoststr.substr(0, domainpos-1);
@@ -277,10 +280,8 @@ struct CompThingNameMatch {
       return (get<1>(t1) < get<1>(t2));
    }
 };
-void mailfn (
-   struct mg_connection *c, int ev, void *ev_data, void *fn_data
-) {
-   uint8_t *state = (uint8_t *) c->label;
+void mailfn (struct mg_connection *c, int ev, void *ev_data) {
+   uint8_t* state = (uint8_t*) c->data;
    if (ev == MG_EV_OPEN) {
          // c->is_hexdumping = 1;
    } else if (ev == MG_EV_READ) {
@@ -295,14 +296,14 @@ void mailfn (
             *state = STARTTLS_WAIT;
          } else if (*state == STARTTLS_WAIT) {
             struct mg_tls_opts opts =
-               {.ca = "/etc/ssl/certs/ca-certificates.crt"};
+               {.ca = mg_unpacked("/etc/ssl/certs/ca-certificates.crt")};
             mg_tls_init(c, &opts);
             *state = AUTH;
          } else if (*state == AUTH) {
             char a[100], b[300] = "";
             size_t n = mg_snprintf(a, sizeof(a), "%c%s%c%s", 0, admin, 0,
                                    admin_pass);
-            mg_base64_encode((uint8_t *) a, n, b);
+            mg_base64_encode((uint8_t *) a, n, b, sizeof(b));
             mg_printf(c, "AUTH PLAIN %s\r\n", b);
             *state = FROM;
          } else if (*state == FROM) {
@@ -338,7 +339,7 @@ void mailfn (
       MG_INFO(("TLS handshake done! Sending EHLO again"));
       mg_printf(c, "EHLO %s\r\n", getMachineName().c_str());
    }
-   (void) fn_data, (void) ev_data;
+   (void) ev_data;
 }
 
 bool isValidEmail (FFJSON& tname) {
@@ -485,20 +486,66 @@ int addSmtgsToReply (FFJSON& users, FFJSON& user, FFJSON& r,
    }
    return k-ik;
 }
-void tls_ntls_common (
-   struct mg_connection* c, int ev, void* ev_data, void* fn_data
-) {
-   struct mg_http_serve_opts opts = {
-      .root_dir = config["homeFolder"]
-   };   // Serve local dir
-   if (ev == MG_EV_HTTP_MSG) {
-      unsigned char b[4];
-      b[0] = c->rem.ip & 0xFF;
-      b[1] = (c->rem.ip >> 8) & 0xFF;
-      b[2] = (c->rem.ip >> 16) & 0xFF;
-      b[3] = (c->rem.ip >> 24) & 0xFF;
+struct thread_data {
+   struct mg_mgr* mgr;
+   unsigned long conn_id;  // Parent connection ID
+   void* data;  // Original HTTP request
+};
+#include <pthread.h>
+#define closesocket(x) close(x)
+static void start_thread (void *(*f)(void *), void *p) {
+   pthread_t thread_id = (pthread_t) 0;
+   pthread_attr_t attr;
+   (void) pthread_attr_init(&attr);
+   (void) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+   pthread_create(&thread_id, &attr, f, p);
+   pthread_attr_destroy(&attr);
+}
+
+static void* thread_function(void *param) {
+  struct thread_data* p = (struct thread_data*) param;
+  uint st = (uint)(size_t)p->data;
+  ffl_notice(FPL_WSSERV, "sleeping for 5d", st);
+  sleep(st);                                 // Simulate long execution
+  ffl_notice(FPL_WSSERV, "woke up after %dsecs", st);
+  
+  mg_wakeup(p->mgr, p->conn_id, "slept for a while", 17);  // Respond to parent
+  free(p);                                  // passed to us
+  return NULL;
+}
+
+void fn (struct mg_connection* c, int ev, void* ev_data) {
+   if (ev == MG_EV_ACCEPT && c->is_tls) {
+      static struct mg_tls_opts opts = {0};
+      static string cert;
+      static string key;
+      if (opts.cert.len==0) {
+         std::ifstream certif((ccp)config["sslCert"]);
+         std::ostringstream certStr;
+         certStr << certif.rdbuf();
+         cert = certStr.str();
+         std::ifstream keyif((ccp)config["sslKey"]);
+         std::ostringstream keyStr;
+         keyStr << keyif.rdbuf();
+         key = keyStr.str();
+         opts.cert.buf = const_cast<char*>(cert.c_str());
+         opts.cert.len = cert.length();
+         opts.key.buf = const_cast<char*>(key.c_str());
+         opts.key.len = key.length();
+      }
+      mg_tls_init(c, &opts);
+   } else if (ev == MG_EV_HTTP_MSG) {
+      // unsigned char b[4];
+      // b[0] = c->rem.ip & 0xFF;
+      // b[1] = (c->rem.ip >> 8) & 0xFF;
+      // b[2] = (c->rem.ip >> 16) & 0xFF;
+      // b[3] = (c->rem.ip >> 24) & 0xFF;
+      static struct mg_http_serve_opts opts = {
+         .root_dir = config["homeFolder"]
+      };   // Serve local dir
       ffl_notice(FPL_HTTPSERV, "Remote IP: %d.%d.%d.%d-------------------",
-                 b[0], b[1], b[2], b[3]);
+                 c->rem.ip[0], c->rem.ip[1], c->rem.ip[2], c->rem.ip[3]);
+      //ffl_notice(FPL_HTTPSERV, "Remote IP: %s-------------------", c->rem.ip);
       struct mg_http_message* hm = (struct mg_http_message*) ev_data;
       //ffl_notice(FPL_HTTPSERV, "hm->uri:\n%s", hm->uri.ptr);
       FFJSON sessionData, cookie, payload, reply, user, rbsid;
@@ -509,7 +556,7 @@ void tls_ntls_common (
       ccp jsonHeader = "content-type: text/json\r\n";
       ccp headers = jsonHeader, path;
       string bid;
-      parseHTTPHeader((ccp)hm->uri.ptr, strlen(hm->uri.ptr), sessionData);
+      parseHTTPHeader((ccp)hm->uri.buf, strlen(hm->uri.buf), sessionData);
       if (!sessionData["host"]) return;
       subdomain=get_subdomain(sessionData["host"]);
       ffl_notice(FPL_HTTPSERV, "subdomain: %s",subdomain.c_str());
@@ -531,12 +578,12 @@ void tls_ntls_common (
       if (vhost["redirect"]) {
          char rhed[64];
          sprintf(rhed, "Location: %s\r\n", (ccp)vhost["redirect"]);
-         mg_http_reply(c, 301, rhed, "permenantly moved to %s",
+         mg_http_reply(c, 308, rhed, "Permanent Redirect",
                        (ccp)vhost["redirect"]);
          goto done;
       }
       if (!sessionData["referer"]) goto nextproto;
-      referer=sessionData["referer"];
+      referer = sessionData["referer"];
       username = strstr(referer,":");
       protolen = username - referer;
       if (username==nullptr || protolen<0 || protolen>=8) {
@@ -550,7 +597,17 @@ void tls_ntls_common (
       ffl_debug(FPL_HTTPSERV, "proto: %s",proto);
       ffl_notice(FPL_HTTPSERV, "Serving: %s", opts.root_dir);
       path = sessionData["path"];
-
+      const char* pathStart;
+      pathStart = strstr(path,"/sleep?");
+      if (pathStart) {
+         struct thread_data *data =
+            (struct thread_data *) calloc(1, sizeof(*data));  // Worker owns it
+         data->data = (void*)(size_t)atoi(pathStart+7); // Pass message
+         data->conn_id = c->id;
+         data->mgr = c->mgr;
+         start_thread(thread_function, data);  // Start thread and pass data
+         goto done;
+      }
       if (strstr(path, "/activate?")) {
          get_data_in_url(path, urlData);
          username=urlData["user"];
@@ -594,9 +651,9 @@ void tls_ntls_common (
             bid=random_alphnuma_string();
             goto bidcheck;
          }
-         rbs[bid]["ip"]=c->rem.ip;
+         rbs[bid]["ip"]=*(uint32_t*)(c->rem.ip);
         gotbid:
-         if ((uint32_t)rbs[bid]["ip"]!=c->rem.ip) {
+         if ((uint32_t)rbs[bid]["ip"]!=*(uint32_t*)(c->rem.ip)) {
             goto newbid;
          }
          rbsid = &rbs[bid];
@@ -686,7 +743,7 @@ void tls_ntls_common (
              !strcmp(password,user["password"])
          ) {
             rbsid["user"]=user["name"];
-            rbsid["ip"]=c->rem.ip;
+            rbsid["ip"]=*(uint32_t*)(c->rem.ip);
             user["bid"]=bid;
             rbsid["urts"]=lepoch;
             addSmtgsToReply(users, user, reply, bidThings[&rbsid]);
@@ -827,8 +884,8 @@ void tls_ntls_common (
             pts.c.y=(float)payload["geoposition"][0];
             rbsid["geoposition"] = payload["geoposition"];
          }
-         printf("searching %s at %s\n",srchStr,
-                payload["geoposition"].stringify().c_str());
+         ffl_info(FPL_HTTPSERV, "searching %s at %s\n",srchStr,
+                  payload["geoposition"].stringify().c_str());
          CompThingNameMatch cTNM;
          multiset<tuple<FFJSON*, int8_t>, CompThingNameMatch> score(cTNM);
          thnsTree.getPointsFromQuad(pts);
@@ -1038,8 +1095,8 @@ void tls_ntls_common (
                   }
                } else {
                   string uname(uthings[j]["name"]?(ccp)uthings[j]["name"]:"");
-                  strLower(cname);
-                  strLower(uname);
+                  tolower(cname);
+                  tolower(uname);
                   if (strcmp(cname.c_str(),uname.c_str())) {
                      mstr = metaname(uname);
                      for (int k=0; k<mstr.size(); ++k) {
@@ -1104,7 +1161,7 @@ void tls_ntls_common (
             }
          }
          mg_http_reply(c, 200, headers, "%s", reply.stringify(true).c_str());
-         vhost.save();
+         users.save();
       } else if (strstr(path, "/owl")) {
          FFJSON& things = user["things"];
          FFJSON& smsgs = user["smsgs"];
@@ -1343,29 +1400,33 @@ void tls_ntls_common (
      done:
       if (valgrind_test && !--valgrind_count)
          force_exit=true;
+   } else if (ev == MG_EV_WAKEUP) {
+      struct mg_str *data = (struct mg_str *) ev_data;
+      mg_http_reply(c, 200, "", data->buf);
    }
 }
 
-void fn (
-   struct mg_connection *c, int ev, void *ev_data, void *fn_data
-) {
-   tls_ntls_common(c, ev, ev_data, fn_data);
-}
+// void fn (struct mg_connection *c, int ev, void *ev_data) {
 
-void fn_tls (
-   struct mg_connection *c, int ev, void *ev_data, void *fn_data
-) {
-   if (ev == MG_EV_ACCEPT) {
-      struct mg_tls_opts opts = {
-//         .cert = "/etc/letsencrypt/live/ferryfair.com/cert.pem",
-//         .certkey = "/etc/letsencrypt/live/ferryfair.com/privkey.pem"
-         .cert = "/etc/letsencrypt/live/ferryfair.com/signed_chain.crt",
-         .certkey = "/etc/letsencrypt/live/ferryfair.com/domain.key"
-      };
-      mg_tls_init(c, &opts);
-   }
-   tls_ntls_common(c, ev, ev_data, fn_data);
-}
+//    tls_ntls_common(c, ev, ev_data);
+// }
+
+// void fn_tls (struct mg_connection *c, int ev, void *ev_data) {
+//    if (ev == MG_EV_ACCEPT) {
+//       struct mg_tls_opts opts = {
+// //         .cert = "/etc/letsencrypt/live/ferryfair.com/cert.pem",
+// //         .certkey = "/etc/letsencrypt/live/ferryfair.com/privkey.pem"
+//          .ca = mg_unpacked((ccp)config["sslCA"]),
+//          .cert = mg_unpacked((ccp)config["sslCert"]),
+//          .key = mg_unpacked((ccp)config["sslKey"])
+//       };
+//       mg_tls_init(c, &opts);
+//    } else if (ev == MG_EV_TLS_HS) {
+//       MG_INFO(("TLS handshake done! Sending EHLO again"));
+//       mg_printf(c, "EHLO myname\r\n");
+//    }
+//    tls_ntls_common(c, ev, ev_data);
+// }
 
 //set<void*> qpset;
 // void QuadNode::geti (vector<uint>& ina) {
@@ -2311,7 +2372,7 @@ WSServer::WSServer (
    //pts.c = {77.7645299,12.9941367, 10.5};
    //pts.c = {77.7644272, 12.9940713, 10.5};
    pts.c = {77.7644577, 12.9941273, 10.5};
-   printf("c: %f,%f\n", pts.c.x, pts.c.y);
+   ffl_debug(FPL_WSSERV, "c: %f,%f\n", pts.c.x, pts.c.y);
    FerryTimeStamp ftsStart;
    FerryTimeStamp ftsEnd;
    FerryTimeStamp ftsDiff;
@@ -2337,17 +2398,22 @@ WSServer::WSServer (
    // pts.c.nf=nullptr;
    // thnsTree.print(pts.c);
    // printf("nf: %s\n", (*pts.c.nf)["location"].stringify().c_str());
+   //mg_log_set(MG_LL_DEBUG);
    mg_mgr_init(&mgr);
    mg_mgr_init(&mail_mgr);
-   char httpsport[16];
-   char httpport[16];
-   sprintf(httpsport, "0.0.0.0:%d", (int)config["HTTPSPort"]);
-   sprintf(httpport, "0.0.0.0:%d", (int)config["HTTPPort"]);
-   mg_http_listen(&mgr, httpsport, fn_tls, NULL);
+   char httpsport[24];
+   char httpport[24];
+   sprintf(httpsport, "https://0.0.0.0:%d", (int)config["HTTPSPort"]);
+   sprintf(httpport, "http://0.0.0.0:%d", (int)config["HTTPPort"]);
+   ffl_debug(FPL_WSSERV, httpsport);
+   ffl_debug(FPL_WSSERV, httpport);
+   mg_http_listen(&mgr, httpsport, fn, NULL);
    mg_http_listen(&mgr, httpport, fn, NULL);
+   mg_wakeup_init(&mgr);
    while (!force_exit) {
       mg_mgr_poll(&mgr, 1000);
    }
+   mg_mgr_free(&mgr);
 }
 
 WSServer::~WSServer () {

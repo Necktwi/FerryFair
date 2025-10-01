@@ -127,42 +127,31 @@ void stopRunningProcess() {
 
 int readConfig() {
    ffl_notice(FPL_MAIN, "ConfigFile: %s", configFile.c_str());
-   std::ifstream t(configFile);
-   std::string str((std::istreambuf_iterator<char>(t)),
-      std::istreambuf_iterator<char>());
-   try {
-      config.init(str);
-      homeFolder.assign((const char*)config["homeFolder"]);
-      port = config["port"];
-      internetTestURL.assign((const char*)config["internetTestURL"]);
-      corpNWGW.assign((const char*)config["corpNWGW"]);
-      unsigned int ff_log_type = 0;
-      unsigned int ff_log_level = 0;
-      if (config["logType"].isType(FFJSON::ARRAY)) {
-         for (FFJSON::Iterator it = config["logType"].begin();
-            it != config["logType"].end(); it++)
-            ff_log_type |= (unsigned int)*it;
-      }
-      else {
-         ff_log_type = config["logType"];
-      }
-      if (config["logLevel"].isType(FFJSON::ARRAY)) {
-         for (FFJSON::Iterator it = config["logLevel"].begin();
-            it != config["logLevel"].end(); it++)
-            ff_log_level |= (unsigned int)*it;
-      }
-      else {
-         ff_log_level = config["logLevel"];
-      }
-      fflAllowedType = (FF_LOG_TYPE)ff_log_type;
-      fflAllowedLevel = ff_log_level;
-      ffl_debug(FPL_MAIN, "fflAllowedType: %08X, fflAllowedLevel: %08X", (unsigned int)fflAllowedType, (unsigned int)fflAllowedLevel);
+   config.init("file://"+configFile+"|OBJECT");
+   homeFolder.assign((const char*)config["homeFolder"]);
+   port = config["port"];
+   internetTestURL.assign((const char*)config["internetTestURL"]);
+   corpNWGW.assign((const char*)config["corpNWGW"]);
+   unsigned int ff_log_type = 0;
+   unsigned int ff_log_blks = 0;
+   if (config["logType"].isType(FFJSON::ARRAY)) {
+      for (FFJSON::Iterator it = config["logType"].begin();
+           it != config["logType"].end(); it++)
+         ff_log_type |= 1 << (unsigned int)*it;
+   } else {
+      ff_log_type = config["logType"];
    }
-   catch (FFJSON::Exception e) {
-      ffl_err(FPL_MAIN, "Reading configuration failed. Please check the configuration file");
-      ffl_debug(FPL_MAIN, "%s", e.what());
-      return -1;
+   if (config["logBlks"].isType(FFJSON::ARRAY)) {
+      for (FFJSON::Iterator it = config["logBlks"].begin();
+           it != config["logBlks"].end(); it++)
+         ff_log_blks |= 1 << (unsigned int)*it;
+   } else {
+      ff_log_blks = config["logBlks"];
    }
+   fflAllowedType = (FF_LOG_TYPE)ff_log_type;
+   fflAllowedBlks = ff_log_blks;
+   ffl_debug(FPL_MAIN, "fflAllowedType: %08X, fflAllowedLevel: %08X",
+             (unsigned int)fflAllowedType, (unsigned int)fflAllowedBlks);
    std::ifstream hfile ("/etc/hostname", ios::ate | ios::in);
    if (!hfile .is_open()) {
       ffl_err (FPL_MAIN, "/etc/hostname not found.");

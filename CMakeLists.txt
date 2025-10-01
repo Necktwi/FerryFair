@@ -54,7 +54,7 @@ if (DEFINED _DEBUG)
    add_definitions (-D_DEBUG=${_DEBUG})
 endif ()
 add_definitions (-Dcimg_display=0)
-add_definitions (-DMG_ENABLE_OPENSSL=1)
+#add_definitions (-DMG_ENABLE_OPENSSL=1)
 
 set (VERSION_MAJOR 1)
 set (VERSION_MINOR 0)
@@ -82,10 +82,10 @@ set (
    "-fPIC -Wl,-unresolved-symbols=ignore-in-shared-libs"
 )
 if (DEFINED _DEBUG)
-   set (GCC_COVERAGE_COMPILE_FLAGS "${GCC_COVERAGE_COMPILE_FLAGS} -g")
-   set (GCC_COVERAGE_LINK_FLAGS "${GCC_COVERAGE_LINK_FLAGS} -g")
+   set (GCC_COVERAGE_COMPILE_FLAGS "${GCC_COVERAGE_COMPILE_FLAGS} -g -O0")
+   set (GCC_COVERAGE_LINK_FLAGS "${GCC_COVERAGE_LINK_FLAGS} -g -O0")
 endif ()
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS} -Wno-changes-meaning")
+set (CMAKE_CXX_FLAGS "-DMG_TLS=MG_TLS_OPENSSL -DMG_ENABLE_LOG=0 ${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS} -Wno-changes-meaning")
 set (
    CMAKE_EXE_LINKER_FLAGS
    "${CMAKE_EXE_LINKER_FLAGS} ${GCC_COVERAGE_LINK_FLAGS}"
