@@ -150,4 +150,20 @@ struct Qn2 {
    QuadNode* p4;
 };
 void printpts (const vector<NdNPrn>& pts);
+tuple<void*,int8_t> getNode (NdNPrn n);
+// template<typename T, typename U>
+// tuple<void*, int8_t> bpxor (T* a, U* b);
+vector<string> metaname (string name);
+vector<uint> nametouint (vector<string>& mstr);
+int getIdChildInd (FFJSON& arr, int id);
+extern map<string, FFJSON*>* nameints;
+extern FFJSON* fnameints;
+extern map<const string*, uint> mitpos;
+extern QuadHldr thnsTree;
+struct CompNameWt {
+   bool operator () (const map<string, FFJSON*>::iterator it1,
+                     const map<string, FFJSON*>::iterator it2) const;
+};
+extern CompNameWt cmpNmWt;
+
 #endif

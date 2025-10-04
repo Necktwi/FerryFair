@@ -5,10 +5,10 @@
 const uint thnsPrSrch = 25;
 QuadHldr thnsTree;
 Metaphone3Encoder m3e;
-map<string, FFJSON*>* nameints;
-FFJSON* fnameints=nullptr;
 vector<map<QuadNode*, uint>> qpmapvec;
 map<set<FFJSON*>*, vector<uint>> mapffset;
+map<string, FFJSON*>* nameints;
+FFJSON* fnameints;
 map<const string*, uint> mitpos;
 
 void ptswap (vector<NdNPrn>& pts, uint one, uint two) {
@@ -46,16 +46,6 @@ void quickSort (vector<NdNPrn>& pts, int start, int end) {
    }
 }
 
-int getIdChildInd (FFJSON& arr, int id) {
-   int last = arr.size;
-   last = id<last?id:last;
-   for (int i=last-1;i>=0;++i) {
-      if ((int)arr[i]["id"]==id) {
-         return i;
-      }
-   }
-   return -1;
-}
 vector<string> metaname (string name) {
    vector<string> r = explode(name);
    for (int k=0;k<r.size();++k) {
@@ -128,12 +118,11 @@ struct UintName {
    vector<uint> vu;
    vector<string> mwd;
 };
-struct CompNameWt {
-   bool operator () (const map<string, FFJSON*>::iterator it1,
-                     const map<string, FFJSON*>::iterator it2) const {
+bool CompNameWt::operator () (const map<string, FFJSON*>::iterator it1,
+                              const map<string, FFJSON*>::iterator it2) const {
       return it1->second->val.number > it2->second->val.number;
-   }
-} cmpNmWt;
+}
+CompNameWt cmpNmWt;
 
 void QuadNode::seti (vector<uint>& ina) {
    for (int i=0; i<ina.size();++i) {

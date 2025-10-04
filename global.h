@@ -6,7 +6,7 @@
  */
 
 #ifndef GLOBAL_H
-#define	GLOBAL_H
+#define GLOBAL_H
 
 #define NELEMS(x)  (sizeof(x) / sizeof(x[0]))
 #define INIT_LOGGER

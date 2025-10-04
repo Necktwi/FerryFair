@@ -1,4 +1,5 @@
 name: "FairPlay configuration file",
+hostname: ferryfair.com,
 homeFolder: "/mnt/Ganges/workspace/WWW-development",
 config: file:///mnt/Ganges/workspace/WWW-development/config.ffjson,
 cert: "/etc/letsencrypt/live/ferryfair.com/cert.pem",
@@ -27,3 +28,8 @@ logType: [4, 3, 2, 1],
 		fport=9
 ",
 logBlks: [16, 8, 4, 1],
+vhosts: {
+   www: {
+      rootdir: "../../WWW-development"
+   }
+}
