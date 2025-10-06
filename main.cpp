@@ -356,19 +356,18 @@ int run () {
    catch (SocketException e) {
       ffl_err(FPL_MAIN, "Unable to create socket on port: %d", port);
    }
-   while (ss && !force_exit && (duration == 0 || duration > (time(NULL) - starttime))) {
+   while (ss && !force_exit && (
+             duration == 0 || duration > (time(NULL) - starttime))) {
       try {
          ffl_notice(FPL_MAIN, "waiting for a connection on %d ...", port);
          FerryStream* fs = new FerryStream(ss->accept(),
             &ferryStreamFuneral);
          cleanDeadFSList();
          ffl_notice(FPL_MAIN, "a connection accepted.");
-      }
-      catch (SocketException e) {
+      } catch (SocketException e) {
          ffl_warn(FPL_MAIN, "Exception accepting incoming connection: %s",
             e.description().c_str());
-      }
-      catch (FerryStream::Exception e) {
+      } catch (FerryStream::Exception e) {
          ffl_err(FPL_MAIN, "Exception creating a new FerryStream: %s",
             e.what());
       }

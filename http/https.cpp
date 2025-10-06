@@ -1,15 +1,4 @@
-// mt_server.cpp
-// Minimal multithreaded HTTP + HTTPS server with AJAX and form POST support.
-// Build:
-//   g++ -std=c++17 mt_server.cpp -lssl -lcrypto -lpthread -o mt_server
-//
-// Generate self-signed cert for testing:
-//   openssl req -x509 -newkey rsa:4096 -nodes -keyout key.pem -out cert.pem -days 365 \
-//       -subj "/CN=localhost"
-//
-// Run:
-//   ./mt_server --http-port 8080 --https-port 8443 --docroot ./www --cert cert.pem --key key.pem --threads 8
-//
+// author: gowtham
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -45,6 +34,9 @@
 #include <ctime>
 #include <algorithm>
 #include <set>
+#include <sys/epoll.h>
+#include <errno.h>
+#include <sys/socket.h>
 
 #include <FFJSON.h>
 #include <logger.h>
@@ -72,6 +64,7 @@ void handle_sigint (int) {
    }
    g_running = false;
    ffl_debug(HL, "interrupted! g_running: %d", g_running.load());
+   ffl_notice(HL, "Shutting down...");
 }
 
 // ---------------- Thread pool ----------------
@@ -171,26 +164,43 @@ int makeNonBlocking (int fd) {
    return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
 
-using cread = function<size_t(char*, size_t)>;
-void parseCookie (cread read, FFJSON& ffCookie) {
+using crdwr = function<size_t(char*, size_t)>;
+void parseHost (crdwr read, FFJSON& host) {
+   char c;
+   string buf;
+   FFJSON& dom = host["domain"];
+   dom.init("[]");
+   bool port = false;
+   int ci=0;
+   while (read(&c, 1)>0) {
+      switch (c) {
+         case '\r':
+            continue;
+         case '\n':
+            ffl_info_contnu(HL,"%s\n", buf.c_str());
+            dom["name"]=buf;
+            return;
+         case ' ':
+            if (!buf.length()) {
+               continue;
+            }
+         case ':':
+         case '.':
+            ffl_info_contnu(HL,"%s%c", buf.c_str(), c);
+            dom[dom.size]=ci;
+            buf.clear();
+            continue;
+         default:
+            buf+=c;
+            ++ci;
+            break;
+      }
+   }
+}
+void parseCookie (crdwr read, FFJSON& ffCookie) {
    char c;
    string key,value;
-   int retry = 10;
-   while (true) {
-     readagain:
-      ssize_t r = read(&c, 1);
-      if (r<=0) {
-         ffl_debug(HL, "r: %zu", r);
-         if (retry<10) {
-            ++retry;
-            ffl_debug(HL, "retry %d", retry);
-            this_thread::sleep_for(chrono::milliseconds(200));
-            ffl_debug(HL, "retry %d woke", retry);
-            goto readagain;
-         }
-         retry=0;
-         return;
-      }
+   while (read(&c, 1)>0) {
       string* buf = &key;
       int i;
       switch (c) {
@@ -206,10 +216,14 @@ void parseCookie (cread read, FFJSON& ffCookie) {
             while (buf->back()==' ')
                buf->pop_back();
             ffCookie[key]=value;
-            if (c=='\n')
+            ffl_info_contnu(HL,"%s=%s",key.c_str(),value.c_str());
+            if (c=='\n') {
+               ffl_info_contnu(HL,"\n");
                return;
-            else
+            } else {
+               ffl_info_contnu(HL,";");
                buf=&key;
+            }
             break;
          case ' ':
             if (!buf->length())
@@ -222,7 +236,7 @@ void parseCookie (cread read, FFJSON& ffCookie) {
    }
 }
 
-void parseHTTP (cread read, FFJSON& ffHttp) {
+void parseHTTP (crdwr read, FFJSON& ffHttp) {
    unsigned int i=0;
    unsigned int pairStartPin=i;
    char c;
@@ -230,7 +244,7 @@ void parseHTTP (cread read, FFJSON& ffHttp) {
    ffl_info(HL, "request: ");
    int li=0;
    int spCnt=0;
-   int ci=0,hend = 0,bodyBegin=0,retry=0,query=0;
+   int ci=0,hend = 0,bodyBegin=0,query=0;
    while (true) {
       if (bodyBegin) {
          ssize_t r = read(buf, 1023);
@@ -246,24 +260,14 @@ void parseHTTP (cread read, FFJSON& ffHttp) {
                ffHttp["cl-mismatch"]=inL;
                ffHttp["content-length"]=r;
             }
-         }
+         } 
          if (r>=1023) {
             ffHttp["cl-excess"]=1023;
          }
          return;
       } else {
-        readagain:
          ssize_t r = read(&c, 1);
          if (r<=0) {
-            ffl_debug(HL, "r: %zu", r);
-            if (retry<10) {
-               ++retry;
-               ffl_debug(HL, "retry %d", retry);
-               this_thread::sleep_for(chrono::milliseconds(200));
-               ffl_debug(HL, "retry %d woke", retry);
-               goto readagain;
-            }
-            retry=0;
             return;
          }
       }
@@ -274,9 +278,11 @@ void parseHTTP (cread read, FFJSON& ffHttp) {
                ffl_info_contnu(HL, "version: %s\n", buf);
                ffHttp["version"]=(ccp)buf;
             } else if (hend) {
-               ffHttp[(ccp)buf]=buf+hend;
-               ffl_info_contnu(HL, "%s: %s\n", buf, buf+hend);
+               ffHttp[(ccp)buf]=(ccp)(buf+hend);
+               ffl_info_contnu(HL, "%s\n", (ccp)(buf+hend));
             } else if (!bodyBegin) {
+               if (!ffHttp["content-length"])
+                  return;
                bodyBegin=1;
             }
             ++li;
@@ -347,11 +353,17 @@ void parseHTTP (cread read, FFJSON& ffHttp) {
          case ':':
             if (li && !hend) {
                buf[ci]='\0';
+               ffl_info_contnu(HL,"%s: ",buf);
                tolower((ccp)buf);
-               hend=++ci;
                if (!strcmp(buf,"cookie")) {
                   parseCookie(read, ffHttp["cookie"]);
+               } else if (!strcmp(buf,"host")) {
+                  parseHost(read, ffHttp["host"]);
+               } else {
+                  hend=++ci;
+                  continue;
                }
+               ci=0;
                continue;
             }
       }
@@ -472,30 +484,15 @@ string get_mime_type(const fs::path &path) {
     }
     return "application/octet-stream"; // default
 }
-string get_subdomain (const char* host) {
-   string hoststr(host);
-   if(!cfg["hostName"]) return string();
-   string chost((ccp)cfg["hostName"]);
-   tolower(chost);
-   int domainpos =
-      hoststr.find(chost.c_str());
-   int portpos=hoststr.find(":");
-   if (domainpos > 1)
-      return hoststr.substr(0, domainpos-1);
-   else
-      return portpos>1?hoststr.substr(0,portpos):hoststr;
-}
 
-string myHandle (FFJSON& ffHttp) {
+string httpHandle (FFJSON& ffHttp) {
    FFJSON& fpath = ffHttp["path"];
    if (!fpath)
       return mkHttpRes("NaNa!");
    if (!ffHttp["host"])
       return "";
-   string subdomain = get_subdomain(ffHttp["host"]);
-   ffl_notice(HL, "subdomain: %s",subdomain.c_str());
-   FFJSON& vhost = (bool)cfg["vhosts"][subdomain]?
-      cfg["virtualWebHosts"][subdomain]:cfg;
+   ccp subdomain = ffHttp["host"]["domain"][0];
+   FFJSON& vhost = cfg["vhosts"][subdomain]?cfg["vhosts"][subdomain]:cfg;
    string path((ccp)vhost["rootdir"]);
    int plen = fpath.size;
    path+="/";
@@ -503,6 +500,7 @@ string myHandle (FFJSON& ffHttp) {
       path+=((ccp)fpath)+1;
    else
       path+="index.html";
+   ffl_info(HL,"serving %s", path.c_str());
    fs::path fspath(path);
    if (!fs::exists(fspath))
       return ferryfair(ffHttp, vhost);
@@ -539,7 +537,8 @@ string myHandle (FFJSON& ffHttp) {
       }
       dirHtml += "</table></body></html>";
       return mkHttpRes(dirHtml,"text/html");
-   } else if (path.find("/upload") || path.find("/red") || path.find("/tmp")) {
+   } else if (path.find("/red")!=string::npos ||
+              path.find("/tmp")!=string::npos) {
       return mkHttpRes("NaNa!");
    } else {
       ifstream reqFile(path);
@@ -551,28 +550,7 @@ string myHandle (FFJSON& ffHttp) {
    return mkHttpRes("NaNa!");
 }
 
-ssize_t write_all_fd (int fd, const void *buf, size_t n) {
-   size_t off = 0;
-   while (off < n) {
-      ssize_t w = ::write(fd, (const char*)buf + off, n - off);
-      if (w <= 0) return w;
-      off += w;
-   }
-   return (ssize_t)off;
-}
-
-
-int ssl_write_all (SSL *ssl, const void *buf, int n) {
-   int off = 0;
-   while (off < n) {
-      int w = SSL_write(ssl, (const char*)buf + off, n - off);
-      if (w <= 0) return w;
-      off += w;
-   }
-   return off;
-}
-
-void handle_connection (struct sockaddr_in& cli, int client_fd,
+void handle_connection (struct sockaddr_in cli, int client_fd,
                         SSL *ssl=nullptr) {
    if (ssl && SSL_accept(ssl) <= 0) {
       ffl_err(HL, "SSL accept failed: %s",
@@ -586,40 +564,90 @@ void handle_connection (struct sockaddr_in& cli, int client_fd,
    inet_ntop(AF_INET, &cli.sin_addr, ip_str, sizeof(ip_str));
    ffHttp["ip"] = (ccp)ip_str;
    
-   makeNonBlocking(client_fd);
-   cread nr = [client_fd] (char* buf, size_t bufSize)->size_t {
-      return read(client_fd, buf, bufSize);
+   //makeNonBlocking(client_fd);
+   crdwr nr = [client_fd] (char* buf, size_t bufSize)->size_t {
+      return recv(client_fd, buf, bufSize, 0);
    };
-   cread sr = [ssl] (char* buf, size_t bufSize)->size_t {
+   crdwr sr = [ssl] (char* buf, size_t bufSize)->size_t {
       return SSL_read(ssl, buf, bufSize);
    };
-   cread r = ssl ? sr : nr;
-   parseHTTP(r, ffHttp);
+   crdwr rd = ssl ? sr : nr;
+   crdwr rr = [&rd, client_fd] (char* buf, size_t bufSize)->size_t {
+      static int retry = cfg["readRetry"];
+      static int retryMS = cfg["retryMS"];
+     readagain:
+      ssize_t r = rd(buf, bufSize);
+      if (r<0 && retry) {
+         ffl_debug(HL, "r: %zu", r);
+         if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+            --retry;
+            ffl_debug(HL, "retry %d", retry);
+            this_thread::sleep_for(chrono::milliseconds(retryMS));
+            ffl_debug(HL, "retry %d woke", retry);
+            goto readagain;
+         }
+      }
+      return r;
+   };
+   parseHTTP(rr, ffHttp);
    string res;
-   if (!ffHttp) {
+   if (!ffHttp["version"]) {
       goto handledone;
    }
    ffl_info(HL, "%s %s %s %s fd=%d", (ccp)ffHttp["ip"], (ccp)ffHttp["version"],
             (ccp)ffHttp["method"], (ccp)ffHttp["path"], client_fd);
-   res = myHandle(ffHttp);
+   res = httpHandle(ffHttp);
    if (!res.empty()) {
-      if (ssl)
-         ssl_write_all(ssl, res.data(), (int)res.size());
-      else
-         write_all_fd(client_fd, res.data(), (int)res.size());
+      crdwr nw = [client_fd] (char* buf, size_t bufSize)->size_t {
+         return write(client_fd, buf, bufSize);
+      };
+      crdwr sw = [ssl] (char* buf, size_t bufSize)->size_t {
+         return SSL_write(ssl, buf, bufSize);
+      };
+      crdwr wd = ssl ? sw : nw;
+      crdwr rw = [&wd, client_fd] (char* buf, size_t bufSize)->size_t {
+         static int retry = cfg["readRetry"];
+         static int retryMS = cfg["retryMS"];
+         size_t off = 0;
+         while (off < bufSize) {
+           writeagain:
+            ssize_t w = wd(buf+off, bufSize - off);
+            if (w<=0) {
+               ffl_notice(
+                  HL, "write socket error: %d(%s)@%zu/%zu",
+                  errno, strerror(errno), off , bufSize);
+               if (retry && (errno==EAGAIN || errno==EWOULDBLOCK ||
+                             errno==EINTR || errno==EINVAL)) {
+                  ffl_debug(HL, "w: %zu", w);
+                  --retry;
+                  this_thread::sleep_for(chrono::milliseconds(retryMS));
+                  ffl_debug(HL, "%d fd write retry %d woke", client_fd, retry);
+                  goto writeagain;
+               } else {
+                  ffl_notice("wrie error, closing at %d", off);
+                  return off;
+               }
+               off += w;
+            }
+         }
+         return off;
+      };
+      rw(res.data(),res.size());
    }
+   
   handledone:
    if (ssl) {
       SSL_shutdown(ssl);
       SSL_free(ssl);
    }
    ::close(client_fd);
+   ffl_debug(HL, "%d fd closed", client_fd);
    return;
  }
 
 // ---------------- Networking & SSL setup ----------------
-int create_listen_socket(uint16_t port) {
-   int fd = ::socket(AF_INET, SOCK_STREAM, 0);
+int create_listen_socket (uint16_t port) {
+   int fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
    if (fd < 0) return -1;
    int on = 1;
    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
@@ -627,16 +655,17 @@ int create_listen_socket(uint16_t port) {
    addr.sin_family = AF_INET;
    addr.sin_addr.s_addr = INADDR_ANY;
    addr.sin_port = htons(port);
-   if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+   ffl_info(HL, "listening on %d", port);
+   if (::bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
       ::close(fd); return -1;
    }
-   if (listen(fd, SOMAXCONN) < 0) {
+   if (::listen(fd, SOMAXCONN) < 0) {
       ::close(fd); return -1;
    }
    return fd;
 }
 
-SSL_CTX *create_ssl_ctx (const string &cert_file, const string &key_file) {
+SSL_CTX* create_ssl_ctx (const string &cert_file, const string &key_file) {
    SSL_library_init();
    SSL_load_error_strings();
    const SSL_METHOD *method = TLS_server_method();
@@ -667,26 +696,12 @@ SSL_CTX *create_ssl_ctx (const string &cert_file, const string &key_file) {
       ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION);
    return ctx;
 }
-list<thread*> threadLs;
-void cleanThreads () {
-   list<thread*>::iterator it, dit;
-   it = threadLs.begin();
-   while (it != threadLs.end()) {
-      dit = it;
-      thread* t = *it;
-      ++it;
-      if (t->joinable()) {
-         delete t;
-         threadLs.erase(dit);
-      }
-   }
-}
 
 void accept_loop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
    while (g_running) {
       struct sockaddr_in cli{};
       socklen_t sl = sizeof(cli);
-      ffl_debug(HL, "ssl listening...");
+      ffl_debug(HL, "listening on %d...", listen_fd);
       int c = accept(listen_fd, (struct sockaddr*)&cli, &sl);
       if (c < 0) {
          if (errno == EINTR) {
@@ -701,11 +716,7 @@ void accept_loop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
          SSL_set_fd(ssl, c);
       }
       ffl_debug(HL, "got %d...", c);
-      // thread t([ssl,c] () {
-      //    handle_connection_ssl(ssl, c);
-      // });
-      // t.detach();
-      pool.enqueue([&cli, ssl, c](){
+      pool.enqueue([cli, ssl, c](){
          handle_connection(cli, c, ssl);
       });
    }
@@ -721,11 +732,8 @@ void usage_and_exit (const char *p) {
 int main (int argc, char **argv) {
    cfg.init("file://http.ffjson|OBJECT");
    ffl_debug(HL, "%s\n", cfg.prettyString().c_str());
-   cfg["httpPort"]=8080;
-   cfg["httpsPort"]=8443;
    cfg["threadCount"]=2*thread::hardware_concurrency();
-   if (!(cfg["cert"] && cfg["key"] && cfg["ca"] &&
-         cfg["docroot"])) {
+   if (!(cfg["cert"] && cfg["key"] && cfg["ca"])) {
       ffl_err(HL, "improper cfg");
       return 0;
    }
@@ -768,7 +776,6 @@ int main (int argc, char **argv) {
       this_thread::sleep_for(chrono::milliseconds(2000));
    }
 
-   ffl_notice(HL, "Shutting down...");
    ::shutdown(http_fd, SHUT_RDWR);
    ::shutdown(https_fd, SHUT_RDWR);
    ::close(http_fd);

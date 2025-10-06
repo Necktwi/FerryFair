@@ -38,7 +38,10 @@ FerryStream::FerryStream() {
 FerryStream::FerryStream(const FerryStream& orig) {
 }
 
-FerryStream::FerryStream(ServerSocket::Connection * source, void(*funeral)(int)) : source(source), funeral(funeral) {
+FerryStream::FerryStream(
+   ServerSocket::Connection * source, void(*funeral)(int)) :
+   source(source), funeral(funeral)
+{
 	string initPack;
 	try {
 		*source >> this->buffer;

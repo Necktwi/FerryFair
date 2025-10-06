@@ -11,7 +11,7 @@ all:
 	${TCPP} -std=c++23 -g -O0 -D_DEBUG -Dcimg_display=0\
    -Wno-unqualified-std-cast-call -I${FFJINC} -I${FFLINC} -I${FBINC} -I${FFINC}\
    -I.. ferryfair.cpp spatialSearch.cpp https.cpp ../cap.cpp -lssl -lcrypto -lpthread -lxml2 -lz -lrt -licuuc -licudata -licui18n ${FFJLIB} ${FFLLIB} ${FBLIB} -ljpeg\
-   -o https
+   -o https_${ARCH}
 
 clean:
 	rm -rf https

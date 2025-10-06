@@ -190,13 +190,11 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
    username=nullptr;
    ffl_debug(HL, "proto: %s",proto);
    path = ffHttp["path"];
-   const char* pathStart;
-   pathStart = strstr(path,"/sleep?");
-   if (pathStart) {
-      int sd = atoi(pathStart+7);
+   if (!strcmp(path,"/sleep")) {
+      int sd = atoi((ccp)ffHttp["query"]["time"]);
       sleep(sd);
       return mkHttpRes("slept for "+to_string(sd));
-   } else if (strstr(path, "/activate?")) {
+   } else if (!strcmp(path, "/activate")) {
       username=ffHttp["query"]["user"];
       user=&users[username];
       if ((!user["password"] || !user["inactive"]) &&
@@ -296,7 +294,7 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
    }
    rbsid = &rbs[bid];
    if (!cpld) {
-      if (strstr(path, "/upload?chunkSize=")) {
+      if (!strcmp(path, "/upload")) {
          goto upload;
       }
       goto allfileserver;
@@ -503,7 +501,7 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
       goto logout;
    }
 
-   if (strstr(path, "/upload?")) {
+   if (!strcmp(path, "/upload")) {
       int maxThings = (bool)user["maxThings"]?
          user["maxThings"]:vhost["config"]["maxThings"];
       int maxThingPics = (bool)user["maxThingsPics"]?
@@ -587,7 +585,18 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
          // }
       }
       char msg[30];
-      sprintf(msg, "{\"thingId\":%d,\"picId\":%d", thingId, picId);
+      ofstream upfile(upldpth.c_str(), std::ios::app | std::ios::binary);
+      if (!upfile.is_open()) {
+         sprintf(msg, "{\"error\":\"createFailed\"}");
+         return mkHttpRes(msg, jsonMime, 400);
+         
+      }
+      int initial_size = (int)(long long)upfile.tellp();
+      if (initial_size!=fofst) {
+         sprintf(msg, "{\"lastChunk\":%d}", initial_size);
+         return mkHttpRes(msg, jsonMime, 400);
+      }
+      upfile.write((ccp)ffHttp["payload"], (int)ffHttp["content-length"]);
       // mg_http_upload(
       //    c, hm, &mg_fs_posix, upldpth.c_str(), 2999999, msg);
       if (fofst+chnkSz >= ttlSz) {
@@ -595,14 +604,16 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
          uthings[thngi]["pics"][picId].erase("partial");
          uthings[thngi]["pics"][picId]["ts"]=lepoch;
 //            printf("pendingThings\n");
-         users.save();
+         saveUsers=true;
       }
+      sprintf(msg, "{\"thingId\":%d,\"picId\":%d", thingId, picId);
+      return mkHttpRes(msg, jsonMime);
    } else if (!strcmp(path, "/logout")) {
      logout:
       rbsid["user"]=nullFFJSON;
       saveRBS=true;
       return mkHttpRes("{\"logout\":true}", jsonMime);
-   } else if (strstr(path, "/update")) {
+   } else if (!strcmp(path, "/update")) {
       FFJSON& user = users[username];
       if (strcmp((ccp)user["bid"],bid.c_str())) {
          return mkHttpRes("{\"error\":\"bidmismatch\"}", jsonMime, 400);
