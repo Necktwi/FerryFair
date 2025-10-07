@@ -9,6 +9,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <string.h>
+#include <zlib.h>
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -65,6 +66,50 @@ void handle_sigint (int) {
    g_running = false;
    ffl_debug(HL, "interrupted! g_running: %d", g_running.load());
    ffl_notice(HL, "Shutting down...");
+}
+
+string gzipCompress (
+   const string &data, int level = Z_BEST_COMPRESSION) {
+   string compressed;
+   
+   z_stream zs{};
+   zs.zalloc = Z_NULL;
+   zs.zfree = Z_NULL;
+   zs.opaque = Z_NULL;
+   
+   // 16 + MAX_WBITS tells zlib to write a gzip header/trailer
+   if (deflateInit2(&zs, level, Z_DEFLATED, 16 + MAX_WBITS, 8,
+                    Z_DEFAULT_STRATEGY) != Z_OK) {
+      return compressed;
+   }
+   
+   zs.next_in = reinterpret_cast<Bytef*>(const_cast<char *>(data.data()));
+   zs.avail_in = data.size();
+   
+   const size_t CHUNK_SIZE = 16384;
+   std::vector<unsigned char> outbuffer(CHUNK_SIZE);
+   
+   int ret;
+   do {
+      zs.next_out = outbuffer.data();
+      zs.avail_out = outbuffer.size();
+      
+      ret = deflate(&zs, zs.avail_in ? Z_NO_FLUSH : Z_FINISH);
+      if (compressed.size() < zs.total_out) {
+         compressed.insert(compressed.end(),
+                           outbuffer.data(),
+                           outbuffer.data() +
+                           (zs.total_out - compressed.size()));
+      }
+   } while (ret == Z_OK);
+   
+   deflateEnd(&zs);
+   
+   if (ret != Z_STREAM_END) {
+      compressed.clear();
+   }
+   
+   return compressed;
 }
 
 // ---------------- Thread pool ----------------
@@ -132,7 +177,7 @@ private:
 };
 
 // ---------------- Utilities ----------------
-string url_decode(const string &s) {
+string url_decode (const string &s) {
    string out;
    out.reserve(s.size());
    for(size_t i=0;i<s.size();++i){
@@ -169,7 +214,8 @@ void parseHost (crdwr read, FFJSON& host) {
    char c;
    string buf;
    FFJSON& dom = host["domain"];
-   dom.init("[]");
+   FFJSON& subs = dom["subs"];
+   subs.init("[]");
    bool port = false;
    int ci=0;
    while (read(&c, 1)>0) {
@@ -187,9 +233,7 @@ void parseHost (crdwr read, FFJSON& host) {
          case ':':
          case '.':
             ffl_info_contnu(HL,"%s%c", buf.c_str(), c);
-            dom[dom.size]=ci;
-            buf.clear();
-            continue;
+            subs[subs.size]=ci;
          default:
             buf+=c;
             ++ci;
@@ -200,9 +244,8 @@ void parseHost (crdwr read, FFJSON& host) {
 void parseCookie (crdwr read, FFJSON& ffCookie) {
    char c;
    string key,value;
+   string* buf = &key;
    while (read(&c, 1)>0) {
-      string* buf = &key;
-      int i;
       switch (c) {
          case '=':
             while (buf->back()==' ')
@@ -236,6 +279,30 @@ void parseCookie (crdwr read, FFJSON& ffCookie) {
    }
 }
 
+void parseAcceptEncoding (crdwr read, FFJSON& ffAEnc) {
+   char c;
+   string enc;
+   while (read(&c, 1)>0) {
+      switch (c) {
+         case ',':
+            ffAEnc[]=enc;
+            ffl_info_contnu(HL, "%s,", enc.c_str());
+            enc.clear();
+         case ' ':
+         case '\r':
+            continue;
+         case '\n':
+            ffAEnc[]=enc;
+            ffl_info_contnu(HL, "%s\n", enc.c_str());
+            return;
+         default:
+            enc+=c;
+            break;
+      }
+   }
+   return;
+}
+
 void parseHTTP (crdwr read, FFJSON& ffHttp) {
    unsigned int i=0;
    unsigned int pairStartPin=i;
@@ -247,22 +314,26 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
    int ci=0,hend = 0,bodyBegin=0,query=0;
    while (true) {
       if (bodyBegin) {
-         ssize_t r = read(buf, 1023);
-         if (r<=0) {
-            ffl_debug(HL,"end r: %zu", r);
-            return;
-         }
-         buf[r] = '\0';
-         ffHttp["payload"] = (ccp)buf;
          if (ffHttp["content-length"]) {
-            int inL = ffHttp["content-length"];
-            if (inL!=r) {
-               ffHttp["cl-mismatch"]=inL;
-               ffHttp["content-length"]=r;
+            int inL = atoi((ccp)ffHttp["content-length"]);
+            ffHttp["content-length"]=inL;
+            uint8_t* pbuf = new uint8_t[inL+1];
+            ssize_t r = read((char*)pbuf, inL);
+            if (r<=0) {
+               ffl_debug(HL,"end r: %zd", r);
+               delete[] pbuf;
+               return;
             }
-         } 
-         if (r>=1023) {
-            ffHttp["cl-excess"]=1023;
+            if (inL!=r) {
+               ffl_err(HL, "payload != content-length");
+               delete[] pbuf;
+               return;
+            }
+            pbuf[r] = '\0';
+            FFJSON::Blob_ b;
+            b.p = pbuf;
+            b.s = inL+1;
+            ffHttp["payload"] = b;
          }
          return;
       } else {
@@ -359,6 +430,8 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
                   parseCookie(read, ffHttp["cookie"]);
                } else if (!strcmp(buf,"host")) {
                   parseHost(read, ffHttp["host"]);
+               } else if (!strcmp(buf,"accept-encoding")) {
+                  parseAcceptEncoding(read, ffHttp["accept-encoding"]);
                } else {
                   hend=++ci;
                   continue;
@@ -374,7 +447,7 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
    }
 }
 
-string mkHttpRes (const string &body,
+string mkHttpRes (FFJSON& ffHttp, const string& body,
                   const string &ctype,
                   const int code,
                   const string &codeMsg,
@@ -382,10 +455,20 @@ string mkHttpRes (const string &body,
    ostringstream oss;
    oss << "HTTP/1.0 " << code << " " << codeMsg << "\r\n";
    oss << "Content-Type: " << ctype << "\r\n";
-   oss << "Content-Length: " << body.size() << "\r\n";
    oss << addlHdrs;
-   oss << "Connection: close\r\n\r\n";
-   oss << body;
+   oss << "Connection: close\r\n";
+   int ocl = body.size();
+   FFJSON& accEnc = ffHttp["accept-encoding"];
+   if (ocl>1024 && accEnc && accEnc["gzip"] &&
+       ctype.find("image")==string::npos) {
+      string gz = gzipCompress(body);
+      oss << "Content-Encoding: gzip\r\n";
+      oss << "Content-Length: " << gz.size() << "\r\n\r\n";
+      oss << gz;
+   } else {
+      oss << "Content-Length: " << ocl << "\r\n\r\n";
+      oss << body;
+   }
    return oss.str();
 }
 
@@ -451,7 +534,7 @@ string html_escape (ccp s) {
    return out;
 }
 
-string get_mime_type(const fs::path &path) {
+string get_mime_type(const fs::path& path) {
     static const unordered_map<string, string> mime {
         {".html", "text/html"},
         {".htm",  "text/html"},
@@ -488,13 +571,16 @@ string get_mime_type(const fs::path &path) {
 string httpHandle (FFJSON& ffHttp) {
    FFJSON& fpath = ffHttp["path"];
    if (!fpath)
-      return mkHttpRes("NaNa!");
+      return mkHttpRes(ffHttp, "NaNa!");
    if (!ffHttp["host"])
       return "";
-   ccp subdomain = ffHttp["host"]["domain"][0];
+   FFJSON& domain = ffHttp["host"]["domain"];
+   ccp domname = domain["name"];
+   string subdomain(domname,(int)domain["subs"][0]);
    FFJSON& vhost = cfg["vhosts"][subdomain]?cfg["vhosts"][subdomain]:cfg;
    string path((ccp)vhost["rootdir"]);
    int plen = fpath.size;
+   string res;
    path+="/";
    if (plen>1)
       path+=((ccp)fpath)+1;
@@ -502,9 +588,11 @@ string httpHandle (FFJSON& ffHttp) {
       path+="index.html";
    ffl_info(HL,"serving %s", path.c_str());
    fs::path fspath(path);
-   if (!fs::exists(fspath))
-      return ferryfair(ffHttp, vhost);
-   else if (fs::is_directory(fspath)) {
+   res = ferryfair(ffHttp, vhost);
+   if (res.length()) {
+      return res;
+   }
+   if (fs::is_directory(fspath)) {
       vector<Entry> entries;
       for (auto &de : fs::directory_iterator(fspath)) {
          Entry e;
@@ -536,18 +624,18 @@ string httpHandle (FFJSON& ffHttp) {
          dirHtml += "<td>" + mtime + "</td></tr>";
       }
       dirHtml += "</table></body></html>";
-      return mkHttpRes(dirHtml,"text/html");
+      return mkHttpRes(ffHttp, dirHtml,"text/html");
    } else if (path.find("/red")!=string::npos ||
               path.find("/tmp")!=string::npos) {
-      return mkHttpRes("NaNa!");
+      return mkHttpRes(ffHttp, "NaNa!");
    } else {
       ifstream reqFile(path);
       ostringstream resStr;
       resStr << reqFile.rdbuf();
       string res = resStr.str();
-      return mkHttpRes(res,get_mime_type(fspath));
+      return mkHttpRes(ffHttp, res,get_mime_type(fspath));
    }
-   return mkHttpRes("NaNa!");
+   return mkHttpRes(ffHttp, "NaNa!");
 }
 
 void handle_connection (struct sockaddr_in cli, int client_fd,
@@ -573,12 +661,12 @@ void handle_connection (struct sockaddr_in cli, int client_fd,
    };
    crdwr rd = ssl ? sr : nr;
    crdwr rr = [&rd, client_fd] (char* buf, size_t bufSize)->size_t {
-      static int retry = cfg["readRetry"];
+      int retry = cfg["readRetry"];
       static int retryMS = cfg["retryMS"];
      readagain:
       ssize_t r = rd(buf, bufSize);
-      if (r<0 && retry) {
-         ffl_debug(HL, "r: %zu", r);
+      if (r<0 && retry>0) {
+         ffl_debug(HL, "r: %zd", r);
          if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
             --retry;
             ffl_debug(HL, "retry %d", retry);
@@ -606,7 +694,7 @@ void handle_connection (struct sockaddr_in cli, int client_fd,
       };
       crdwr wd = ssl ? sw : nw;
       crdwr rw = [&wd, client_fd] (char* buf, size_t bufSize)->size_t {
-         static int retry = cfg["readRetry"];
+         int retry = cfg["readRetry"];
          static int retryMS = cfg["retryMS"];
          size_t off = 0;
          while (off < bufSize) {
@@ -614,17 +702,18 @@ void handle_connection (struct sockaddr_in cli, int client_fd,
             ssize_t w = wd(buf+off, bufSize - off);
             if (w<=0) {
                ffl_notice(
-                  HL, "write socket error: %d(%s)@%zu/%zu",
+                  HL, "fd: %d, write socket error: %d(%s)@%zd/%zd", client_fd,
                   errno, strerror(errno), off , bufSize);
-               if (retry && (errno==EAGAIN || errno==EWOULDBLOCK ||
-                             errno==EINTR || errno==EINVAL)) {
-                  ffl_debug(HL, "w: %zu", w);
+               if (retry>0 && (errno==EAGAIN || errno==EINTR)) {
+                  ffl_debug(HL, "fd: %d, w: %zd", client_fd, w);
                   --retry;
                   this_thread::sleep_for(chrono::milliseconds(retryMS));
-                  ffl_debug(HL, "%d fd write retry %d woke", client_fd, retry);
+                  ffl_debug(HL, "fd: %d, write retry %d woke",
+                            client_fd, retry);
                   goto writeagain;
                } else {
-                  ffl_notice("wrie error, closing at %d", off);
+                  ffl_notice(HL,"fd: %d, write error, closing at %d",
+                             client_fd, off);
                   return off;
                }
                off += w;
@@ -732,6 +821,8 @@ void usage_and_exit (const char *p) {
 int main (int argc, char **argv) {
    cfg.init("file://http.ffjson|OBJECT");
    ffl_debug(HL, "%s\n", cfg.prettyString().c_str());
+   ffl_debug(HL, "EAGAIN(%zd) EINTR(%zd) EINVAL(%zd)\n",
+             EAGAIN, EINTR, EINVAL);
    cfg["threadCount"]=2*thread::hardware_concurrency();
    if (!(cfg["cert"] && cfg["key"] && cfg["ca"])) {
       ffl_err(HL, "improper cfg");
