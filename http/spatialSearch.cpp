@@ -1,6 +1,7 @@
 #include "spatialSearch.h"
 #include <myconverters.h>
 #include <metaphone3.h>
+#include <memory>
 
 const uint thnsPrSrch = 25;
 QuadHldr thnsTree;
@@ -10,6 +11,13 @@ map<set<FFJSON*>*, vector<uint>> mapffset;
 map<string, FFJSON*>* nameints;
 FFJSON* fnameints;
 map<const string*, uint> mitpos;
+struct CntMut_ {
+   mutex m;
+   int count=0;
+};
+map<QuadHldr*, CntMut_> qhModMut;
+mutex qhMapMut;
+mutex qhModLkMut;
 
 void ptswap (vector<NdNPrn>& pts, uint one, uint two) {
    NdNPrn temp = pts[one];
@@ -328,10 +336,14 @@ uint QuadHldr::insert (
    uint returnv=0;
    void* resfp = get<0>(bpxor(fp, pQN));
    set<FFJSON*>* ressfp = (set<FFJSON*>*)resfp;
-   map<set<FFJSON*>*, vector<uint>>::iterator sit = mapffset.find(ressfp);
-   vector<map<QuadNode*,uint>::iterator> qit = qpfind((QuadNode*)resfp);
-   if (!qit.size()) {
-      bool isS=sit != mapffset.end();
+   map<set<FFJSON*>*, vector<uint>>::iterator sit;
+   vector<map<QuadNode*,uint>::iterator> qit;
+   if (!sn) {
+      sit = mapffset.find(ressfp);
+      qit = qpfind((QuadNode*)resfp);
+   }
+   if (!qit.size() || sn) {
+      bool isS = sn ? false : sit != mapffset.end();
       if (deleteLeaf) {
          if (!isS && resfp == (void*)&rF) {
             fp=nullptr;
@@ -371,6 +383,13 @@ uint QuadHldr::insert (
          }
          return level;
       }
+      if (!sn) {
+         qhMapMut.lock();
+         CntMut_& cm = qhModMut[this];
+         ++cm.count;
+         qhMapMut.unlock();
+         cm.m.lock();
+      }
       qp = new QuadNode();
       if (!sn) {
          if (isS) {
@@ -379,12 +398,25 @@ uint QuadHldr::insert (
             xorinaname(ina, (ccp)tmp["name"]);
          }
       }
-      qp->seti(ina);
       qp->insert(*(FFJSON*)resfp,ina,llx,lly,x,y,level,tQN,tind,deleteLeaf,1);
       returnv =
          qp->insert(rF,ina,lx,ly,x,y,level,tQN,tind,deleteLeaf,1);
+      qp->seti(ina);
       qp = (QuadNode*)fpxor(qp,pQN,ind);
       //printf("qp: %p, tQN: %p\n", qp, tQN);
+      if (!sn) {
+         qhMapMut.lock();
+         map<QuadHldr*, CntMut_>::iterator it = qhModMut.find(this);
+         CntMut_& cm = it->second;
+         if (cm.count==1) {
+            cm.m.unlock();
+            qhModMut.erase(it);
+         } else {
+            --cm.count;
+            cm.m.unlock();
+         }
+         qhMapMut.unlock();
+      }
       return returnv;
    } else {
       QuadNode* qpres = (QuadNode*)resfp;
