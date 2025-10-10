@@ -13,5 +13,8 @@ all:
    -I.. ferryfair.cpp spatialSearch.cpp https.cpp ../cap.cpp -lssl -lcrypto -lpthread -lxml2 -lz -lrt -licuuc -licudata -licui18n ${FFJLIB} ${FFLLIB} ${FBLIB} -ljpeg\
    -o https_${ARCH}
 
+test:
+	${TCPP} -std=c++23 -g -O0 test.cpp -o test
+
 clean:
-	rm -rf https
+	rm -rf https test

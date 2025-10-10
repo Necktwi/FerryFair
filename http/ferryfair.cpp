@@ -17,11 +17,14 @@
 
 using namespace std;
 
-static atomic<bool> saveUsers{true};
-static atomic<bool> saveRBS{true};
+mutex mtxSaveUsers;
+mutex mtxSaveRbs;
+atomic<bool> saveUsers{false};
+atomic<bool> saveRbs{false};
+atomic<bool> saveNameints{false};
+atomic<bool> saveFerryfair{false};
 bool valgrind_test = false;
 int valgrind_count = 1;
-
 struct CompThingNameMatch {
    bool operator () (const tuple<FFJSON*,int8_t>& t1,
                      const tuple<FFJSON*,int8_t>& t2) const {
@@ -211,6 +214,7 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
          user["smsgs"].init("[]");
          user["reps"].init("[]");
          saveUsers=true;
+         saveFerryfair=true;
          return mkHttpRes(ffHttp, string(username) + " activated.");
       } else {
          return mkHttpRes(ffHttp, "{\"error\":\"wrongKey\"}", jsonMime, 400);
@@ -285,7 +289,8 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
          addSmtgsToReply(users, user, reply, mdts);
       }
      cookieReply:
-      saveRBS = true;
+      saveRbs = true;
+      saveFerryfair=true;
       return mkHttpRes(ffHttp, reply.stringify(true).c_str(),jsonMime);
    }
   bidcheck2:
@@ -306,7 +311,8 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
       cap randcap(randstr, tempPath, 7, 288, 68, 40, 80, 48);
       rbsid["captcha"]=randstr;
       randcap.save();
-      saveRBS=true;
+      saveRbs=true;
+      saveFerryfair=true;
       return mkHttpRes(ffHttp, "{\"cap\":\"true\"}", jsonMime);
    } else if (!strcmp(path, "/login")) {
       ffl_notice(HL, "Login");
@@ -326,8 +332,9 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
          user["bid"]=bid;
          rbsid["urts"]=lepoch;
          addSmtgsToReply(users, user, reply, bidThings[&rbsid]);
-         saveRBS = true;
+         saveRbs = true;
          saveUsers = true;
+         saveFerryfair=true;
          return mkHttpRes(ffHttp, reply.stringify(true).c_str(), jsonMime, 200);
       } else {
          return mkHttpRes(ffHttp, "\{\"login\":\"false\"}", jsonMime);
@@ -436,8 +443,9 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
       // while(!s_quit)
       //    mg_mgr_poll(&mail_mgr, 100);
       s_quit=false;
-      saveRBS = true;
+      saveRbs = true;
       saveUsers = true;
+      saveFerryfair=true;
       return mkHttpRes(ffHttp, 
          "{\"actEmailSent\":-6,\"msg\":\"Activation mail sent to ur email"
          " :D\"}", jsonMime, 200);
@@ -610,13 +618,15 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
          uthings[thngi]["pics"][picId]["ts"]=lepoch;
 //            printf("pendingThings\n");
          saveUsers=true;
+         saveFerryfair=true;
       }
       sprintf(msg, "{\"thingId\":%d,\"picId\":%d}", thingId, picId);
       return mkHttpRes(ffHttp, msg, jsonMime);
    } else if (!strcmp(path, "/logout")) {
      logout:
       rbsid["user"]=nullFFJSON;
-      saveRBS=true;
+      saveRbs=true;
+      saveFerryfair=true;
       return mkHttpRes(ffHttp, "{\"logout\":true}", jsonMime);
    } else if (!strcmp(path, "/updateThing")) {
       FFJSON& user = users[username];
@@ -733,6 +743,8 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
          }
       }
       saveUsers=true;
+      saveNameints=true;
+      saveFerryfair=true;
       return mkHttpRes(ffHttp, reply.stringify(true).c_str(), jsonMime, 200);
    } else if (strstr(path, "/owl")) {
       FFJSON& things = user["things"];
@@ -942,7 +954,8 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
       payload["status"]=1;
       rbsid["urts"]=lepoch;
       saveUsers=true;
-      saveRBS=true;
+      saveRbs=true;
+      saveFerryfair=true;
       return mkHttpRes(ffHttp, payload.stringify(true).c_str(), jsonMime, 200);
    }
    if (valgrind_test && !--valgrind_count)
@@ -1000,7 +1013,59 @@ void makeThngsTree () {
 }
 
 void initFerryFair (FFJSON& cfg) {
-   cfg["vhosts"]["www"]["cfg"].init(
+   cfg["cfg"].init(
       string("file://")+(ccp)cfg["vhosts"]["www"]["rootdir"]+"/config.ffjson");
+   cfg["vhosts"]["www"]["cfg"]=&cfg["cfg"];
    makeThngsTree();
+   Pts pts;
+   vector<string> mstr = metaname("Touch");
+   //vector<string> mstr = metaname("Indulehka Bringha Hair Oil");
+   pts.ina=nametouint(mstr);
+   //Circle c = {180.0, 90.0, 10.5};
+   //Circle c = {0.1, 0.1, 10.5};
+   //Circle c = {0.9, 0.8, 10.5};
+   //pts.c = {77.7584640, 12.9826816, 10.5};
+   //pts.c = {77.7645299,12.9941367, 10.5};
+   //pts.c = {77.7644272, 12.9940713, 10.5};
+   pts.c = {77.7644577, 12.9941273, 10.5};
+   ffl_debug(HL, "c: %f,%f\n", pts.c.x, pts.c.y);
+   FerryTimeStamp ftsStart;
+   FerryTimeStamp ftsEnd;
+   FerryTimeStamp ftsDiff;
+   ftsStart.Update();
+   thnsTree.print(pts.c);
+   //ina.push_back(0x80);
+   thnsTree.getPointsFromQuad(pts);
+   ftsEnd.Update();
+   ftsDiff = ftsEnd - ftsStart;
+   cout << "%TEST_FINISHED% time=" << ftsDiff << " test21\n" << endl;
+   std::vector<NdNPrn>::iterator it = pts.pts.begin();
+   it = pts.pts.begin();
+   while (it!=pts.pts.end()) {
+      FFJSON* fp;
+      if (it->prn==(QuadNode*)-1) {
+         fp = (FFJSON*)it->qh;
+      } else {
+         fp = (FFJSON*)get<0>(getNode(*it));
+      }
+      printf("%s\n",(*fp)["location"].stringify().c_str());
+      ++it;
+   }
+}
+
+void saveFerryFair (void* pcfg) {
+   FFJSON& cfg = *(FFJSON*)pcfg;
+   saveFerryfair=false;
+   if (saveUsers) {
+      saveUsers=false;
+      cfg["cfg"]["users"].save();
+   }
+   if (saveRbs) {
+      saveRbs=false;
+      cfg["cfg"]["rbs"].save();
+   }
+   if (saveNameints) {
+      saveNameints=false;
+      cfg["cfg"]["nameints"].save();
+   }
 }

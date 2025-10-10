@@ -381,21 +381,6 @@ uint QuadHldr::insert (
       }
       qp->seti(ina);
       qp->insert(*(FFJSON*)resfp,ina,llx,lly,x,y,level,tQN,tind,deleteLeaf,1);
-      // FFJSON* xorfp = (FFJSON*)fpxor(resfp,tQN,tind);
-      // //printf("%p,%p\n", resfp, xorfp);
-      // if ((double)tmp["location"][1] >= x) {
-      //    if ((double)tmp["location"][0] >= y) {
-      //       qp->en.fp=xorfp;
-      //    } else {
-      //       qp->es.fp=xorfp;
-      //    }
-      // } else {
-      //    if ((double)tmp["location"][0] >= y) {
-      //       qp->wn.fp=xorfp;
-      //    } else {
-      //       qp->ws.fp=xorfp;
-      //    }
-      // }
       returnv =
          qp->insert(rF,ina,lx,ly,x,y,level,tQN,tind,deleteLeaf,1);
       qp = (QuadNode*)fpxor(qp,pQN,ind);
@@ -403,24 +388,6 @@ uint QuadHldr::insert (
       return returnv;
    } else {
       QuadNode* qpres = (QuadNode*)resfp;
-      // float lx = rF["location"][1];
-      // float ly = rF["location"][0];
-      // int8_t qind =  lx>= x?0:1;
-      // int8_t xs=qind==0?1:-1;
-      // qind<<=1;
-      // int8_t ys = ly >= y?1:-1;
-      // //fflush(stdout);
-      // qind |= ys>=0?0:1;
-      // //printf("%f,%f,%f,%f,%d,%d,%d\n",x,y,lx,ly,xs,ys,qind);
-      // qh+=qind;
-      // if (qh->fp==nullptr) {
-      //    qh->fp=pxorrf;
-      // } else {
-      //    float dx = 180/(pow(2,level+1));
-      //    float dy = 90/(pow(2,level+1));
-      //    returnv = qh->insert(
-      //       rF, ina, deleteLeaf, level+1, x+xs*dx, y+ys*dy, qpres, qind, tQN, tind, sn);
-      // }
       returnv = qpres->insert(
          rF, ina, lx, ly, x, y, level, tQN, tind, deleteLeaf, sn);
       if (deleteLeaf) {
@@ -470,12 +437,7 @@ bool Circle::grabIfNearest (FFJSON& f) {
    float y1 = y - (double)f["location"][0];
    float x2 = x - (double)(*nf)["location"][1];
    float y2 = y - (double)(*nf)["location"][0];
-   //x1 = x1<0?-x1:x1;
-   //y1 = y1<0?-y1:y1;
-   //x2 = x2<0?-x2:x2;
-   //y2 = y2<0?-y2:y2;
    if ((pow(x1,2)+pow(y1,2)) < (pow(x2,2)+pow(y2,2))) {
-      //if (x1+y1 < x2+y2) {
       nf=&f;
       return true;
    }
@@ -792,25 +754,18 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
          //pts.nni=pts.pts.size();
          ncnt+=nd.qh->findNeighbours(
             pts, tQN, tind, nd.prn, nd.ind, nd.dx, nd.ds, nd.d);
-         //quickSort(pts.pts, pts.nni, pts.pts.size()-1);
          if (nd.d.x!=0 && nd.d.y!=0) {
             Direction dd = nd.d;
             dd.x = 0;
             //pts.nni=pts.pts.size();
             ncnt+=nd.qh->findNeighbours(
                pts, tQN, tind, nd.prn, nd.ind, nd.dx, nd.ds, dd);
-            //quickSort(pts.pts, pts.nni, pts.pts.size()-1);
             dd.x = nd.d.x;
             dd.y=0;
             //pts.nni=pts.pts.size();
             ncnt+=nd.qh->findNeighbours(
                pts, tQN, tind, nd.prn, nd.ind, nd.dx, nd.ds, dd);
-            //quickSort(pts.pts, pts.nni, pts.pts.size()-1);
          }
-         // if (pts.ni==pts.nni) {
-         //    quickSort(pts.pts, pts.nni+1, pts.pts.size()-1);
-         //    pts.nni=pts.pts.size()-1;
-         // }
          quickSort(pts.pts, pts.ni+1, pts.pts.size()-1);
          if (nd.qh->fp && pts.ni>=pni) {
             QuadNode* resqp = (QuadNode*)get<0>(getNode(nd));
@@ -873,32 +828,6 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
    return ncnt;
 }
 
-
-// void QuadNode::del (QuadNode* tQN, int8_t tind,
-//                     QuadNode* pQN, int8_t ind) {
-//    QuadHldr* qh = &en;
-//    for (int8_t i = 0; i < 4; ++i,++qh) {
-//       qh->del(this, i, tQN, tind);
-//    }
-// }
-
-// void QuadHldr::del (QuadNode* tQN, int8_t tind,
-//                     QuadNode* pQN, int8_t ind) {
-//    if (!fp) {
-//       return;
-//    }
-//    QuadNode* resfp = (QuadNode*)get<0>(bpxor(fp,pQN));
-//    map<QuadNode*,int>::iterator qit = qpfind(resfp);
-//    bool isQ = isQuad(qit);
-//    if (!isQ) {
-//       delete resfp;
-//    } else {
-//       resfp->del(tQN, tind, pQN, ind);
-//       qpset.erase(qit);
-//       delete resfp;
-//    }
-//    fp=nullptr;
-// }
 
 uint QuadHldr::getPointsFromQuad (
    Pts& pts, uint level, float x, float y, QuadNode* tQN,

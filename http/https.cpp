@@ -232,7 +232,6 @@ void parseHost (crdwr read, FFJSON& host) {
             }
          case ':':
          case '.':
-            ffl_info_contnu(HL,"%s%c", buf.c_str(), c);
             subs[subs.size]=ci;
          default:
             buf+=c;
@@ -639,7 +638,7 @@ string httpHandle (FFJSON& ffHttp) {
 }
 
 void handle_connection (struct sockaddr_in cli, int client_fd,
-                        SSL *ssl=nullptr) {
+                        SSL* ssl = nullptr) {
    if (ssl && SSL_accept(ssl) <= 0) {
       ffl_err(HL, "SSL accept failed: %s",
               ERR_error_string(ERR_get_error(), nullptr));
@@ -808,6 +807,9 @@ void accept_loop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
       pool.enqueue([cli, ssl, c](){
          handle_connection(cli, c, ssl);
       });
+      if (saveFerryfair) {
+         thread(saveFerryFair,(void*)&cfg).detach();
+      }
    }
 }
 
