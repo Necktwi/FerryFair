@@ -113,37 +113,38 @@ string gzipCompress (
 }
 
 // ---------------- Thread pool ----------------
-class ThreadPool {
-public:
-   ThreadPool (size_t n) {
+
+ThreadPool::ThreadPool (size_t n) {
+   start(n);
+};
+ThreadPool::~ThreadPool () {
+   stop();
+};
+void ThreadPool::init (size_t n) {
+   if (!started) {
       start(n);
+      started = true;
    }
-   ~ThreadPool () {
-      stop();
+}
+void ThreadPool::enqueue(function<void()> job) {
+   {
+      unique_lock<mutex> lk(mutex_);
+      jobs_.push(move(job));
    }
+   cv_.notify_one();
+}
 
-   void enqueue(function<void()> job) {
-      {
-         unique_lock<mutex> lk(mutex_);
-         jobs_.push(move(job));
-      }
-      cv_.notify_one();
-   }
-
-private:
-   vector<thread> workers_;
-   queue<function<void()>> jobs_;
-   mutex mutex_;
-   condition_variable cv_;
-   bool stopping_ = false;
-
-   void start (size_t n) {
-      for (size_t i=0; i<n; ++i) {
-         workers_.emplace_back([this] () {
-            while (true) {
-               function<void()> job;
+void ThreadPool::start (size_t n) {
+   for (size_t i=0; i<n; ++i) {
+      workers_.emplace_back([this] () {
+         while (true) {
+            function<void()> job;
                {
                   unique_lock<mutex> lk(mutex_);
+                  ffl_debug(HL, "jobs in queue: %d", jobs_.size());
+                  if (jobs_.empty()) {
+                     cvJoin_.notify_all();
+                  }
                   cv_.wait(lk, [this] {
                      return stopping_ || !jobs_.empty();
                   });
@@ -159,23 +160,29 @@ private:
                } catch (...) {
                   ffl_err(HL, "worker exception: unknown");
                }
-            }
-         });
-      }
+         }
+      });
    }
+}
 
-   void stop () {
-      {
-         unique_lock<mutex> lk(mutex_);
-         stopping_ = true;
-      }
-      cv_.notify_all();
-      for(auto &t : workers_)
-         if (t.joinable())
-            t.join();
+void ThreadPool::stop () {
+   {
+      unique_lock<mutex> lk(mutex_);
+      stopping_ = true;
    }
-};
+   cv_.notify_all();
+   for(auto &t : workers_)
+      if (t.joinable())
+         t.join();
+}
+void ThreadPool::join () {
+   unique_lock<mutex> lk(mutex_);
+   cvJoin_.wait(lk, [this] {
+      return jobs_.empty();
+   });
+}
 
+ThreadPool pool;
 // ---------------- Utilities ----------------
 string url_decode (const string &s) {
    string out;
@@ -316,6 +323,8 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
          if (ffHttp["content-length"]) {
             int inL = atoi((ccp)ffHttp["content-length"]);
             ffHttp["content-length"]=inL;
+            if (!inL)
+               return;
             uint8_t* pbuf = new uint8_t[inL+1];
             ssize_t r = read((char*)pbuf, inL);
             if (r<=0) {
@@ -456,6 +465,7 @@ string mkHttpRes (FFJSON& ffHttp, const string& body,
    oss << "Content-Type: " << ctype << "\r\n";
    oss << addlHdrs;
    oss << "Connection: close\r\n";
+   oss << "Cache-Control: public, max-age=3600\r\n";
    int ocl = body.size();
    FFJSON& accEnc = ffHttp["accept-encoding"];
    if (ocl>1024 && accEnc && accEnc["gzip"] &&
@@ -577,6 +587,12 @@ string httpHandle (FFJSON& ffHttp) {
    ccp domname = domain["name"];
    string subdomain(domname,(int)domain["subs"][0]);
    FFJSON& vhost = cfg["vhosts"][subdomain]?cfg["vhosts"][subdomain]:cfg;
+   if (vhost["redirect"]) {
+      char rhed[64];
+      sprintf(rhed, "Location: %s\r\n", (ccp)vhost["redirect"]);
+      return mkHttpRes(ffHttp, "", "text/plain", 308, "Permanent Redirect",
+                       rhed);
+   }
    string path((ccp)vhost["rootdir"]);
    int plen = fpath.size;
    string res;
@@ -587,8 +603,11 @@ string httpHandle (FFJSON& ffHttp) {
       path+="index.html";
    ffl_info(HL,"serving %s", path.c_str());
    fs::path fspath(path);
-   res = ferryfair(ffHttp, vhost);
+   res = ferryfair(ffHttp);
    if (res.length()) {
+      if (res=="1")
+         goto serveFile;
+      
       return res;
    }
    if (fs::is_directory(fspath)) {
@@ -628,6 +647,7 @@ string httpHandle (FFJSON& ffHttp) {
               path.find("/tmp")!=string::npos) {
       return mkHttpRes(ffHttp, "NaNa!");
    } else {
+     serveFile:
       ifstream reqFile(path);
       ostringstream resStr;
       resStr << reqFile.rdbuf();
@@ -834,8 +854,9 @@ int main (int argc, char **argv) {
    signal(SIGINT, handle_sigint);
    signal(SIGPIPE, SIG_IGN);
    ffl_notice(HL, "Starting server. docroot=%s threads=%d",
-              (ccp)cfg["docroot"], (int)cfg["threadCount"]);
+              (ccp)cfg["rootdir"], (int)cfg["threadCount"]);
 
+   pool.init((int)cfg["threadCount"]);
    initFerryFair(cfg);
 
    int http_fd = create_listen_socket((uint16_t)(int)cfg["httpPort"]);
@@ -856,8 +877,7 @@ int main (int argc, char **argv) {
       return 1;
    }
 
-   ThreadPool pool((int)cfg["threadCount"]);
-
+   
    thread t1([&] () {
       accept_loop(http_fd, pool);
    });

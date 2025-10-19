@@ -63,10 +63,23 @@ struct Pts {
    uint minPts=-1;
 };
 struct CompareByDistanceToCenter;
+struct QHMut_ {
+   void* vp;
+   mutex m;
+};
 union QuadHldr {
    QuadHldr () {
       qp=nullptr;
    };
+   struct InitInsArgs_ {
+      FFJSON& rF;
+      const vector<uint>& ina;
+      float lx;
+      float ly;
+      InitInsArgs_ (FFJSON& rF, const vector<uint>& ina, float lx, float ly):
+         rF(rF), ina(ina), lx(lx), ly(ly) {};
+   };
+   //QHMut_ mtx;
    QuadNode* qp;
    FFJSON* fp;
    set<FFJSON*>* sp;
@@ -98,7 +111,9 @@ union QuadHldr {
    void print (Circle& c, uint level = 0, QuadNode* tQN = nullptr,
                uint8_t tind = 0, QuadNode* pQN = nullptr, uint8_t ind = 0);
    vector<uint> getIntNames (QuadNode* tQN=nullptr, uint8_t tind=0,
-                             QuadNode* pQN=nullptr, uint8_t ind=0); 
+                             QuadNode* pQN=nullptr, uint8_t ind=0);
+   void lock();
+   void unlock();
    // void del (QuadNode* tQN = nullptr, int8_t tind = 0,
    //           QuadNode* pQN = nullptr, int8_t ind = 0);
 };

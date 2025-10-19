@@ -2,6 +2,8 @@
 #include <string>
 #include <chrono>
 #include <filesystem>
+#include <condition_variable>
+#include <mutex>
 // #include <sys/types.h>
 // #include <sys/stat.h>
 // #include <unistd.h>
@@ -14,6 +16,7 @@
 #include "ferryfair.h"
 #include "spatialSearch.h"
 #include "cap.h"
+#include "smtpClient.h"
 
 using namespace std;
 
@@ -25,6 +28,12 @@ atomic<bool> saveNameints{false};
 atomic<bool> saveFerryfair{false};
 bool valgrind_test = false;
 int valgrind_count = 1;
+mutex qhModMtx;
+unique_lock<mutex> modLk(qhModMtx);
+condition_variable cvMod, cvSrch;
+atomic<int> searchCv{0};
+atomic<int> modQhCv{0};
+
 struct CompThingNameMatch {
    bool operator () (const tuple<FFJSON*,int8_t>& t1,
                      const tuple<FFJSON*,int8_t>& t2) const {
@@ -143,28 +152,29 @@ bool isValidLocation (FFJSON& cloc) {
    }
    return false;
 }
-const char* mail_server;
-const char* admin;
-const char* admin_pass;
-const char* to = nullptr;
-const char* from = "FerryFair";
+ccp admin, adminPass, to = nullptr;
+static ccp from = "FerryFair";
+string wdir;
+FFJSON* pffcfg = nullptr;
+FFJSON* prbs = nullptr;
+FFJSON* pusers = nullptr;
+ccp mailServer = nullptr;
+int mailPort = 0;
 char subj[64];
 char mesg[128];
 
 bool s_quit = false;
-bool sendMail = false;
 
-string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
+string ferryfair (FFJSON& ffHttp) {
    FFJSON reply, user, rbsid;
+   static FFJSON& ffcfg = *pffcfg;
+   static FFJSON& rbs = *prbs;
+   static FFJSON& users = *pusers;
    ccp referer=nullptr;char proto[8]="https"; int protolen;
    ccp username = nullptr, password = nullptr, cpld = nullptr;
-   ccp jsonMime = "text/json";
+   static ccp jsonMime = "text/json";
    ccp path;
    string bid;
-   string vhdir((ccp)vhost["rootdir"]);
-   static FFJSON& ffcfg = vhost["cfg"];
-   static FFJSON& rbs = ffcfg["rbs"];
-   static FFJSON& users = ffcfg["users"];
    FFJSON& cookie = ffHttp["cookie"];
    FFJSON payload;
    ffl_notice(HL, "cookie[bid]: %s",(ccp)cookie["bid"]);
@@ -175,11 +185,6 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
    auto now_ms =
       chrono::time_point_cast<chrono::milliseconds>(now);
    long lepoch = now_ms.time_since_epoch().count();
-   if (vhost["redirect"]) {
-      char rhed[64];
-      sprintf(rhed, "Location: %s\r\n", (ccp)vhost["redirect"]);
-      return mkHttpRes(ffHttp, "", "text/plain", 308, "Permanent Redirect", rhed);
-   }
    if (!ffHttp["referer"]) goto nextproto;
    referer = ffHttp["referer"];
    username = strstr(referer,":");
@@ -298,15 +303,9 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
       return "";
    }
    rbsid = &rbs[bid];
-   if (!cpld) {
-      if (!strcmp(path, "/upload")) {
-         goto upload;
-      }
-      return "";
-   }
    if (!strcmp(path, "/captcha")) {
       ffl_notice(HL, "captcha");
-      string tempPath(vhdir+"/tmp/"+bid+".jpg");
+      string tempPath(wdir+"/tmp/"+bid+".jpg");
       string randstr = random_alphnuma_string(7);
       cap randcap(randstr, tempPath, 7, 288, 68, 40, 80, 48);
       rbsid["captcha"]=randstr;
@@ -314,7 +313,16 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
       saveRbs=true;
       saveFerryfair=true;
       return mkHttpRes(ffHttp, "{\"cap\":\"true\"}", jsonMime);
-   } else if (!strcmp(path, "/login")) {
+   }
+   if (!cpld) {
+      if (!strcmp(path, "/upload")) {
+         goto upload;
+      } else if (strstr(path, "/tmp/")) {
+         return "1";
+      }
+      return "";
+   }
+   if (!strcmp(path, "/login")) {
       ffl_notice(HL, "Login");
       payload.init(cpld);
       username=payload["username"];password=payload["password"];
@@ -422,7 +430,7 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
          users[(ccp)user["email"]].addLink(users,username);
          user["inactive"]=true;
          filesystem::path
-            usrpth(vhdir+string("/upload/")+username);
+            usrpth(wdir+string("/upload/")+username);
          filesystem::create_directory(usrpth);
       } else {
          user["newpassword"] = password;
@@ -435,13 +443,20 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
       sprintf(mesg, "Open %s://%s/activate?user=%s&key=%s to activate "
               "%s", proto, (ccp)ffHttp["host"], username,
               (ccp)user["activationKey"], username);
-      mail_server = ffcfg["secret"]["mail_server"];
-      admin = ffcfg["secret"]["admin"];
-      admin_pass = ffcfg["secret"]["admin_pass"];
       // TODO
       // mg_connect(&mail_mgr, mail_server, mailfn, NULL);
       // while(!s_quit)
       //    mg_mgr_poll(&mail_mgr, 100);
+      string sfrom(admin);
+      sfrom+="@";
+      sfrom+=from;
+      sfrom+=".com";
+      static int mailPort = ffcfg["secret"]["mailPort"];
+      if (sendMail(mailServer, mailPort, "plain", admin, adminPass, sfrom, to,
+                   subj, mesg)!=0) {
+         return mkHttpRes(
+            ffHttp, "{\"error\":\"sendMailFailed\"}", jsonMime, 200);
+      };
       s_quit=false;
       saveRbs = true;
       saveUsers = true;
@@ -467,7 +482,11 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
                payload["geoposition"].stringify().c_str());
       CompThingNameMatch cTNM;
       multiset<tuple<FFJSON*, int8_t>, CompThingNameMatch> score(cTNM);
+      cvSrch.wait(modLk, []{return modQhCv.load()==0;});
+      ++searchCv;
       thnsTree.getPointsFromQuad(pts);
+      --searchCv;
+      cvMod.notify_all();
       for (int i=0;i<pts.pts.size();++i) {
          NdNPrn& nd = pts.pts[i];
          FFJSON* f;
@@ -569,7 +588,7 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
       if (picId >= maxThingPics) {
          return mkHttpRes(ffHttp, "{\"error\":\"picsAreAtMax\"}", jsonMime, 400);
       }
-      string upldpth(vhdir);
+      string upldpth(wdir);
       upldpth += "/upload/";
       upldpth += username;
       upldpth += "/";
@@ -710,7 +729,11 @@ string ferryfair (FFJSON& ffHttp, FFJSON& vhost) {
                }
                if (nameChanged||locChanged) {
                   ina = nametouint(mstr);
+                  cvMod.wait(modLk, [] {return searchCv.load()==0;});
+                  ++modQhCv;
                   thnsTree.insert(uthings[j], ina, true);
+                  --modQhCv;
+                  cvSrch.notify_all();
                }
             }
             if (cthings[i]["details"]) {
@@ -985,6 +1008,7 @@ void makeThngsTree () {
    FFJSON& users = cfg["vhosts"]["www"]["cfg"]["users"];
    FFJSON::Iterator it = users.begin();
    FFJSON::Iterator tit;
+   int ic=0;
    while (it!= users.end()) {
       if (it->isType(FFJSON::LINK)) {
          ++it;
@@ -996,11 +1020,19 @@ void makeThngsTree () {
       while (tit!=uthings.end()) {
          if (!((*tit)["name"].isType(FFJSON::UNDEFINED) ||
                (*tit)["location"].isType(FFJSON::UNDEFINED))) {
-            vector<string> mstr = metaname((ccp)(*tit)["name"]);
-            vector<uint> ina = nametouint(mstr);
-            float lx = (*tit)["location"][1];
-            float ly = (*tit)["location"][0];
-            uint level=thnsTree.insert((*tit), ina,0,lx,ly);
+            FFJSON* pF = &*tit;
+            ffl_debug(HL, "inserting %d", ic);
+            pool.enqueue([pF, ic] {
+               FFJSON& rF = *pF;
+               vector<string> mstr = metaname((ccp)rF["name"]);
+               vector<uint> ina = nametouint(mstr);
+               float lx = rF["location"][1];
+               float ly = rF["location"][0];
+               thnsTree.insert(rF, ina, 0, lx, ly);
+               ffl_debug(HL, "inserted %d", ic);
+            });
+            //uint level = thnsTree.insert(*tit, ina, 0, lx, ly);
+            ++ic;
          }
          // Circle c;
          // c.nf=(FFJSON*)1;
@@ -1010,12 +1042,20 @@ void makeThngsTree () {
       }
       ++it;
    }
+   pool.join();
 }
 
 void initFerryFair (FFJSON& cfg) {
-   cfg["cfg"].init(
-      string("file://")+(ccp)cfg["vhosts"]["www"]["rootdir"]+"/config.ffjson");
-   cfg["vhosts"]["www"]["cfg"]=&cfg["cfg"];
+   FFJSON& ffcfg = cfg["cfg"];
+   wdir=(ccp)cfg["vhosts"]["www"]["rootdir"];
+   ffcfg.init(string("file://")+wdir+"/config.ffjson");
+   cfg["vhosts"]["www"]["cfg"]=pffcfg=&cfg["cfg"];
+   admin = ffcfg["secret"]["admin"];
+   adminPass = ffcfg["secret"]["adminPass"];
+   prbs = &ffcfg["rbs"];
+   pusers = &ffcfg["users"];
+   mailServer = ffcfg["secret"]["mailServer"];
+   mailPort = ffcfg["secret"]["mailPort"];
    makeThngsTree();
    Pts pts;
    vector<string> mstr = metaname("Touch");
