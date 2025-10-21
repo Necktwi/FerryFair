@@ -81,7 +81,8 @@ void groomLogFile () {
    int stat_r = stat(logFile.c_str(), &statbuf);
    ferr = open (
       logFile.c_str(), O_WRONLY |
-      ((stat_r == -1 || statbuf.st_size > 5000000) ? (O_CREAT | O_TRUNC) : O_APPEND), 0600
+      ((stat_r == -1 || statbuf.st_size > 5000000) ?
+       (O_CREAT | O_TRUNC) : O_APPEND), 0600
    );
 }
 

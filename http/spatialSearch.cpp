@@ -1,12 +1,9 @@
+#include "https.h"
 #include "spatialSearch.h"
 #include <myconverters.h>
 #include <metaphone3.h>
 #include <memory>
 #include <mutex>
-
-enum HTTPLOG {
-   HL = 1<<12
-};
 
 const uint thnsPrSrch = 25;
 QuadHldr thnsTree;
@@ -16,10 +13,6 @@ map<set<FFJSON*>*, vector<uint>> mapffset;
 map<string, FFJSON*>* nameints;
 FFJSON* fnameints;
 map<const string*, uint> mitpos;
-struct CntMut_ {
-   mutex m;
-   int count=0;
-};
 map<QuadHldr*, CntMut_> qhModMutMap;
 mutex qhMapMut;
 
@@ -296,49 +289,50 @@ QuadNode::~QuadNode () {
    }
 }
 
+CntMut_& QuadHldr::lock (int l) {
+   qhMapMut.lock();
+   ffl_debug(SLL, "tid: %02d: locking %p@%d", tid, this, l);
+   CntMut_& cntMut = qhModMutMap[this];
+   ++cntMut.count;
+   qhMapMut.unlock();
+   cntMut.m.lock();
+   return cntMut;
+}
+
+void QuadHldr::unlock (CntMut_* p = nullptr) {
+   qhMapMut.lock();
+   ffl_debug(SLL, "tid: %02d: unlocking %p", tid, this);
+   if (!p)
+      p = &qhModMutMap[this];
+   --p->count;
+   qhMapMut.unlock();
+   p->m.unlock();
+}
+
 uint QuadNode::insert (
    FFJSON& rF, vector<uint>& ina, float lx, float ly, float x, float y,
    uint level, QuadNode* pQN, int8_t ind, bool deleteLeaf, int8_t sn
 ) {
-   if (!sn)
-      this->seti(ina);
    QuadHldr* qh = (QuadHldr*)this;
+   CntMut_* pcm = nullptr;
+   if (!sn) {
+      pcm = &qh->lock(__LINE__);
+      this->seti(ina);
+      qh->unlock(pcm);
+   }
    uint returnv=0;
    int8_t qind = lx>= x?0:1;
    int8_t xs=qind==0?1:-1;
    qind<<=1;
    int8_t ys = ly >= y?1:-1;
    qind |= ys>=0?0:1;
-   ffl_debug(HL, "%p, %f,%f,%f,%f,%d,%d,%d\n", this, x,y,lx,ly,xs,ys,qind);
+   ffl_debug(SL, "%p, %f,%f,%f,%f,%d,%d,%d\n", this, x,y,lx,ly,xs,ys,qind);
    qh+=qind;
-   if (qh->fp==nullptr) {
-      FFJSON* pxorrf = (FFJSON*)fpxor(&rF, pQN, ind);
-      qh->fp=pxorrf;
-      returnv = 1;
-   } else {
-      float dx = 180/(pow(2,level+1));
-      float dy = 90/(pow(2,level+1));
-      returnv = qh->insert(
-         rF, ina, deleteLeaf, lx, ly, x+xs*dx, y+ys*dy, level+1, this, qind,
-         pQN, ind, sn);
-   }
-   return returnv;
-}
-
-void QuadHldr::lock () {
-   qhMapMut.lock();
-   CntMut_& cntMut = qhModMutMap[this];
-   ++cntMut.count;
-   qhMapMut.unlock();
-   cntMut.m.lock();
-}
-
-void QuadHldr::unlock () {
-   qhMapMut.lock();
-   CntMut_& cntMut = qhModMutMap[this];
-   --cntMut.count;
-   qhMapMut.unlock();
-   cntMut.m.unlock();
+   float dx = 180/(pow(2,level+1));
+   float dy = 90/(pow(2,level+1));
+   return qh->insert(
+      rF, ina, deleteLeaf, lx, ly, x+xs*dx, y+ys*dy, level+1, this, qind,
+      pQN, ind, sn);
 }
 
 uint QuadHldr::insert (
@@ -346,16 +340,18 @@ uint QuadHldr::insert (
    float x, float y, uint level, QuadNode* tQN, int8_t tind, QuadNode* pQN,
    int8_t ind,int8_t sn
 ) {
-   lock();
    uint ret = level;
    map<set<FFJSON*>*, vector<uint>>::iterator sit;
    vector<map<QuadNode*,uint>::iterator> qit;
    void* resfp;
    set<FFJSON*>* ressfp;
-   ffl_debug(HL, "qh: %p, x,y: %lf,%lf\n", this, x, y);
+   ffl_debug(SL, "qh: %p, x,y: %lf,%lf\n", this, x, y);
+   CntMut_* pcm = nullptr;
+   if (!sn)
+      pcm = &lock(__LINE__);
    if (fp==nullptr) {
       fp = (FFJSON*)fpxor(&rF, pQN, ind);
-      ffl_debug(HL, "rF:%p,%s inserted\n", &rF,rF["location"].stringify().c_str());
+      ffl_debug(SL, "rF:%p,%s inserted\n", &rF,rF["location"].stringify().c_str());
       goto retn;
    }
    resfp = get<0>(bpxor(fp, pQN));
@@ -390,11 +386,11 @@ uint QuadHldr::insert (
          goto retn;
       }
       if (resfp == (void*)&rF) {
-         ffl_debug(HL, "rF: %p inserted in %p\n", &rF, pQN);
+         ffl_debug(SL, "rF: %p inserted in %p\n", &rF, pQN);
          goto retn;
       }
       FFJSON& tmp = isS ? **ressfp->begin() : *(FFJSON*)resfp;
-      ffl_debug(HL, "tfp: %p,%p,%p\n", &tmp, fp, pQN);
+      ffl_debug(SL, "tfp: %p,%p,%p\n", &tmp, fp, pQN);
       float llx = (float)tmp["location"][1];
       float lly = (float)tmp["location"][0];
       if (llx==lx && lly==ly) {
@@ -409,7 +405,7 @@ uint QuadHldr::insert (
             xorina(sit->second, ina);
             ressfp->insert(&rF);
          }
-         ffl_debug(HL, "rF: %p inserted in %p\n", &rF, pQN);
+         ffl_debug(SL, "rF: %p inserted in %p\n", &rF, pQN);
          goto retn;
       }
       qp = new QuadNode();
@@ -425,12 +421,15 @@ uint QuadHldr::insert (
       ret =
          qp->insert(rF,ina,lx,ly,x,y,level,tQN,tind,deleteLeaf,1);
       qp = (QuadNode*)fpxor(qp,pQN,ind);
-      ffl_debug(HL, "rF: %p inserted in %p\n", &rF, pQN);
+      ffl_debug(SL, "rF: %p inserted in %p\n", &rF, pQN);
       goto retn;
    } else {
       QuadNode* qpres = (QuadNode*)resfp;
       if (!deleteLeaf)
-         unlock();
+         if (pcm) {
+            unlock(pcm);
+            pcm=nullptr;
+         }
       ret = qpres->insert(
          rF, ina, lx, ly, x, y, level, tQN, tind, deleteLeaf, sn);
       if (deleteLeaf) {
@@ -468,11 +467,13 @@ uint QuadHldr::insert (
          ret = 0;
          goto retn;
       }
-      ffl_debug(HL, "rF: %p,%s:%p inserted\n", &rF,
+      ffl_debug(SL, "rF: %p,%s:%p inserted\n", &rF,
                 rF["location"].stringify().c_str(), pQN);
+      return ret;
    }
   retn:
-   unlock();
+   if (pcm)
+      unlock(pcm);
    return ret;
 }
 bool Circle::grabIfNearest (FFJSON& f) {

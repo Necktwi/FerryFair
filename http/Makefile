@@ -7,10 +7,29 @@ FFJLIB=../../FFJSON/build/Linux/${ARCH}/debug/libFFJSON.a
 FFLLIB=../../logger/build/Linux/${ARCH}/debug/liblogger.a
 FBLIB=../../ferrybase/build/Linux/${ARCH}/debug/libferrybase.a
 TCPP?=/opt/rocm/llvm/bin/clang++
-all:
-	${TCPP} -std=c++23 -g -O0 -D_DEBUG0 -Dcimg_display=0\
+DBG=_DEBUG
+DBGF=-g -O0
+
+smtpClient.o: smtpClient.cpp
+	${TCPP} -c ${DBGF} -D${DBG} $^ -o $@
+
+cap.o: ../cap.cpp
+	${TCPP} -c ${DBGF} -D${DBG} -Dcimg_display=0 $^ -o $@
+
+spatialSearch.o: spatialSearch.cpp
+	${TCPP} -c -std=c++23 ${DBGF} -D${DBG}\
    -Wno-unqualified-std-cast-call -I${FFJINC} -I${FFLINC} -I${FBINC} -I${FFINC}\
-   -I.. smtpClient.cpp ferryfair.cpp spatialSearch.cpp https.cpp ../cap.cpp -lssl -lcrypto -lpthread -lxml2 -lz -lrt -licuuc -licudata -licui18n ${FFJLIB} ${FFLLIB} ${FBLIB} -ljpeg\
+   -I.. $^ -o $@
+
+ferryfair.o: ferryfair.cpp
+	${TCPP} -c -std=c++23 ${DBGF} -D${DBG}\
+   -Wno-unqualified-std-cast-call -I${FFJINC} -I${FFLINC} -I${FBINC} -I${FFINC}\
+   -I.. $^ -o $@
+
+all: https.cpp ferryfair.o cap.o smtpClient.o spatialSearch.o
+	${TCPP} -std=c++23 ${DBGF} -D${DBG}\
+   -Wno-unqualified-std-cast-call -I${FFJINC} -I${FFLINC} -I${FBINC} -I${FFINC}\
+   -I.. $^ ${FFJLIB} ${FFLLIB} ${FBLIB} -lssl -lcrypto -lpthread -ljpeg -lz -lrt -licui18n -licuuc -licudata\
    -o https_${ARCH}
 
 critcalSection.o:
@@ -19,4 +38,4 @@ test: criticalSection.o
 	${TCPP} -std=c++23 -g -O0 criticalSection.o test.cpp -o test
 
 clean:
-	rm -rf https test
+	rm -rf *.o https_${ARCH} test

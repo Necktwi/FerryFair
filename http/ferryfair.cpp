@@ -152,7 +152,8 @@ bool isValidLocation (FFJSON& cloc) {
    }
    return false;
 }
-ccp admin, adminPass, to = nullptr;
+ccp admin, adminPass;
+thread_local ccp to = nullptr;
 static ccp from = "FerryFair";
 string wdir;
 FFJSON* pffcfg = nullptr;
@@ -160,8 +161,8 @@ FFJSON* prbs = nullptr;
 FFJSON* pusers = nullptr;
 ccp mailServer = nullptr;
 int mailPort = 0;
-char subj[64];
-char mesg[128];
+thread_local char subj[64];
+thread_local char mesg[128];
 
 bool s_quit = false;
 
@@ -177,7 +178,7 @@ string ferryfair (FFJSON& ffHttp) {
    string bid;
    FFJSON& cookie = ffHttp["cookie"];
    FFJSON payload;
-   ffl_notice(HL, "cookie[bid]: %s",(ccp)cookie["bid"]);
+   ffl_notice(FL, "cookie[bid]: %s",(ccp)cookie["bid"]);
    if (cookie["bid"]) {
       bid = (ccp)cookie["bid"];
    }
@@ -190,13 +191,13 @@ string ferryfair (FFJSON& ffHttp) {
    username = strstr(referer,":");
    protolen = username - referer;
    if (username==nullptr || protolen<0 || protolen>=8) {
-      ffl_debug(HL, "badproto");
+      ffl_debug(FL, "badproto");
       return mkHttpRes(ffHttp, "badproto");
    }
    sprintf(proto,"%.*s",protolen,(ccp)ffHttp["referer"]);
   nextproto:
    username=nullptr;
-   ffl_debug(HL, "proto: %s",proto);
+   ffl_debug(FL, "proto: %s, host: %s", proto, (ccp)ffHttp["host"]);
    path = ffHttp["path"];
    if (!strcmp(path,"/sleep")) {
       int sd = atoi((ccp)ffHttp["query"]["time"]);
@@ -233,7 +234,7 @@ string ferryfair (FFJSON& ffHttp) {
       
    if (strstr(path, "/cookie")==path) {
       //cookie
-      ffl_notice(HL, "cookie");
+      ffl_notice(FL, "cookie");
       if (bid.length())
          if(rbs[bid])
             goto gotbid;
@@ -304,7 +305,7 @@ string ferryfair (FFJSON& ffHttp) {
    }
    rbsid = &rbs[bid];
    if (!strcmp(path, "/captcha")) {
-      ffl_notice(HL, "captcha");
+      ffl_notice(FL, "captcha");
       string tempPath(wdir+"/tmp/"+bid+".jpg");
       string randstr = random_alphnuma_string(7);
       cap randcap(randstr, tempPath, 7, 288, 68, 40, 80, 48);
@@ -323,10 +324,10 @@ string ferryfair (FFJSON& ffHttp) {
       return "";
    }
    if (!strcmp(path, "/login")) {
-      ffl_notice(HL, "Login");
+      ffl_notice(FL, "Login");
       payload.init(cpld);
       username=payload["username"];password=payload["password"];
-      ffl_notice(HL, "\nUser: %s\nPass: %s", username, password);
+      ffl_notice(FL, "\nUser: %s\nPass: %s", username, password);
       if (!users[username]) {
          return mkHttpRes(ffHttp, "{\"login\":\"false\"}", jsonMime);
       }
@@ -351,14 +352,14 @@ string ferryfair (FFJSON& ffHttp) {
       //signup
       payload.init(cpld);
       bool recovery=false;
-      ffl_notice(HL, "Signup");
+      ffl_notice(FL, "Signup");
       if (!isValidEmail(payload["email"])) {
-         ffl_warn(HL, "invalid email.");
+         ffl_warn(FL, "invalid email.");
          return mkHttpRes(ffHttp, "{\"error\":\"yay\"}", jsonMime, 400);
       }
       if (payload["username"]) {
          username=payload["username"];
-         ffl_debug(HL, "User: %s\nPass: %s\nEmail: %s",
+         ffl_debug(FL, "User: %s\nPass: %s\nEmail: %s",
                    username, password, (ccp)payload["email"]);
       } else if (payload["email"]) {
          recovery=true;
@@ -368,9 +369,9 @@ string ferryfair (FFJSON& ffHttp) {
             FFJSON::Link* link =
                ffemln->getFeaturedMember(FFJSON::FM_LINK).link;
             username=(*link)[0].c_str();
-            ffl_debug(HL, "username: %s", username);
+            ffl_debug(FL, "username: %s", username);
          } else {
-            ffl_warn(HL, "%s Email not registered.",
+            ffl_warn(FL, "%s Email not registered.",
                      (ccp)payload["email"]);
             return mkHttpRes(ffHttp, 
                "{\"actEmailSent\":-5,\"msg\":\"Email not registered!\"}",
@@ -381,32 +382,32 @@ string ferryfair (FFJSON& ffHttp) {
       user=&users[username];
       if (!recovery && user &&
           (user["activationKey"] && !user["inactive"])) {
-         ffl_warn(HL, "User already exists.");
+         ffl_warn(FL, "User already exists.");
          return mkHttpRes(ffHttp, 
             "{\"actEmailSent\":-1,\"msg\":\"Username already taken, choose an"
             " another :|\"}", jsonMime, 200);
       } else if (!recovery && user["inactive"] &&
                  strcmp(payload["email"],user["email"])) {
-         ffl_warn(HL, "User exists; mail mismatch");
+         ffl_warn(FL, "User exists; mail mismatch");
          return mkHttpRes(ffHttp, 
             "{\"actEmailSent\":-5,\"msg\":\"Email not registered!\"}",
             jsonMime, 200);
       } else if (
          !recovery && users[(ccp)payload["email"]] && !user["email"]
       ) {
-         ffl_warn(HL, "Email already registered.");
+         ffl_warn(FL, "Email already registered.");
          return mkHttpRes(ffHttp, 
             "{\"actEmailSent\":-3,\"msg\":\"Email already registered! Try"
             " resetting password\"}", jsonMime, 200);
       } else if (!recovery && !(validUsername(string(username)))) {
-         ffl_warn(HL, "Invalid password");
+         ffl_warn(FL, "Invalid password");
          return mkHttpRes(ffHttp, 
             "{\"actEmailSent\":-6,\"msg\":\"Invalid password X|\"}",
             jsonMime, 200);
       } else if (
          !(password!=nullptr && validMD5(string(password)))
       ) {
-         ffl_warn(HL, "Invalid password");
+         ffl_warn(FL, "Invalid password");
          return mkHttpRes(ffHttp, 
             "{\"actEmailSent\":-6,\"msg\":\"Invalid password X|\"}",
             jsonMime, 200);
@@ -414,12 +415,12 @@ string ferryfair (FFJSON& ffHttp) {
          !payload["captcha"] || !rbsid["captcha"] ||
          strcmp((ccp)payload["captcha"],(ccp)rbsid["captcha"])!=0
       ) {
-         ffl_warn(HL, "Captcha mismatch.");
+         ffl_warn(FL, "Captcha mismatch.");
          return mkHttpRes(ffHttp, 
             "{\"actEmailSent\":-4,\"msg\":\"Captcha mismatch, hmm!\"}",
             jsonMime, 200);
       } else if (!payload["consent"]) {
-         ffl_warn(HL, "Captcha mismatch.");
+         ffl_warn(FL, "Captcha mismatch.");
          return mkHttpRes(ffHttp, 
             "{\"actEmailSent\":-5,\"msg\":\"U didn't consent to this tool"
             " usage :/\"}", jsonMime, 200);
@@ -437,7 +438,7 @@ string ferryfair (FFJSON& ffHttp) {
       }
       string actKey = random_alphnuma_string();
       user["activationKey"]=actKey;
-      ffl_notice(HL, "actKey: %s",actKey.c_str());
+      ffl_notice(FL, "actKey: %s",actKey.c_str());
       to=user["email"];
       sprintf(subj, "User activation link");
       sprintf(mesg, "Open %s://%s/activate?user=%s&key=%s to activate "
@@ -478,7 +479,7 @@ string ferryfair (FFJSON& ffHttp) {
          pts.c.y=(float)payload["geoposition"][0];
          rbsid["geoposition"] = payload["geoposition"];
       }
-      ffl_info(HL, "searching %s at %s\n",srchStr,
+      ffl_info(FL, "searching %s at %s\n",srchStr,
                payload["geoposition"].stringify().c_str());
       CompThingNameMatch cTNM;
       multiset<tuple<FFJSON*, int8_t>, CompThingNameMatch> score(cTNM);
@@ -596,7 +597,7 @@ string ferryfair (FFJSON& ffHttp) {
       upldpth += ".";
       upldpth += to_string(picId);
       upldpth +=".jpg";
-      ffl_notice(HL, "receiving: %s", upldpth.c_str());
+      ffl_notice(FL, "receiving: %s", upldpth.c_str());
       ios_base::openmode ofmode;
       if (fofst==0) {
          uthings[thngi]["id"]=thingId;
@@ -1021,7 +1022,7 @@ void makeThngsTree () {
          if (!((*tit)["name"].isType(FFJSON::UNDEFINED) ||
                (*tit)["location"].isType(FFJSON::UNDEFINED))) {
             FFJSON* pF = &*tit;
-            ffl_debug(HL, "inserting %d", ic);
+            ffl_debug(FL, "inserting %d", ic);
             pool.enqueue([pF, ic] {
                FFJSON& rF = *pF;
                vector<string> mstr = metaname((ccp)rF["name"]);
@@ -1029,7 +1030,7 @@ void makeThngsTree () {
                float lx = rF["location"][1];
                float ly = rF["location"][0];
                thnsTree.insert(rF, ina, 0, lx, ly);
-               ffl_debug(HL, "inserted %d", ic);
+               ffl_debug(FL, "inserted %d", ic);
             });
             //uint level = thnsTree.insert(*tit, ina, 0, lx, ly);
             ++ic;
@@ -1068,7 +1069,7 @@ void initFerryFair (FFJSON& cfg) {
    //pts.c = {77.7645299,12.9941367, 10.5};
    //pts.c = {77.7644272, 12.9940713, 10.5};
    pts.c = {77.7644577, 12.9941273, 10.5};
-   ffl_debug(HL, "c: %f,%f\n", pts.c.x, pts.c.y);
+   ffl_debug(FL, "c: %f,%f\n", pts.c.x, pts.c.y);
    FerryTimeStamp ftsStart;
    FerryTimeStamp ftsEnd;
    FerryTimeStamp ftsDiff;

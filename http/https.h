@@ -5,10 +5,14 @@
 #include <queue>
 #include <thread>
 #include <FFJSON.h>
+#include <condition_variable>
 
 extern FFJSON cfg;
 enum HTTPLOG {
-   HL = 1<<11
+   HL = 1<<11,
+   FL = 1<<12,
+   SL = 1<<13,
+   SLL = 1<<14
 };
 static atomic<bool> g_running{true};
 string mkHttpRes (FFJSON& ffHttp, const string& body,
@@ -33,10 +37,11 @@ private:
    condition_variable cvJoin_;
    bool stopping_ = false;
    bool started;
-   
+   atomic<int> jc = {0};
    void start (size_t n);
 
    void stop ();
 };
+extern thread_local int tid;
 extern ThreadPool pool;
 #endif

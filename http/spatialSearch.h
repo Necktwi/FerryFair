@@ -67,6 +67,10 @@ struct QHMut_ {
    void* vp;
    mutex m;
 };
+struct CntMut_ {
+   mutex m;
+   int count=0;
+};
 union QuadHldr {
    QuadHldr () {
       qp=nullptr;
@@ -112,8 +116,8 @@ union QuadHldr {
                uint8_t tind = 0, QuadNode* pQN = nullptr, uint8_t ind = 0);
    vector<uint> getIntNames (QuadNode* tQN=nullptr, uint8_t tind=0,
                              QuadNode* pQN=nullptr, uint8_t ind=0);
-   void lock();
-   void unlock();
+   CntMut_& lock (int l);
+   void unlock (CntMut_* p);
    // void del (QuadNode* tQN = nullptr, int8_t tind = 0,
    //           QuadNode* pQN = nullptr, int8_t ind = 0);
 };

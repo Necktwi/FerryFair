@@ -52,7 +52,8 @@ FFJSON cfg;
 int child_exit_status = 0;
 FF_LOG_TYPE fflAllowedType = (FF_LOG_TYPE) (FFL_ERR | FFL_NOTICE | FFL_DEBUG |
                                             FFL_INFO);
-unsigned int fflAllowedBlks = (uint)HL;
+unsigned int fflAllowedBlks = (uint)(HL);
+thread_local int tid = 0;
 
 using namespace std;
 namespace fs = std::filesystem;
@@ -136,17 +137,18 @@ void ThreadPool::enqueue(function<void()> job) {
 
 void ThreadPool::start (size_t n) {
    for (size_t i=0; i<n; ++i) {
-      workers_.emplace_back([this] () {
+      workers_.emplace_back([this,i] () {
+         tid = i;
          while (true) {
             function<void()> job;
                {
                   unique_lock<mutex> lk(mutex_);
                   ffl_debug(HL, "jobs in queue: %d", jobs_.size());
-                  if (jobs_.empty()) {
+                  if (jobs_.empty() && !jc) {
                      cvJoin_.notify_all();
                   }
                   cv_.wait(lk, [this] {
-                     return stopping_ || !jobs_.empty();
+                     return !jobs_.empty();
                   });
                   if (stopping_ && jobs_.empty())
                      return;
@@ -154,7 +156,9 @@ void ThreadPool::start (size_t n) {
                   jobs_.pop();
                }
                try {
+                  ++jc;
                   job();
+                  --jc;
                } catch (const exception &e) {
                   ffl_err(HL, "worker exception: %s", e.what());
                } catch (...) {
