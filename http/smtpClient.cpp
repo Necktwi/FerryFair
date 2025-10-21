@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "smtpClient.h"
+#include "https.h"
 
 static void print_ssl_error (const char *msg) {
    unsigned long e = ERR_get_error();
@@ -161,12 +162,14 @@ int sendMail (
    string host, int port, string mode, string user, string pass, string from,
    string to, string subj, string body
 ) {
-
+   ffl_debug(SM, "%s, %d, %s, %s, %s, %s, %s, %s, %s", host.c_str(), port,
+             mode.c_str(), user.c_str(), pass.c_str(), from.c_str(), to.c_str(),
+             subj.c_str(), body.c_str());
    SmtpClient client;
    if (!client.connect_plain(host, port)) {
       cerr << "Cannot connect.\n"; return 2;
    }
-
+   
    string resp;
    client.read_response(resp);
    cout << resp;

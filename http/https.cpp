@@ -224,8 +224,8 @@ using crdwr = function<size_t(char*, size_t)>;
 void parseHost (crdwr read, FFJSON& host) {
    char c;
    string buf;
-   FFJSON& dom = host["domain"];
-   FFJSON& subs = dom["subs"];
+   FFJSON& fqdn = host["fqdn"];
+   FFJSON& subs = host["subs"];
    subs.init("[]");
    bool port = false;
    int ci=0;
@@ -235,7 +235,7 @@ void parseHost (crdwr read, FFJSON& host) {
             continue;
          case '\n':
             ffl_info_contnu(HL,"%s\n", buf.c_str());
-            dom["name"]=buf;
+            fqdn=buf;
             return;
          case ' ':
             if (!buf.length()) {
@@ -585,11 +585,11 @@ string httpHandle (FFJSON& ffHttp) {
    FFJSON& fpath = ffHttp["path"];
    if (!fpath)
       return mkHttpRes(ffHttp, "NaNa!");
-   if (!ffHttp["host"])
+   FFJSON& host = ffHttp["host"];
+   if (!host)
       return "";
-   FFJSON& domain = ffHttp["host"]["domain"];
-   ccp domname = domain["name"];
-   string subdomain(domname,(int)domain["subs"][0]);
+   ccp fqdn = host["fqdn"];
+   string subdomain(fqdn,(int)host["subs"][0]);
    FFJSON& vhost = cfg["vhosts"][subdomain]?cfg["vhosts"][subdomain]:cfg;
    if (vhost["redirect"]) {
       char rhed[64];

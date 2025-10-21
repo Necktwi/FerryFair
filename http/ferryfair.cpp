@@ -153,7 +153,6 @@ bool isValidLocation (FFJSON& cloc) {
    return false;
 }
 ccp admin, adminPass;
-thread_local ccp to = nullptr;
 static ccp from = "FerryFair";
 string wdir;
 FFJSON* pffcfg = nullptr;
@@ -161,8 +160,6 @@ FFJSON* prbs = nullptr;
 FFJSON* pusers = nullptr;
 ccp mailServer = nullptr;
 int mailPort = 0;
-thread_local char subj[64];
-thread_local char mesg[128];
 
 bool s_quit = false;
 
@@ -178,6 +175,9 @@ string ferryfair (FFJSON& ffHttp) {
    string bid;
    FFJSON& cookie = ffHttp["cookie"];
    FFJSON payload;
+   ccp to = nullptr;
+   char subj[64];
+   char mesg[128];
    ffl_notice(FL, "cookie[bid]: %s",(ccp)cookie["bid"]);
    if (cookie["bid"]) {
       bid = (ccp)cookie["bid"];
@@ -225,8 +225,14 @@ string ferryfair (FFJSON& ffHttp) {
       } else {
          return mkHttpRes(ffHttp, "{\"error\":\"wrongKey\"}", jsonMime, 400);
       }
+   } else if (!strcmp(path, "/logout")) {
+     logout:
+      rbsid["user"]=nullFFJSON;
+      saveRbs=true;
+      saveFerryfair=true;
+      return mkHttpRes(ffHttp, "{\"logout\":true}", jsonMime);
    }
-         
+   
    cpld = (ccp)ffHttp["payload"];
    if (!cpld) {
       goto bidcheck2;
@@ -442,7 +448,7 @@ string ferryfair (FFJSON& ffHttp) {
       to=user["email"];
       sprintf(subj, "User activation link");
       sprintf(mesg, "Open %s://%s/activate?user=%s&key=%s to activate "
-              "%s", proto, (ccp)ffHttp["host"], username,
+              "%s", proto, (ccp)ffHttp["host"]["fqdn"], username,
               (ccp)user["activationKey"], username);
       // TODO
       // mg_connect(&mail_mgr, mail_server, mailfn, NULL);
@@ -452,7 +458,6 @@ string ferryfair (FFJSON& ffHttp) {
       sfrom+="@";
       sfrom+=from;
       sfrom+=".com";
-      static int mailPort = ffcfg["secret"]["mailPort"];
       if (sendMail(mailServer, mailPort, "plain", admin, adminPass, sfrom, to,
                    subj, mesg)!=0) {
          return mkHttpRes(
@@ -642,12 +647,6 @@ string ferryfair (FFJSON& ffHttp) {
       }
       sprintf(msg, "{\"thingId\":%d,\"picId\":%d}", thingId, picId);
       return mkHttpRes(ffHttp, msg, jsonMime);
-   } else if (!strcmp(path, "/logout")) {
-     logout:
-      rbsid["user"]=nullFFJSON;
-      saveRbs=true;
-      saveFerryfair=true;
-      return mkHttpRes(ffHttp, "{\"logout\":true}", jsonMime);
    } else if (!strcmp(path, "/updateThing")) {
       FFJSON& user = users[username];
       if (strcmp((ccp)user["bid"],bid.c_str())) {

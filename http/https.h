@@ -12,7 +12,8 @@ enum HTTPLOG {
    HL = 1<<11,
    FL = 1<<12,
    SL = 1<<13,
-   SLL = 1<<14
+   SLL = 1<<14,
+   SM = 1<<15
 };
 static atomic<bool> g_running{true};
 string mkHttpRes (FFJSON& ffHttp, const string& body,
