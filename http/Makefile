@@ -7,7 +7,7 @@ FFJLIB=-L../../FFJSON/build/Linux/${ARCH}/debug/
 FFLLIB=-L../../logger/build/Linux/${ARCH}/debug/
 FBLIB=-L../../ferrybase/build/Linux/${ARCH}/debug/
 TCPP?=/opt/rocm/llvm/bin/clang++
-DBG=_DEBUG
+DBG=_DEBUG0
 DBGF=-g -O0
 
 smtpClient.o: smtpClient.cpp
@@ -18,7 +18,7 @@ cap.o: ../cap.cpp
 
 spatialSearch.o: spatialSearch.cpp
 	${TCPP} -c -std=c++23 ${DBGF} -D${DBG}\
-   -Wno-unqualified-std-cast-call -I${FFINC}\
+   -Wno-unqualified-std-cast-call -I${FFINC} -I${FBINC} -I${FFLINC} -I${FFJINC}\
    -I.. $^ -o $@
 
 ferryfair.o: ferryfair.cpp

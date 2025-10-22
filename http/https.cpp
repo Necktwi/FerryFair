@@ -140,30 +140,29 @@ void ThreadPool::start (size_t n) {
       workers_.emplace_back([this,i] () {
          tid = i;
          while (true) {
-            function<void()> job;
-               {
-                  unique_lock<mutex> lk(mutex_);
-                  ffl_debug(HL, "jobs in queue: %d", jobs_.size());
-                  if (jobs_.empty() && !jc) {
-                     cvJoin_.notify_all();
-                  }
-                  cv_.wait(lk, [this] {
-                     return !jobs_.empty();
-                  });
-                  if (stopping_ && jobs_.empty())
-                     return;
-                  job = move(jobs_.front());
-                  jobs_.pop();
+            function<void()> job; {
+               unique_lock<mutex> lk(mutex_);
+               ffl_debug(HL, "jobs in queue: %d", jobs_.size());
+               if (jobs_.empty() && !jc) {
+                  cvJoin_.notify_all();
                }
-               try {
-                  ++jc;
-                  job();
-                  --jc;
-               } catch (const exception &e) {
-                  ffl_err(HL, "worker exception: %s", e.what());
-               } catch (...) {
-                  ffl_err(HL, "worker exception: unknown");
-               }
+               if (stopping_ && jobs_.empty())
+                  return;
+               cv_.wait(lk, [this] {
+                  return !jobs_.empty();
+               });
+               job = move(jobs_.front());
+               jobs_.pop();
+            }
+            try {
+               ++jc;
+               job();
+               --jc;
+            } catch (const exception &e) {
+               ffl_err(HL, "worker exception: %s", e.what());
+            } catch (...) {
+               ffl_err(HL, "worker exception: unknown");
+            }
          }
       });
    }
@@ -724,7 +723,7 @@ void handle_connection (struct sockaddr_in cli, int client_fd,
            writeagain:
             ssize_t w = wd(buf+off, bufSize - off);
             if (w<=0) {
-               ffl_notice(
+               ffl_debug(
                   HL, "fd: %d, write socket error: %d(%s)@%zd/%zd", client_fd,
                   errno, strerror(errno), off , bufSize);
                if (retry>0 && (errno==EAGAIN || errno==EINTR)) {
@@ -735,8 +734,8 @@ void handle_connection (struct sockaddr_in cli, int client_fd,
                             client_fd, retry);
                   goto writeagain;
                } else {
-                  ffl_notice(HL,"fd: %d, write error, closing at %d",
-                             client_fd, off);
+                  ffl_debug(HL,"fd: %d, write error, closing at %d",
+                            client_fd, off);
                   return off;
                }
                off += w;
