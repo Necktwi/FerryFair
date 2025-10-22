@@ -514,7 +514,7 @@ string url_encode (ccp s) {
    }
    return out;
 }
-string time_to_string(const fs::file_time_type &ft) {
+string time_to_string (const fs::file_time_type &ft) {
    using namespace std::chrono;
    // portable conversion: convert from fs clock to system_clock
    auto sctp = time_point_cast<system_clock::duration>(
@@ -610,7 +610,6 @@ string httpHandle (FFJSON& ffHttp) {
    if (res.length()) {
       if (res=="1")
          goto serveFile;
-      
       return res;
    }
    if (fs::is_directory(fspath)) {
@@ -651,6 +650,11 @@ string httpHandle (FFJSON& ffHttp) {
       return mkHttpRes(ffHttp, "NaNa!");
    } else {
      serveFile:
+      if (!fs::exists(fspath)) {
+         path = (ccp)vhost["rootdir"];
+         path += "/index.html";
+         fspath=fs::path(path);
+      }
       ifstream reqFile(path);
       ostringstream resStr;
       resStr << reqFile.rdbuf();

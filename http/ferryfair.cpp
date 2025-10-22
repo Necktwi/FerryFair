@@ -55,7 +55,7 @@ map<FFJSON*,set<FFJSON*>> bidThings;
 
 int addSmtgsToReply (FFJSON& users, FFJSON& user, FFJSON& r,
                      set<FFJSON*>& mdts) {
-   FFJSON q("{things:!}");
+   FFJSON q("{things:!}");//all all keys of user except things to r;
    user.answerObject(&q, nullptr, FerryTimeStamp(), &r);
    FFJSON& rts = r["things"];
    FFJSON& uts = user["things"];
@@ -299,6 +299,22 @@ string ferryfair (FFJSON& ffHttp) {
           !strcmp((ccp)user["bid"],bid.c_str())) {
          rbsid["urts"]=lepoch;
          addSmtgsToReply(users, user, reply, mdts);
+      }
+      to = payload["path"];
+      if (to) {
+         FFJSON& pldusr = users[to];
+         if (pldusr && &pldusr != &user) {
+            FFJSON::Iterator fit = pldusr["things"].begin();
+            FFJSON& trs = reply["things"];
+            while (fit != pldusr["things"].end()) {
+               FFJSON* f = &*fit;
+               if (mdts.find(f)==mdts.end()) {
+                  trs[trs.size] = f;
+                  mdts.insert(f);
+               }
+               ++fit;
+            }
+         }
       }
      cookieReply:
       saveRbs = true;
