@@ -26,7 +26,12 @@ ferryfair.o: ferryfair.cpp
    -Wno-unqualified-std-cast-call -I${FFJINC} -I${FFLINC} -I${FBINC} -I${FFINC}\
    -I.. $^ -o $@
 
-all: https.cpp ferryfair.o cap.o smtpClient.o spatialSearch.o
+https.o: https.cpp
+	${TCPP} -c -pthread -std=c++23 ${DBGF} -D${DBG}\
+   -Wno-unqualified-std-cast-call -I${FFJINC} -I${FFLINC} -I${FBINC} -I${FFINC}\
+   -I.. $^ -o $@
+
+all: https.o ferryfair.o cap.o smtpClient.o spatialSearch.o
 	${TCPP} -pthread -std=c++23 -fPIE ${DBGF} -D${DBG}\
    -Wno-unqualified-std-cast-call -I${FFJINC} -I${FFLINC} -I${FBINC} -I${FFINC}\
    -I.. $^ ${FFJLIB} ${FFLLIB} ${FBLIB} -lFFJSON -llogger -lferrybase -lssl -lcrypto -ljpeg -lz -lrt -licui18n -licuuc -licudata\

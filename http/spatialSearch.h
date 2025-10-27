@@ -58,9 +58,11 @@ struct Pts {
    Circle c = {0};
    vector<NdNPrn> pts;
    vector<uint> ina;
+   NdNPrn cnd;
    int ni=-1;
    int nni=-1;
-   uint minPts=-1;
+   int pni=-1;
+   uint minPts=20;
 };
 struct CompareByDistanceToCenter;
 struct QHMut_ {

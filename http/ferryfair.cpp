@@ -20,12 +20,6 @@
 
 using namespace std;
 
-mutex mtxSaveUsers;
-mutex mtxSaveRbs;
-atomic<bool> saveUsers{false};
-atomic<bool> saveRbs{false};
-atomic<bool> saveNameints{false};
-atomic<bool> saveFerryfair{false};
 bool valgrind_test = false;
 int valgrind_count = 1;
 mutex qhModMtx;
@@ -51,18 +45,31 @@ int getIdChildInd (FFJSON& arr, int id) {
    return -1;
 }
 
-map<FFJSON*,set<FFJSON*>> bidThings; 
-
+struct BidThings_ {
+   set<FFJSON*> mdts;
+   Pts all;
+   Pts search;
+};
+map<FFJSON*, BidThings_> bidThings;
+thread_local ccp to = nullptr;
+thread_local char subj[64];
+thread_local char mesg[128];
 int addSmtgsToReply (FFJSON& users, FFJSON& user, FFJSON& r,
-                     set<FFJSON*>& mdts) {
-   FFJSON q("{things:!}");//all all keys of user except things to r;
-   user.answerObject(&q, nullptr, FerryTimeStamp(), &r);
+                     set<FFJSON*>& mdts, bool usr = true) {
+   if (usr) {
+      FFJSON q("{things:!}");//all all keys of user except things to r;
+      user.answerObject(&q, nullptr, FerryTimeStamp(), &r);
+   }
    FFJSON& rts = r["things"];
    FFJSON& uts = user["things"];
    int k=rts.size;
    int ik=k;
    for (uint i = 0; i<uts.size; ++i) {
       FFJSON* f = &uts[i];
+      if (to) {
+         if (strcmp((*f)["user"]["name"], to))
+            continue;
+      }
       set<FFJSON*>::iterator it = mdts.find(f);
       if (it==mdts.end()) {
          rts[k]=f;
@@ -89,6 +96,37 @@ int addSmtgsToReply (FFJSON& users, FFJSON& user, FFJSON& r,
       }
    }
    return k-ik;
+}
+
+void addSearchNoDups (Pts& pts, FFJSON& reply, set<FFJSON*>& mdts, bool dupLnks = true) {
+   CompThingNameMatch cTNM;
+   multiset<tuple<FFJSON*, int8_t>, CompThingNameMatch> score(cTNM);
+   int k=0;
+   for (int i=0;i<pts.pni;++i) {
+      NdNPrn& nd = pts.pts[i];
+      FFJSON* f;
+      if (nd.prn==(QuadNode*)-1) {
+         f = (FFJSON*)nd.qh;
+      } else {
+         auto aa = getNode(nd);
+         f = (FFJSON*)get<0>(aa);
+      }
+      score.insert({f,nd.d.x});
+   }
+   multiset<tuple<FFJSON*, int8_t>, CompThingNameMatch>::iterator it=
+      score.begin();
+   while (it!=score.end()) {
+      FFJSON& f = *get<0>(*it);
+      bool thingIsWithUser = mdts.find(&f)!=mdts.end();
+      if (dupLnks && thingIsWithUser) {
+         FFJSON& rt = reply["things"][k];
+         rt["id"]=f["id"];
+         rt["user"]=&f["user"]["name"];
+      } else {
+         reply["things"][k]=&f;
+      }
+      ++k;++it;
+   }  
 }
 
 bool isValidEmail (FFJSON& tname) {
@@ -162,6 +200,10 @@ ccp mailServer = nullptr;
 int mailPort = 0;
 
 bool s_quit = false;
+static ccp jsonMime = "text/json";
+static ccp txtMime = "text/plain";
+
+ccp yay = "{\"error\":\"yay\"}";
 
 string ferryfair (FFJSON& ffHttp) {
    FFJSON reply, user, rbsid;
@@ -170,14 +212,10 @@ string ferryfair (FFJSON& ffHttp) {
    static FFJSON& users = *pusers;
    ccp referer=nullptr;char proto[8]="https"; int protolen;
    ccp username = nullptr, password = nullptr, cpld = nullptr;
-   static ccp jsonMime = "text/json";
    ccp path;
    string bid;
    FFJSON& cookie = ffHttp["cookie"];
    FFJSON payload;
-   ccp to = nullptr;
-   char subj[64];
-   char mesg[128];
    ffl_notice(FL, "cookie[bid]: %s",(ccp)cookie["bid"]);
    if (cookie["bid"]) {
       bid = (ccp)cookie["bid"];
@@ -199,16 +237,20 @@ string ferryfair (FFJSON& ffHttp) {
    username=nullptr;
    ffl_debug(FL, "proto: %s, host: %s", proto, (ccp)ffHttp["host"]);
    path = ffHttp["path"];
+   if (path[1]=='.' || strstr(path,"/red")) {
+      return mkHttpRes(ffHttp, "NaNa!", txtMime, -1, 404);
+   }
    if (!strcmp(path,"/sleep")) {
       int sd = atoi((ccp)ffHttp["query"]["time"]);
       sleep(sd);
-      return mkHttpRes(ffHttp, "slept for "+to_string(sd));
+      sprintf(mesg, "slept for %d", sd);
+      return mkHttpRes(ffHttp, mesg);
    } else if (!strcmp(path, "/activate")) {
       username=ffHttp["query"]["user"];
       user=&users[username];
       if ((!user["password"] || !user["inactive"]) &&
           !user["newpassword"]) {
-         return mkHttpRes(ffHttp, "{\"error\":\"wrongKey\"}", jsonMime, 400);
+         return mkHttpRes(ffHttp, "{\"error\":\"wrongKey\"}", jsonMime, -1, 400);
       } else if (!strcmp(user["activationKey"],ffHttp["query"]["key"])) {
          if (user["newpassword"]) {
             user["password"]=user["newpassword"];
@@ -219,17 +261,21 @@ string ferryfair (FFJSON& ffHttp) {
          user["things"].init("[]");
          user["smsgs"].init("[]");
          user["reps"].init("[]");
-         saveUsers=true;
-         saveFerryfair=true;
-         return mkHttpRes(ffHttp, string(username) + " activated.");
+         setSavMtx.lock();
+         pFSetToSave.insert(user.val.fptr);
+         pFSetToSave.insert(&users);
+         setSavMtx.unlock();
+         sprintf(mesg, "%s activated", username);
+         return mkHttpRes(ffHttp, mesg);
       } else {
-         return mkHttpRes(ffHttp, "{\"error\":\"wrongKey\"}", jsonMime, 400);
+         return mkHttpRes(ffHttp, "{\"error\":\"wrongKey\"}", jsonMime, -1, 400);
       }
    } else if (!strcmp(path, "/logout")) {
      logout:
       rbsid["user"]=nullFFJSON;
-      saveRbs=true;
-      saveFerryfair=true;
+      setSavMtx.lock();
+      pFSetToSave.insert(&rbs);
+      setSavMtx.unlock();
       return mkHttpRes(ffHttp, "{\"logout\":true}", jsonMime);
    }
    
@@ -259,8 +305,26 @@ string ferryfair (FFJSON& ffHttp) {
       rbsid = &rbs[bid];
       rbsid["ts"]=now;
       reply["bid"]=bid;
-      set<FFJSON*>& mdts = bidThings[&rbsid];
-      Pts pts;
+      BidThings_& bts = bidThings[rbsid.val.fptr];
+      set<FFJSON*>& mdts = bts.mdts;
+      Pts& pts = bts.all;
+      if (!cpld)
+         return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+      payload.init(cpld);
+      to = payload["path"];
+      if (to) {
+         FFJSON& pldusr = users[to];
+         reply["things"].init("[]");
+         if (!pldusr) {
+            reply["error"]="noUser";
+            goto cookieReply;
+         }
+         if (pldusr != &user) {
+            addSmtgsToReply(users, pldusr, reply, mdts, false);
+         }
+         goto cookieReply;
+      }
+      pts=Pts();
       if (ffHttp["query"]["user"] && ffHttp["query"]["thing"]) {
          FFJSON& uthings = users[(ccp)ffHttp["query"]["user"]]["things"];
          int tind = getIdChildInd(uthings, atoi(ffHttp["query"]["thing"]));
@@ -272,7 +336,6 @@ string ferryfair (FFJSON& ffHttp) {
          user.answerObject(&q, nullptr, FerryTimeStamp(), &reply);
          goto cookieReply;
       }
-      payload.init(cpld);
       if (!payload["geoposition"].isType(FFJSON::UNDEFINED) &&
           payload["geoposition"].size==2
       ) {
@@ -282,7 +345,7 @@ string ferryfair (FFJSON& ffHttp) {
       }
       thnsTree.getPointsFromQuad(pts);
       mdts.clear();
-      for (uint i = 0; i<pts.pts.size(); ++i) {
+      for (uint i = 0; i<pts.pni; ++i) {
          NdNPrn& nd = pts.pts[i];
          FFJSON* f;
          if (nd.prn==(QuadNode*)-1) {
@@ -300,25 +363,10 @@ string ferryfair (FFJSON& ffHttp) {
          rbsid["urts"]=lepoch;
          addSmtgsToReply(users, user, reply, mdts);
       }
-      to = payload["path"];
-      if (to) {
-         FFJSON& pldusr = users[to];
-         if (pldusr && &pldusr != &user) {
-            FFJSON::Iterator fit = pldusr["things"].begin();
-            FFJSON& trs = reply["things"];
-            while (fit != pldusr["things"].end()) {
-               FFJSON* f = &*fit;
-               if (mdts.find(f)==mdts.end()) {
-                  trs[trs.size] = f;
-                  mdts.insert(f);
-               }
-               ++fit;
-            }
-         }
-      }
      cookieReply:
-      saveRbs = true;
-      saveFerryfair=true;
+      setSavMtx.lock();
+      pFSetToSave.insert(&rbs);
+      setSavMtx.unlock();
       return mkHttpRes(ffHttp, reply.stringify(true).c_str(),jsonMime);
    }
   bidcheck2:
@@ -333,21 +381,23 @@ string ferryfair (FFJSON& ffHttp) {
       cap randcap(randstr, tempPath, 7, 288, 68, 40, 80, 48);
       rbsid["captcha"]=randstr;
       randcap.save();
-      saveRbs=true;
-      saveFerryfair=true;
+      rbs.clearEFlag(FFJSON::FILE);
+      setSavMtx.lock();
+      pFSetToSave.insert(&rbs);
+      setSavMtx.unlock();
       return mkHttpRes(ffHttp, "{\"cap\":\"true\"}", jsonMime);
    }
    if (!cpld) {
       if (!strcmp(path, "/upload")) {
          goto upload;
-      } else if (strstr(path, "/tmp/")) {
+      } else if (strstr(path, "/tmp/") == path) {
          return "1";
       }
       return "";
    }
+   payload.init(cpld);
    if (!strcmp(path, "/login")) {
       ffl_notice(FL, "Login");
-      payload.init(cpld);
       username=payload["username"];password=payload["password"];
       ffl_notice(FL, "\nUser: %s\nPass: %s", username, password);
       if (!users[username]) {
@@ -362,22 +412,56 @@ string ferryfair (FFJSON& ffHttp) {
          rbsid["ip"]=(ccp)ffHttp["ip"];
          user["bid"]=bid;
          rbsid["urts"]=lepoch;
-         addSmtgsToReply(users, user, reply, bidThings[&rbsid]);
-         saveRbs = true;
-         saveUsers = true;
-         saveFerryfair=true;
-         return mkHttpRes(ffHttp, reply.stringify(true).c_str(), jsonMime, 200);
+         addSmtgsToReply(users, user, reply, bidThings[rbsid.val.fptr].mdts);
+         setSavMtx.lock();
+         pFSetToSave.insert(&rbs);
+         setSavMtx.unlock();
+         return mkHttpRes(
+            ffHttp, reply.stringify(true).c_str(), jsonMime);
       } else {
          return mkHttpRes(ffHttp, "\{\"login\":\"false\"}", jsonMime);
       }
+   } else if (!strcmp(path, "/pts")) {
+      ffl_notice(FL, "pts:");
+      BidThings_& bts = bidThings[&rbs[bid]];
+      bool isSearch = payload["search"];
+      Pts& pts = isSearch?bts.search:bts.all;
+      int dir = payload["dir"];
+      if (dir!=1 && dir!=-1) {
+         return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+      }
+      int ni = payload["ni"];
+      int pni = pts.pni;
+      ni = ni==-1?pni:ni;
+      reply["things"].init("[]");
+      if (pni<pts.minPts || pts.pts.size()<=pts.minPts) {
+         return mkHttpRes(ffHttp, reply.stringify(1), jsonMime);
+      }
+      int tpts = ni+dir*20;
+      tpts = tpts<0?0:tpts;
+      if (pni>=tpts || tpts>=512)
+         return mkHttpRes(ffHttp, reply.stringify(1), jsonMime);
+      pts.minPts=tpts;
+      NdNPrn& nd = pts.cnd;
+      QuadNode* tQN=nd.qh->qn();
+      uint8_t tind=nd.qh-(QuadHldr*)tQN;
+      pts.cnd.ds=1;
+      cvSrch.wait(modLk, []{return modQhCv.load()==0;});
+      ++searchCv;
+      nd.qh->findNeighbours(
+         pts, tQN, tind, nd.prn, nd.ind, nd.dx);
+      --searchCv;
+      cvMod.notify_all();
+      set<FFJSON*>& mdts = bts.mdts;
+      addSearchNoDups(pts, reply, mdts, false);
+      return mkHttpRes(ffHttp, reply.stringify(1), jsonMime);
    } else if (!strcmp(path, "/signup")) {
       //signup
-      payload.init(cpld);
       bool recovery=false;
       ffl_notice(FL, "Signup");
       if (!isValidEmail(payload["email"])) {
          ffl_warn(FL, "invalid email.");
-         return mkHttpRes(ffHttp, "{\"error\":\"yay\"}", jsonMime, 400);
+         return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
       }
       if (payload["username"]) {
          username=payload["username"];
@@ -397,7 +481,7 @@ string ferryfair (FFJSON& ffHttp) {
                      (ccp)payload["email"]);
             return mkHttpRes(ffHttp, 
                "{\"actEmailSent\":-5,\"msg\":\"Email not registered!\"}",
-               jsonMime, 200);
+               jsonMime);
          }
       }
       password=payload["password"];
@@ -407,32 +491,32 @@ string ferryfair (FFJSON& ffHttp) {
          ffl_warn(FL, "User already exists.");
          return mkHttpRes(ffHttp, 
             "{\"actEmailSent\":-1,\"msg\":\"Username already taken, choose an"
-            " another :|\"}", jsonMime, 200);
+            " another :|\"}", jsonMime);
       } else if (!recovery && user["inactive"] &&
                  strcmp(payload["email"],user["email"])) {
          ffl_warn(FL, "User exists; mail mismatch");
          return mkHttpRes(ffHttp, 
             "{\"actEmailSent\":-5,\"msg\":\"Email not registered!\"}",
-            jsonMime, 200);
+            jsonMime);
       } else if (
          !recovery && users[(ccp)payload["email"]] && !user["email"]
       ) {
          ffl_warn(FL, "Email already registered.");
          return mkHttpRes(ffHttp, 
             "{\"actEmailSent\":-3,\"msg\":\"Email already registered! Try"
-            " resetting password\"}", jsonMime, 200);
+            " resetting password\"}", jsonMime);
       } else if (!recovery && !(validUsername(string(username)))) {
          ffl_warn(FL, "Invalid password");
          return mkHttpRes(ffHttp, 
             "{\"actEmailSent\":-6,\"msg\":\"Invalid password X|\"}",
-            jsonMime, 200);
+            jsonMime);
       } else if (
          !(password!=nullptr && validMD5(string(password)))
       ) {
          ffl_warn(FL, "Invalid password");
          return mkHttpRes(ffHttp, 
             "{\"actEmailSent\":-6,\"msg\":\"Invalid password X|\"}",
-            jsonMime, 200);
+            jsonMime);
       } else if (
          !payload["captcha"] || !rbsid["captcha"] ||
          strcmp((ccp)payload["captcha"],(ccp)rbsid["captcha"])!=0
@@ -440,12 +524,12 @@ string ferryfair (FFJSON& ffHttp) {
          ffl_warn(FL, "Captcha mismatch.");
          return mkHttpRes(ffHttp, 
             "{\"actEmailSent\":-4,\"msg\":\"Captcha mismatch, hmm!\"}",
-            jsonMime, 200);
+            jsonMime);
       } else if (!payload["consent"]) {
          ffl_warn(FL, "Captcha mismatch.");
          return mkHttpRes(ffHttp, 
             "{\"actEmailSent\":-5,\"msg\":\"U didn't consent to this tool"
-            " usage :/\"}", jsonMime, 200);
+            " usage :/\"}", jsonMime);
       }
       if (!recovery) {
          user["email"] = payload["email"];
@@ -477,22 +561,36 @@ string ferryfair (FFJSON& ffHttp) {
       if (sendMail(mailServer, mailPort, "plain", admin, adminPass, sfrom, to,
                    subj, mesg)!=0) {
          return mkHttpRes(
-            ffHttp, "{\"error\":\"sendMailFailed\"}", jsonMime, 200);
+            ffHttp, "{\"error\":\"sendMailFailed\"}", jsonMime);
       };
       s_quit=false;
-      saveRbs = true;
-      saveUsers = true;
-      saveFerryfair=true;
+      FFJSON::FeaturedMember fm;
+      fm.m_sFileName = new char[11+strlen(username)];
+      sprintf(fm.m_sFileName, "users/%s.txo", username);
+      if (!recovery) {
+         user.setEFlag(FFJSON::CASTFILE);
+         user.setEFlag(FFJSON::FILE);
+         user.insertFeaturedMember(fm, FFJSON::FM_FILE);
+         setSavMtx.lock();
+         pFSetToSave.insert(&users);
+         setSavMtx.unlock();
+      }
+      setSavMtx.lock();
+      pFSetToSave.insert(user.val.fptr);
+      pFSetToSave.insert(&rbs);
+      setSavMtx.unlock();
       return mkHttpRes(ffHttp, 
-         "{\"actEmailSent\":-6,\"msg\":\"Activation mail sent to ur email"
-         " :D\"}", jsonMime, 200);
+         "{\"actEmailSent\":2,\"msg\":\"Activation mail sent to ur email"
+         " :D\"}", jsonMime);
    } else if (strstr(path, "/search")) {
-      payload.init(cpld);
       ccp srchStr = payload["search"];
-      Pts pts;
+      rbsid = &rbs[bid];
+      BidThings_& bts = bidThings[rbsid.val.fptr];
+      set<FFJSON*>& mdts = bts.mdts;
+      Pts& pts = bts.search;
+      pts=Pts();
       vector<string> mstr = metaname(srchStr);
       pts.ina = nametouint(mstr);
-      int k=0;
       if (!payload["geoposition"].isType(FFJSON::UNDEFINED) &&
           payload["geoposition"].size==2
       ) {
@@ -502,42 +600,15 @@ string ferryfair (FFJSON& ffHttp) {
       }
       ffl_info(FL, "searching %s at %s\n",srchStr,
                payload["geoposition"].stringify().c_str());
-      CompThingNameMatch cTNM;
-      multiset<tuple<FFJSON*, int8_t>, CompThingNameMatch> score(cTNM);
       cvSrch.wait(modLk, []{return modQhCv.load()==0;});
       ++searchCv;
       thnsTree.getPointsFromQuad(pts);
       --searchCv;
       cvMod.notify_all();
-      for (int i=0;i<pts.pts.size();++i) {
-         NdNPrn& nd = pts.pts[i];
-         FFJSON* f;
-         if (nd.prn==(QuadNode*)-1) {
-            f = (FFJSON*)nd.qh;
-         } else {
-            auto aa = getNode(nd);
-            f = (FFJSON*)get<0>(aa);
-         }
-         score.insert({f,nd.d.x});
-      }
-      multiset<tuple<FFJSON*, int8_t>, CompThingNameMatch>::iterator it=
-         score.begin();
-      rbsid = &rbs[bid];
-      set<FFJSON*>& mdts = bidThings[&rbsid];
-      while (it!=score.end()) {
-         FFJSON& f = *get<0>(*it);
-         bool thingIsWithUser = mdts.find(&f)!=mdts.end();
-         if (thingIsWithUser) {
-            FFJSON& rt = reply["things"][k];
-            rt["id"]=f["id"];
-            rt["user"]=&f["user"]["name"];
-         } else {
-            reply["things"][k]=&f;
-         }
-         ++k;++it;
-      }
+      to = payload["path"];
+      addSearchNoDups(pts, reply, mdts);
       reply["things"][0];
-      return mkHttpRes(ffHttp, reply.stringify(true).c_str(), jsonMime, 200);
+      return mkHttpRes(ffHttp, reply.stringify(true).c_str(), jsonMime);
    }
 
   upload:
@@ -564,7 +635,7 @@ string ferryfair (FFJSON& ffHttp) {
       // if (fofst!=0) {
       //    FFJSON& ptgs=user["pendingThings"];
       //    if(thingId!=(int)ptgs["thingId"]){
-      //       mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
+      //       mg_http_reply(c, -1, 400, headers, "{%Q:%Q}", "error",
       //                     "noSuchThingId" );
       //       goto done;                  
       //    };
@@ -579,7 +650,7 @@ string ferryfair (FFJSON& ffHttp) {
                HL,
                "user[\"things\"].size: %d", uthings.size
             );
-            return mkHttpRes(ffHttp, "{\"error\":\"thingsAreAtMax\"}", jsonMime, 400);
+            return mkHttpRes(ffHttp, "{\"error\":\"thingsAreAtMax\"}", jsonMime, -1, 400);
          }
          if (uthings && uthings.size) {
             thngi=uthings.size;
@@ -598,7 +669,7 @@ string ferryfair (FFJSON& ffHttp) {
          //    }
          // }
          if (thngi<0) {
-            return mkHttpRes(ffHttp, "{\"error\":\"noSuchThingId\"}", jsonMime, 400);
+            return mkHttpRes(ffHttp, "{\"error\":\"noSuchThingId\"}", jsonMime, -1, 400);
          }
       }
      gotThingId:
@@ -608,7 +679,7 @@ string ferryfair (FFJSON& ffHttp) {
          picId, maxThingPics, thingId, thngi
       );
       if (picId >= maxThingPics) {
-         return mkHttpRes(ffHttp, "{\"error\":\"picsAreAtMax\"}", jsonMime, 400);
+         return mkHttpRes(ffHttp, "{\"error\":\"picsAreAtMax\"}", jsonMime, -1, 400);
       }
       string upldpth(wdir);
       upldpth += "/upload/";
@@ -641,13 +712,13 @@ string ferryfair (FFJSON& ffHttp) {
       ofstream upfile(upldpth.c_str(), ofmode | std::ios::binary);
       if (!upfile.is_open()) {
          sprintf(msg, "{\"error\":\"createFailed\"}");
-         return mkHttpRes(ffHttp, msg, jsonMime, 400);
+         return mkHttpRes(ffHttp, msg, jsonMime, -1, 400);
          
       }
       int initial_size = (int)(long long)upfile.tellp();
       if (initial_size!=fofst) {
          sprintf(msg, "{\"lastChunk\":%d}", initial_size);
-         return mkHttpRes(ffHttp, msg, jsonMime, 400);
+         return mkHttpRes(ffHttp, msg, jsonMime, -1, 400);
       }
       int wrByteCount = ffHttp["content-length"];
       upfile.write(cpld, wrByteCount);
@@ -658,15 +729,16 @@ string ferryfair (FFJSON& ffHttp) {
          uthings[thngi]["pics"][picId].erase("partial");
          uthings[thngi]["pics"][picId]["ts"]=lepoch;
 //            printf("pendingThings\n");
-         saveUsers=true;
-         saveFerryfair=true;
+         setSavMtx.lock();
+         pFSetToSave.insert(user.val.fptr);
+         setSavMtx.unlock();
       }
       sprintf(msg, "{\"thingId\":%d,\"picId\":%d}", thingId, picId);
       return mkHttpRes(ffHttp, msg, jsonMime);
    } else if (!strcmp(path, "/updateThing")) {
       FFJSON& user = users[username];
       if (strcmp((ccp)user["bid"],bid.c_str())) {
-         return mkHttpRes(ffHttp, "{\"error\":\"bidmismatch\"}", jsonMime, 400);
+         return mkHttpRes(ffHttp, "{\"error\":\"bidmismatch\"}", jsonMime, -1, 400);
       }
       payload.init(cpld);
       if (payload["things"]) {
@@ -682,13 +754,13 @@ string ferryfair (FFJSON& ffHttp) {
             if (!cthings[i])
                continue;
             if (i>uthings.size) {
-               return mkHttpRes(ffHttp, "{\"error\":\"sizeExceeded\"}", jsonMime, 400);
+               return mkHttpRes(ffHttp, "{\"error\":\"sizeExceeded\"}", jsonMime, -1, 400);
             }
             FFJSON& cfname = cthings[i]["name"];
             string cname((ccp)cfname);
             if (!isValidThingName(cfname)) {
                return mkHttpRes(ffHttp, "{\"error\":\"invalidThingName\"}",
-                                jsonMime, 400);
+                                jsonMime, -1, 400);
             }
             j=getIdChildInd(uthings, (int)cthings[i]["id"]);
             bool locChanged = false;
@@ -707,7 +779,7 @@ string ferryfair (FFJSON& ffHttp) {
                FFJSON& cloc = cthings[i]["location"];
                if (!isValidLocation(cloc)) {
                   return mkHttpRes(ffHttp, 
-                     "{\"error\":\"invalidLocation\"}", jsonMime, 400);
+                     "{\"error\":\"invalidLocation\"}", jsonMime, -1, 400);
                } else {
                   uthings[j]["location"]=cloc;
                   locChanged=true;
@@ -735,7 +807,7 @@ string ferryfair (FFJSON& ffHttp) {
                FFJSON& uloc = uthings[j]["location"];
                if (!isValidLocation(cloc)) {
                   return mkHttpRes(ffHttp, 
-                     "{\"error\":\"invalidLocation\"}", jsonMime, 400);
+                     "{\"error\":\"invalidLocation\"}", jsonMime, -1, 400);
                }
                if (((double)cloc[0]!=(double)uloc[0] ||
                     (double)cloc[1]!=(double)uloc[1])) {
@@ -757,7 +829,7 @@ string ferryfair (FFJSON& ffHttp) {
                   uthings[j]["details"]=cthings[i]["details"];
                } else {
                   return mkHttpRes(ffHttp, 
-                     "{\"error\":\"invalidThingDetails\"}", jsonMime, 400);
+                     "{\"error\":\"invalidThingDetails\"}", jsonMime, -1, 400);
                }
             }
             if (nameChanged) {
@@ -781,10 +853,11 @@ string ferryfair (FFJSON& ffHttp) {
             reply["things"][reply["things"].size]=&uthings[j];
          }
       }
-      saveUsers=true;
-      saveNameints=true;
-      saveFerryfair=true;
-      return mkHttpRes(ffHttp, reply.stringify(true).c_str(), jsonMime, 200);
+      setSavMtx.lock();
+      pFSetToSave.insert(user.val.fptr);
+      pFSetToSave.insert(fnameints);
+      setSavMtx.unlock();
+      return mkHttpRes(ffHttp, reply.stringify(true).c_str(), jsonMime);
    } else if (strstr(path, "/owl")) {
       FFJSON& things = user["things"];
       FFJSON& smsgs = user["smsgs"];
@@ -803,14 +876,14 @@ string ferryfair (FFJSON& ffHttp) {
       while (it!=fQs.end()) {
          ccp tuser = (ccp)it;
          if (!strcmp(tuser,username)) {
-            return mkHttpRes(ffHttp, "{\"error\":\"yay\"}", jsonMime, 400);
+            return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
          }
          FFJSON::Iterator tit;
          if (tuser) {
             tit  = users.find(tuser);
          }
          if (!tuser || tit==users.end()) {
-            return mkHttpRes(ffHttp, "{\"error\":\"yay\"}", jsonMime, 400);
+            return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
          }
          FFJSON& tfuser = users[tuser];
          FFJSON& tfthings = tfuser["things"];
@@ -818,12 +891,12 @@ string ferryfair (FFJSON& ffHttp) {
          while (tit!=it->end()) {
             ccp ctid = (ccp)tit;
             if (!ctid) {
-               return mkHttpRes(ffHttp, "{\"error\":\"yay\"}", jsonMime, 400);
+               return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
             }
             int tid = atoi(ctid);
             int tind = getIdChildInd(tfthings, tid);
             if (tind<0) {
-               return mkHttpRes(ffHttp, "{\"error\":\"yay\"}", jsonMime, 400);
+               return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
             }
             FFJSON& rmsgs = tfthings[tind]["rmsgs"];
             if (!rmsgs) {
@@ -849,10 +922,16 @@ string ferryfair (FFJSON& ffHttp) {
             ++tit;
          }
          tfuser["lmts"]=lepoch;
+         setSavMtx.lock();
+         pFSetToSave.insert(&tfuser);
+         setSavMtx.unlock();
          ++it;
       }
       payload["status"]=1;
-     rqs:
+      setSavMtx.lock();
+      pFSetToSave.insert(user.val.fptr);
+      setSavMtx.unlock();
+     rqs://mark query as read
       FFJSON& fRs = payload["Rs"];
       if (!fRs) {
          goto rrs;
@@ -861,12 +940,12 @@ string ferryfair (FFJSON& ffHttp) {
       while (it!=fRs.end()) {
          ccp ctid = (ccp)it;
          if (!ctid) {
-            return mkHttpRes(ffHttp, "{\"error\":\"yay\"}", jsonMime, 400);
+            return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
          }
          int tid = atoi(ctid);
          int tind = getIdChildInd(things, tid);
          if (tind<0) {
-            return mkHttpRes(ffHttp, "{\"error\":\"yay\"}", jsonMime, 400);
+            return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
          }
          FFJSON& rmsgs = things[tind]["rmsgs"];
          FFJSON::Iterator tit = it->begin();
@@ -874,7 +953,7 @@ string ferryfair (FFJSON& ffHttp) {
             int mid = (int)*tit;
             mid = getIdChildInd(rmsgs, mid);
             if (mid<0) {
-               return mkHttpRes(ffHttp, "{\"error\":\"yay\"}", jsonMime, 400);
+               return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
             }
             rmsgs[mid].erase("new");
             ++tit;
@@ -882,7 +961,10 @@ string ferryfair (FFJSON& ffHttp) {
          ++it;
       }
       payload["status"]=1;
-     rrs:
+      setSavMtx.lock();
+      pFSetToSave.insert(user.val.fptr);
+      setSavMtx.unlock();
+     rrs://mark received replies as read
       FFJSON& frrs = payload["rrs"];
       if (!frrs) {
          goto news;
@@ -897,7 +979,10 @@ string ferryfair (FFJSON& ffHttp) {
          }
       }
       payload["status"]=1;
-     news:
+      setSavMtx.lock();
+      pFSetToSave.insert(user.val.fptr);
+      setSavMtx.unlock();
+     news://fetch if there are new queries
       urts = (long)rbsid["urts"];
       if (!user["lmts"]) {
          goto rnews;
@@ -919,7 +1004,7 @@ string ferryfair (FFJSON& ffHttp) {
          }
       }
       payload["status"]=1;
-     rnews:
+     rnews://fetch if there are new replies
       if (!reps.size) {
          goto reps;
       }
@@ -947,7 +1032,7 @@ string ferryfair (FFJSON& ffHttp) {
          }
          lmts=(long)reps[i];
       } while (urts<lmts);
-     reps:
+     reps://post reply to target user thing
       FFJSON& fRps = payload["Reps"];
       if (!fRps) {
          goto owldone;
@@ -956,12 +1041,12 @@ string ferryfair (FFJSON& ffHttp) {
       while (it!=fRps.end()) {
          ccp ctid = (ccp)it;
          if (!ctid) {
-            return mkHttpRes(ffHttp, "{\"error\":\"yay\"}", jsonMime, 400);
+            return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
          }
          int tid = atoi(ctid);
          int tind = getIdChildInd(things, tid);
          if (tind<0) {
-            return mkHttpRes(ffHttp, "{\"error\":\"yay\"}", jsonMime, 400);
+            return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
          }
          FFJSON& rmsgs = things[tind]["rmsgs"];
          FFJSON::Iterator tit = it->begin();
@@ -969,7 +1054,7 @@ string ferryfair (FFJSON& ffHttp) {
             int mid = stoi((ccp)tit);
             int mind = getIdChildInd(rmsgs, mid);
             if (mind<0) {
-               return mkHttpRes(ffHttp, "{\"error\":\"yay\"}", jsonMime, 400);
+               return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
             }
             smind=smsgs.size;
             rmsgs[mind]["rep"]=*tit;
@@ -984,18 +1069,21 @@ string ferryfair (FFJSON& ffHttp) {
             }
             treps[treps.size]=rmsgs[mind]["smind"];
             treps[treps.size]=lepoch;
+            setSavMtx.lock();
+            pFSetToSave.insert(&tusr);
+            setSavMtx.unlock();
             ++tit;
          }
          ++it;
       }
+      setSavMtx.lock();
+      pFSetToSave.insert(user.val.fptr);
+      setSavMtx.unlock();
       payload["status"]=1;
      owldone:
       payload["status"]=1;
       rbsid["urts"]=lepoch;
-      saveUsers=true;
-      saveRbs=true;
-      saveFerryfair=true;
-      return mkHttpRes(ffHttp, payload.stringify(true).c_str(), jsonMime, 200);
+      return mkHttpRes(ffHttp, payload.stringify(true).c_str(), jsonMime);
    }
    if (valgrind_test && !--valgrind_count)
       g_running=false;
@@ -1038,7 +1126,7 @@ void makeThngsTree () {
                (*tit)["location"].isType(FFJSON::UNDEFINED))) {
             FFJSON* pF = &*tit;
             ffl_debug(FL, "inserting %d", ic);
-            pool.enqueue([pF, ic] {
+            tpoolPtr->enqueue([pF, ic] {
                FFJSON& rF = *pF;
                vector<string> mstr = metaname((ccp)rF["name"]);
                vector<uint> ina = nametouint(mstr);
@@ -1058,13 +1146,13 @@ void makeThngsTree () {
       }
       ++it;
    }
-   pool.join();
+   tpoolPtr->join();
 }
 
 void initFerryFair (FFJSON& cfg) {
    FFJSON& ffcfg = cfg["cfg"];
    wdir=(ccp)cfg["vhosts"]["www"]["rootdir"];
-   ffcfg.init(string("file://")+wdir+"/config.ffjson");
+   ffcfg.init(string("file://")+wdir+"/config.ffjson|OBJECT");
    cfg["vhosts"]["www"]["cfg"]=pffcfg=&cfg["cfg"];
    admin = ffcfg["secret"]["admin"];
    adminPass = ffcfg["secret"]["adminPass"];
@@ -1088,16 +1176,17 @@ void initFerryFair (FFJSON& cfg) {
    FerryTimeStamp ftsStart;
    FerryTimeStamp ftsEnd;
    FerryTimeStamp ftsDiff;
-   ftsStart.Update();
+   ftsStart.update();
    thnsTree.print(pts.c);
    //ina.push_back(0x80);
    thnsTree.getPointsFromQuad(pts);
-   ftsEnd.Update();
+   ftsEnd.update();
    ftsDiff = ftsEnd - ftsStart;
    cout << "%TEST_FINISHED% time=" << ftsDiff << " test21\n" << endl;
    std::vector<NdNPrn>::iterator it = pts.pts.begin();
    it = pts.pts.begin();
-   while (it!=pts.pts.end()) {
+   auto itend = it+pts.pni;
+   while (it!=itend) {
       FFJSON* fp;
       if (it->prn==(QuadNode*)-1) {
          fp = (FFJSON*)it->qh;
@@ -1106,22 +1195,5 @@ void initFerryFair (FFJSON& cfg) {
       }
       printf("%s\n",(*fp)["location"].stringify().c_str());
       ++it;
-   }
-}
-
-void saveFerryFair (void* pcfg) {
-   FFJSON& cfg = *(FFJSON*)pcfg;
-   saveFerryfair=false;
-   if (saveUsers) {
-      saveUsers=false;
-      cfg["cfg"]["users"].save();
-   }
-   if (saveRbs) {
-      saveRbs=false;
-      cfg["cfg"]["rbs"].save();
-   }
-   if (saveNameints) {
-      saveNameints=false;
-      cfg["cfg"]["nameints"].save();
    }
 }

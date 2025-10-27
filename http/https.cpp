@@ -22,6 +22,7 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <cstdlib>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -60,6 +61,10 @@ namespace fs = std::filesystem;
 
 typedef const char* ccp;
 
+set<FFJSON*> pFSetToSave;
+mutex setSavMtx;
+atomic<bool> saveTxoStop{0};
+
 void handle_sigint (int) {
    if (!g_running) {
       exit(1);
@@ -70,7 +75,7 @@ void handle_sigint (int) {
 }
 
 string gzipCompress (
-   const string &data, int level = Z_BEST_COMPRESSION) {
+   ccp data, int dsz, int level = Z_BEST_COMPRESSION) {
    string compressed;
    
    z_stream zs{};
@@ -84,8 +89,8 @@ string gzipCompress (
       return compressed;
    }
    
-   zs.next_in = reinterpret_cast<Bytef*>(const_cast<char *>(data.data()));
-   zs.avail_in = data.size();
+   zs.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data));
+   zs.avail_in = dsz;
    
    const size_t CHUNK_SIZE = 16384;
    std::vector<unsigned char> outbuffer(CHUNK_SIZE);
@@ -146,11 +151,11 @@ void ThreadPool::start (size_t n) {
                if (jobs_.empty() && !jc) {
                   cvJoin_.notify_all();
                }
+               cv_.wait(lk, [this] {
+                  return stopping_ || !jobs_.empty();
+               });
                if (stopping_ && jobs_.empty())
                   return;
-               cv_.wait(lk, [this] {
-                  return !jobs_.empty();
-               });
                job = move(jobs_.front());
                jobs_.pop();
             }
@@ -185,7 +190,7 @@ void ThreadPool::join () {
    });
 }
 
-ThreadPool pool;
+ThreadPool* tpoolPtr;
 // ---------------- Utilities ----------------
 string url_decode (const string &s) {
    string out;
@@ -458,28 +463,28 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
    }
 }
 
-string mkHttpRes (FFJSON& ffHttp, const string& body,
-                  const string &ctype,
+string mkHttpRes (FFJSON& ffHttp, ccp body,
+                  ccp ctype, int bsz,
                   const int code,
-                  const string &codeMsg,
-                  const string &addlHdrs) {
+                  ccp codeMsg,
+                  ccp addlHdrs) {
    ostringstream oss;
    oss << "HTTP/1.0 " << code << " " << codeMsg << "\r\n";
    oss << "Content-Type: " << ctype << "\r\n";
    oss << addlHdrs;
    oss << "Connection: close\r\n";
    oss << "Cache-Control: public, max-age=3600\r\n";
-   int ocl = body.size();
+   int ocl = bsz==-1?strlen(body):bsz;
    FFJSON& accEnc = ffHttp["accept-encoding"];
    if (ocl>1024 && accEnc && accEnc["gzip"] &&
-       ctype.find("image")==string::npos) {
-      string gz = gzipCompress(body);
+       !strstr(ctype,"image")) {
+      string gz = gzipCompress(body, ocl);
       oss << "Content-Encoding: gzip\r\n";
       oss << "Content-Length: " << gz.size() << "\r\n\r\n";
       oss << gz;
    } else {
       oss << "Content-Length: " << ocl << "\r\n\r\n";
-      oss << body;
+      oss.write(body,ocl);
    }
    return oss.str();
 }
@@ -487,6 +492,19 @@ string mkHttpRes (FFJSON& ffHttp, const string& body,
 enum ftype {
    FSFILE, SLINK, BLINK, DIR
 };
+
+static bool blockIp (ccp ip) {
+   fstr command = fstr("sudo iptables -A INPUT -s ") + ip + " -j DROP";
+   int result = system((ccp)command);
+   return (result == 0);
+}
+
+static bool unblockIp (ccp ip) {
+   fstr command = fstr("sudo iptables -D INPUT -s ") + ip + " -j DROP";
+   int result = system((ccp)command);
+   return (result == 0);
+}    
+
 struct Entry {
    std::string name;
    ftype type;
@@ -546,40 +564,46 @@ string html_escape (ccp s) {
    return out;
 }
 
-string get_mime_type(const fs::path& path) {
-    static const unordered_map<string, string> mime {
-        {".html", "text/html"},
-        {".htm",  "text/html"},
-        {".css",  "text/css"},
-        {".js",   "text/javascript"},
-        {".json", "application/json"},
-        {".png",  "image/png"},
-        {".jpg",  "image/jpeg"},
-        {".jpeg", "image/jpeg"},
-        {".gif",  "image/gif"},
-        {".svg",  "image/svg+xml"},
-        {".ico",  "image/x-icon"},
-        {".txt",  "text/plain"},
-        {".ttf",  "font/ttf"},
-        {".pdf",  "application/pdf"},
-        {".xml",  "application/xml"},
-        {".zip",  "application/zip"},
-        {".gz",   "application/gzip"},
-        {".tar",  "application/x-tar"}
-        // add more as needed
-    };
+fstr get_mime_type(const fs::path& path) {
+   static const unordered_map<fstr, fstr> mime {
+      {".html", "text/html"},
+      {".htm",  "text/html"},
+      {".css",  "text/css"},
+      {".js",   "text/javascript"},
+      {".json", "application/json"},
+      {".png",  "image/png"},
+      {".jpg",  "image/jpeg"},
+      {".jpeg", "image/jpeg"},
+      {".gif",  "image/gif"},
+      {".svg",  "image/svg+xml"},
+      {".ico",  "image/x-icon"},
+      {".txt",  "text/plain"},
+      {".ttf",  "font/ttf"},
+      {".pdf",  "application/pdf"},
+      {".xml",  "application/xml"},
+      {".zip",  "application/zip"},
+      {".gz",   "application/gzip"},
+      {".tar",  "application/x-tar"}
+      // add more as needed
+   };
 
-    auto ext = path.extension().string();
-    // lowercase the extension
-    for (auto &c : ext) c = static_cast<char>(tolower(c));
+   auto ext = path.extension().string();
+   // lowercase the extension
+   for (auto &c : ext) c = static_cast<char>(tolower(c));
 
-    auto it = mime.find(ext);
-    if (it != mime.end()) {
-        return it->second;
-    }
-    return "application/octet-stream"; // default
+   auto it = mime.find(ext);
+   if (it != mime.end()) {
+      return it->second;
+   }
+   return "application/octet-stream"; // default
 }
 
+struct IpTrack_ {
+   FTS_ firstReqTime;
+   int count = 0;
+};
+unordered_map<fstr, IpTrack_> ipTracks;
+FTS_ oneMin = {60,0};
 string httpHandle (FFJSON& ffHttp) {
    FFJSON& fpath = ffHttp["path"];
    if (!fpath)
@@ -593,7 +617,7 @@ string httpHandle (FFJSON& ffHttp) {
    if (vhost["redirect"]) {
       char rhed[64];
       sprintf(rhed, "Location: %s\r\n", (ccp)vhost["redirect"]);
-      return mkHttpRes(ffHttp, "", "text/plain", 308, "Permanent Redirect",
+      return mkHttpRes(ffHttp, "", "text/plain", -1, 308, "Permanent Redirect",
                        rhed);
    }
    string path((ccp)vhost["rootdir"]);
@@ -626,7 +650,7 @@ string httpHandle (FFJSON& ffHttp) {
       sort(entries.begin(), entries.end(), [](auto &a, auto &b){
          return a.name < b.name;
       });
-      string dirHtml = "<html><head><title>";
+      fstr dirHtml = "<html><head><title>";
       dirHtml += html_escape(path.c_str())+"</title></head><body><table>";
       dirHtml += "<tr><th>Name</th><th>Size</th><th>Modified</th></tr>";
       for (auto &e : entries) {
@@ -644,10 +668,7 @@ string httpHandle (FFJSON& ffHttp) {
          dirHtml += "<td>" + mtime + "</td></tr>";
       }
       dirHtml += "</table></body></html>";
-      return mkHttpRes(ffHttp, dirHtml,"text/html");
-   } else if (path.find("/red")!=string::npos ||
-              path.find("/tmp")!=string::npos) {
-      return mkHttpRes(ffHttp, "NaNa!");
+      return mkHttpRes(ffHttp, dirHtml, "text/html");
    } else {
      serveFile:
       if (!fs::exists(fspath)) {
@@ -658,13 +679,28 @@ string httpHandle (FFJSON& ffHttp) {
       ifstream reqFile(path);
       ostringstream resStr;
       resStr << reqFile.rdbuf();
-      string res = resStr.str();
-      return mkHttpRes(ffHttp, res,get_mime_type(fspath));
+      fstr res = resStr.str();
+      return mkHttpRes(ffHttp, res, get_mime_type(fspath), res.length());
    }
+   
+   FTS_ now; now.update();
+   IpTrack_& ipt = ipTracks[(ccp)ffHttp["ip"]];
+   if (!ipt.firstReqTime) {
+      ipt.firstReqTime=now;
+   }
+   ++ipt.count;
+   if (2*oneMin < (now-ipt.firstReqTime)) {
+      if (ipt.count>20) {
+         blockIp((ccp)ffHttp["ip"]);
+      } else if (ipt.count <2) {
+         ipt.firstReqTime=now;
+      }
+   }
+   
    return mkHttpRes(ffHttp, "NaNa!");
 }
 
-void handle_connection (struct sockaddr_in cli, int client_fd,
+void handleConnection (struct sockaddr_in cli, int client_fd,
                         SSL* ssl = nullptr) {
    if (ssl && SSL_accept(ssl) <= 0) {
       ffl_err(HL, "SSL accept failed: %s",
@@ -832,10 +868,22 @@ void accept_loop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
       }
       ffl_debug(HL, "got %d...", c);
       pool.enqueue([cli, ssl, c](){
-         handle_connection(cli, c, ssl);
+         handleConnection(cli, c, ssl);
       });
-      if (saveFerryfair) {
-         thread(saveFerryFair,(void*)&cfg).detach();
+   }
+}
+
+void saveTxo () {
+   while (!saveTxoStop) {
+      this_thread::sleep_for(chrono::milliseconds(2000));
+      while (!pFSetToSave.empty()) {
+         setSavMtx.lock();
+         set<FFJSON*>::iterator it = pFSetToSave.begin();
+         setSavMtx.unlock();
+         (*it)->save();
+         setSavMtx.lock();
+         pFSetToSave.erase(it);
+         setSavMtx.unlock();
       }
    }
 }
@@ -863,48 +911,52 @@ int main (int argc, char **argv) {
    ffl_notice(HL, "Starting server. docroot=%s threads=%d",
               (ccp)cfg["rootdir"], (int)cfg["threadCount"]);
 
-   pool.init((int)cfg["threadCount"]);
+   tpoolPtr = new ThreadPool((int)cfg["threadCount"]);
    initFerryFair(cfg);
 
-   int http_fd = create_listen_socket((uint16_t)(int)cfg["httpPort"]);
-   if (http_fd < 0) {
+   int httpFd = create_listen_socket((uint16_t)(int)cfg["httpPort"]);
+   if (httpFd < 0) {
       perror("http bind");
       return 1;
    }
-   int https_fd = create_listen_socket((uint16_t)(int)cfg["httpsPort"]);
-   if (https_fd < 0) {
+   int httpsFd = create_listen_socket((uint16_t)(int)cfg["httpsPort"]);
+   if (httpsFd < 0) {
       perror("https bind");
       return 1;
    }
 
-   SSL_CTX* ssl_ctx = create_ssl_ctx(
+   SSL_CTX* sslCtx = create_ssl_ctx(
       string((ccp)cfg["cert"]), string((ccp)cfg["key"]));
-   if (!ssl_ctx) {
+   if (!sslCtx) {
       ffl_err(HL, "Failed to create SSL_CTX");
       return 1;
    }
 
    
-   thread t1([&] () {
-      accept_loop(http_fd, pool);
+   thread t1([httpFd] () {
+      accept_loop(httpFd, *tpoolPtr);
    });
-   thread t2([&] () {
-      accept_loop(https_fd, pool, ssl_ctx);
+   thread t2([httpsFd, &sslCtx] () {
+      accept_loop(httpsFd, *tpoolPtr, sslCtx);
    });
+   thread saveTxoT(saveTxo);
    ffl_debug(HL, "main sleeping..");
    while (g_running) {
       this_thread::sleep_for(chrono::milliseconds(2000));
    }
 
-   ::shutdown(http_fd, SHUT_RDWR);
-   ::shutdown(https_fd, SHUT_RDWR);
-   ::close(http_fd);
-   ::close(https_fd);
+   ::shutdown(httpFd, SHUT_RDWR);
+   ::shutdown(httpsFd, SHUT_RDWR);
+   ::close(httpFd);
+   ::close(httpsFd);
    ffl_debug(HL,"joining t1");
    if (t1.joinable()) t1.join();
    if (t2.joinable()) t2.join();
    ffl_debug(HL,"freeing ssl_ctx");
-   SSL_CTX_free(ssl_ctx);
+   SSL_CTX_free(sslCtx);
+   delete tpoolPtr;
+   saveTxoStop=true;
+   saveTxoT.join();
    ffl_notice(HL, "bye!");
    return 0;
 }

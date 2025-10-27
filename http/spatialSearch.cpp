@@ -690,6 +690,11 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
    uint8_t iy = 1&ix;
    ix>>=1;
    uint ncnt = 0;
+   int nni;
+   if (pts.cnd.ds) {
+      pts.cnd.ds=0;
+      goto cntnuFind;
+   }
    // determine the neighbour quadrant
    if (d.x!=0 || d.y!=0) {
       int8_t rx = ix-d.x;//quadrant index is opposite to direction
@@ -786,16 +791,18 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
          }
       }
       //printpts(pts.pts);
-      pts.nni = pts.pts.size()-1;
-      if (pts.nni<0)
+      nni = pts.pts.size()-1;
+      pts.nni = nni;
+      if (nni<0)
          return 0;
       ++pts.ni;
       quickSort(pts.pts,pts.ni,pts.nni);
       //printf("---------\n");
       //printpts(pts.pts);
       //printf("---------\n");
-      uint pni=pts.ni;
-      while (pts.ni<pts.pts.size() && pni<pts.minPts) {
+      pts.pni=pts.ni;
+     cntnuFind:
+      while (pts.ni<pts.pts.size() && pts.pni<pts.minPts) {
          NdNPrn nd = pts.pts[pts.ni];
          tQN=nd.qh->qn();
          tind=nd.qh-(QuadHldr*)tQN;
@@ -815,7 +822,7 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
                pts, tQN, tind, nd.prn, nd.ind, nd.dx, nd.ds, dd);
          }
          quickSort(pts.pts, pts.ni+1, pts.pts.size()-1);
-         if (nd.qh->fp && pts.ni>=pni) {
+         if (nd.qh->fp && pts.ni>=pts.pni) {
             QuadNode* resqp = (QuadNode*)get<0>(getNode(nd));
             vector<map<QuadNode*,uint>::iterator> qit =
                qpfind((QuadNode*)resqp);
@@ -833,15 +840,15 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
                      --moreElms;
                      int8_t matchcount = ffHasName(**sfit, pts.ina);
                      if (matchcount) {
-                        pts.pts[pni] = {(QuadHldr*)*sfit,(QuadNode*)-1,
+                        pts.pts[pts.pni] = {(QuadHldr*)*sfit,(QuadNode*)-1,
                            nd.dx,nd.ds,{matchcount,0},0};
-                        if (pni+moreElms>pts.ni) {
+                        if (pts.pni+moreElms>pts.ni) {
                            pts.pts.insert(
-                              pts.pts.begin()+pni+1,
+                              pts.pts.begin()+pts.pni+1,
                               moreElms,{0});
                            pts.ni+=moreElms;
                         }
-                        ++pni;
+                        ++pts.pni;
                      }
                      ++sfit;
                   }
@@ -849,9 +856,9 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
                   uint8_t matchcount =
                      (uint8_t)ffHasName((*(FFJSON*)resqp),pts.ina);
                   if (matchcount) {
-                     pts.pts[pni] = pts.pts[pts.ni];
-                     pts.pts[pni].d.x = matchcount;
-                     ++pni;
+                     pts.pts[pts.pni] = pts.pts[pts.ni];
+                     pts.pts[pts.pni].d.x = matchcount;
+                     ++pts.pni;
                   }
                }
             }
@@ -871,7 +878,7 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
       //    }
       // }
       // printpts(pts.pts);
-      pts.pts.erase(pts.pts.begin()+pni, pts.pts.end());
+      //pts.pts.erase(pts.pts.begin()+pni, pts.pts.end());
    }
    return ncnt;
 }
@@ -883,6 +890,7 @@ uint QuadHldr::getPointsFromQuad (
 ) {
    float dx = 180/(pow(2,level+1));
    if (fp==nullptr) {
+      pts.cnd = {this, pQN, dx, 0, 0, ind};
       return findNeighbours(pts, tQN, tind, pQN, ind, dx);
    }
    void* resfp = get<0>(bpxor(fp,pQN));
@@ -905,11 +913,13 @@ uint QuadHldr::getPointsFromQuad (
       } else if (ffHasName(*(FFJSON*)resfp, pts.ina)) {
          pts.pts.push_back({this,pQN});
       }
+      pts.cnd = {this, pQN, dx, 0, 0, ind};
       return findNeighbours(pts, tQN, tind, pQN, ind, dx);
    } else {
       QuadNode* resqp = (QuadNode*)resfp;
       uint8_t matchcount = (uint8_t)resqp->hasName(pts.ina,qit);
       if (!matchcount) {
+         pts.cnd = {this, pQN, dx, 0, 0, ind};
          return findNeighbours(pts, tQN, tind, pQN, ind, dx);
       }
       QuadHldr* qh = &resqp->en;

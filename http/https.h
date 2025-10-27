@@ -16,11 +16,11 @@ enum HTTPLOG {
    SM = 1<<15
 };
 static atomic<bool> g_running{true};
-string mkHttpRes (FFJSON& ffHttp, const string& body,
-                  const string &ctype = "text/plain",
+string mkHttpRes (FFJSON& ffHttp, ccp body,
+                  ccp ctype = "text/plain", int bsz=-1,
                   const int code = 200,
-                  const string &codeMsg = "OK",
-                  const string &addlHdrs = "");
+                  ccp codeMsg = "OK",
+                  ccp addlHdrs = "");
 class ThreadPool {
 public:
    ThreadPool () {};
@@ -44,5 +44,9 @@ private:
    void stop ();
 };
 extern thread_local int tid;
-extern ThreadPool pool;
+extern ThreadPool* tpoolPtr;
+extern set<FFJSON*> pFSetToSave;
+extern mutex setSavMtx;
+extern atomic<bool> saveTxoStop;
+
 #endif
