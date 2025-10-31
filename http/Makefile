@@ -7,7 +7,7 @@ FFJLIB=-L../../FFJSON/build/Linux/${ARCH}/debug/
 FFLLIB=-L../../logger/build/Linux/${ARCH}/debug/
 FBLIB=-L../../ferrybase/build/Linux/${ARCH}/debug/
 TCPP?=/opt/rocm/llvm/bin/clang++
-DBG=_DEBUG0
+DBG=_DEBUG
 DBGF=-g -O0
 
 smtpClient.o: smtpClient.cpp
@@ -34,7 +34,7 @@ https.o: https.cpp
 all: https.o ferryfair.o cap.o smtpClient.o spatialSearch.o
 	${TCPP} -pthread -std=c++23 -fPIE ${DBGF} -D${DBG}\
    -Wno-unqualified-std-cast-call -I${FFJINC} -I${FFLINC} -I${FBINC} -I${FFINC}\
-   -I.. $^ ${FFJLIB} ${FFLLIB} ${FBLIB} -lFFJSON -llogger -lferrybase -lssl -lcrypto -ljpeg -lz -lrt -licui18n -licuuc -licudata\
+   -I.. $^ ${FFJLIB} ${FFLLIB} ${FBLIB} -lFFJSON -llogger -lferrybase -lssl -lcrypto -ljpeg -lz -lrt -licui18n -licuuc -licudata -lcurl\
    -o https_${ARCH}
 
 critcalSection.o:

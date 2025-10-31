@@ -492,16 +492,15 @@ string mkHttpRes (FFJSON& ffHttp, ccp body,
 enum ftype {
    FSFILE, SLINK, BLINK, DIR
 };
-
 static bool blockIp (ccp ip) {
-   fstr command = fstr("sudo iptables -A INPUT -s ") + ip + " -j DROP";
-   int result = system((ccp)command);
+   string command = string("sudo iptables -A INPUT -s ") + ip + " -j DROP";
+   int result = system(command.c_str());
    return (result == 0);
 }
 
 static bool unblockIp (ccp ip) {
-   fstr command = fstr("sudo iptables -D INPUT -s ") + ip + " -j DROP";
-   int result = system((ccp)command);
+   string command = string("sudo iptables -D INPUT -s ") + ip + " -j DROP";
+   int result = system(command.c_str());
    return (result == 0);
 }    
 
@@ -564,8 +563,8 @@ string html_escape (ccp s) {
    return out;
 }
 
-fstr get_mime_type(const fs::path& path) {
-   static const unordered_map<fstr, fstr> mime {
+string get_mime_type(const fs::path& path) {
+   static const unordered_map<string, string> mime {
       {".html", "text/html"},
       {".htm",  "text/html"},
       {".css",  "text/css"},
@@ -578,6 +577,7 @@ fstr get_mime_type(const fs::path& path) {
       {".svg",  "image/svg+xml"},
       {".ico",  "image/x-icon"},
       {".txt",  "text/plain"},
+      {".md",  "text/plain"},
       {".ttf",  "font/ttf"},
       {".pdf",  "application/pdf"},
       {".xml",  "application/xml"},
@@ -602,7 +602,7 @@ struct IpTrack_ {
    FTS_ firstReqTime;
    int count = 0;
 };
-unordered_map<fstr, IpTrack_> ipTracks;
+unordered_map<string, IpTrack_> ipTracks;
 FTS_ oneMin = {60,0};
 string httpHandle (FFJSON& ffHttp) {
    FFJSON& fpath = ffHttp["path"];
@@ -650,7 +650,7 @@ string httpHandle (FFJSON& ffHttp) {
       sort(entries.begin(), entries.end(), [](auto &a, auto &b){
          return a.name < b.name;
       });
-      fstr dirHtml = "<html><head><title>";
+      string dirHtml = "<html><head><title>";
       dirHtml += html_escape(path.c_str())+"</title></head><body><table>";
       dirHtml += "<tr><th>Name</th><th>Size</th><th>Modified</th></tr>";
       for (auto &e : entries) {
@@ -672,31 +672,34 @@ string httpHandle (FFJSON& ffHttp) {
    } else {
      serveFile:
       if (!fs::exists(fspath)) {
-         path = (ccp)vhost["rootdir"];
-         path += "/index.html";
+         path += "index.html";
          fspath=fs::path(path);
+         if (!fs::exists(fspath))
+            goto iptrack;
       }
       ifstream reqFile(path);
       ostringstream resStr;
       resStr << reqFile.rdbuf();
-      fstr res = resStr.str();
-      return mkHttpRes(ffHttp, res, get_mime_type(fspath), res.length());
+      string res = resStr.str();
+      return mkHttpRes(ffHttp, res, get_mime_type(fspath).c_str());
    }
-   
+  iptrack:
    FTS_ now; now.update();
    IpTrack_& ipt = ipTracks[(ccp)ffHttp["ip"]];
+   flDbg(HL, "track: %s requested %s %d times",
+         (ccp)ffHttp["ip"], (ccp)ffHttp["path"], ipt.count);
    if (!ipt.firstReqTime) {
       ipt.firstReqTime=now;
    }
    ++ipt.count;
-   if (2*oneMin < (now-ipt.firstReqTime)) {
-      if (ipt.count>20) {
+   if (oneMin < (now-ipt.firstReqTime)) {
+      if (ipt.count>15) {
+         flNtc(HL, "blocking %s", (ccp)ffHttp["ip"]);
          blockIp((ccp)ffHttp["ip"]);
       } else if (ipt.count <2) {
          ipt.firstReqTime=now;
       }
    }
-   
    return mkHttpRes(ffHttp, "NaNa!");
 }
 
@@ -874,16 +877,16 @@ void accept_loop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
 }
 
 void saveTxo () {
+   FFJSON* p;
    while (!saveTxoStop) {
       this_thread::sleep_for(chrono::milliseconds(2000));
       while (!pFSetToSave.empty()) {
          setSavMtx.lock();
          set<FFJSON*>::iterator it = pFSetToSave.begin();
-         setSavMtx.unlock();
-         (*it)->save();
-         setSavMtx.lock();
+         p=*it;
          pFSetToSave.erase(it);
          setSavMtx.unlock();
+         p->save();
       }
    }
 }

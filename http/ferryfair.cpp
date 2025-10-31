@@ -12,6 +12,7 @@
 // #include <cstring>
 #include <myconverters.h>
 #include <mystdlib.h>
+#include <curl/curl.h>
 #include "https.h"
 #include "ferryfair.h"
 #include "spatialSearch.h"
@@ -199,14 +200,18 @@ FFJSON* pusers = nullptr;
 ccp mailServer = nullptr;
 int mailPort = 0;
 
-bool s_quit = false;
 static ccp jsonMime = "text/json";
 static ccp txtMime = "text/plain";
 
 ccp yay = "{\"error\":\"yay\"}";
+static size_t onCurlResponse (void* contents, size_t size, size_t nmemb, string* output) {
+    size_t totalSize = size * nmemb;
+    output->append((char*)contents, totalSize);
+    return totalSize;
+}
 
 string ferryfair (FFJSON& ffHttp) {
-   FFJSON reply, user, rbsid;
+   FFJSON reply;
    static FFJSON& ffcfg = *pffcfg;
    static FFJSON& rbs = *prbs;
    static FFJSON& users = *pusers;
@@ -247,7 +252,7 @@ string ferryfair (FFJSON& ffHttp) {
       return mkHttpRes(ffHttp, mesg);
    } else if (!strcmp(path, "/activate")) {
       username=ffHttp["query"]["user"];
-      user=&users[username];
+      FFJSON& user = users[username];
       if ((!user["password"] || !user["inactive"]) &&
           !user["newpassword"]) {
          return mkHttpRes(ffHttp, "{\"error\":\"wrongKey\"}", jsonMime, -1, 400);
@@ -258,11 +263,14 @@ string ferryfair (FFJSON& ffHttp) {
          }
          user["name"]=username;
          user["inactive"]=false;
-         user["things"].init("[]");
-         user["smsgs"].init("[]");
-         user["reps"].init("[]");
+         if (!user["things"]) {
+            user["things"].init("[]");
+            user["smsgs"].init("[]");
+            user["reps"].init("[]");
+            user["lmts"]=lepoch;
+         }
          setSavMtx.lock();
-         pFSetToSave.insert(user.val.fptr);
+         pFSetToSave.insert(&user);
          pFSetToSave.insert(&users);
          setSavMtx.unlock();
          sprintf(mesg, "%s activated", username);
@@ -270,13 +278,14 @@ string ferryfair (FFJSON& ffHttp) {
       } else {
          return mkHttpRes(ffHttp, "{\"error\":\"wrongKey\"}", jsonMime, -1, 400);
       }
-   } else if (!strcmp(path, "/logout")) {
-     logout:
+   } else if (!strcmp(path, "/signOut")) {
+     signOut:
+      FFJSON& rbsid = rbs[bid];
       rbsid["user"]=nullFFJSON;
       setSavMtx.lock();
       pFSetToSave.insert(&rbs);
       setSavMtx.unlock();
-      return mkHttpRes(ffHttp, "{\"logout\":true}", jsonMime);
+      return mkHttpRes(ffHttp, "{\"signOut\":true}", jsonMime);
    }
    
    cpld = (ccp)ffHttp["payload"];
@@ -302,7 +311,7 @@ string ferryfair (FFJSON& ffHttp) {
       if (strcmp(rbs[bid]["ip"],ffHttp["ip"])) {
          goto newbid;
       }
-      rbsid = &rbs[bid];
+      FFJSON& rbsid = rbs[bid];
       rbsid["ts"]=now;
       reply["bid"]=bid;
       BidThings_& bts = bidThings[rbsid.val.fptr];
@@ -310,6 +319,8 @@ string ferryfair (FFJSON& ffHttp) {
       Pts& pts = bts.all;
       if (!cpld)
          return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+      username = rbsid["user"];
+      FFJSON& user = username?users[username]:nullFFJSON;
       payload.init(cpld);
       to = payload["path"];
       if (to) {
@@ -319,7 +330,7 @@ string ferryfair (FFJSON& ffHttp) {
             reply["error"]="noUser";
             goto cookieReply;
          }
-         if (pldusr != &user) {
+         if (&pldusr != &user) {
             addSmtgsToReply(users, pldusr, reply, mdts, false);
          }
          goto cookieReply;
@@ -357,8 +368,7 @@ string ferryfair (FFJSON& ffHttp) {
          reply["things"][i]=f;
          mdts.insert(f);
       }
-      username = rbsid["user"];
-      if (username && (user = &users[username]) &&
+      if (username && user &&
           !strcmp((ccp)user["bid"],bid.c_str())) {
          rbsid["urts"]=lepoch;
          addSmtgsToReply(users, user, reply, mdts);
@@ -367,13 +377,13 @@ string ferryfair (FFJSON& ffHttp) {
       setSavMtx.lock();
       pFSetToSave.insert(&rbs);
       setSavMtx.unlock();
-      return mkHttpRes(ffHttp, reply.stringify(true).c_str(),jsonMime);
+      return mkHttpRes(ffHttp, reply.stringify(true),jsonMime);
    }
   bidcheck2:
    if (!bid.length() || !rbs[bid]) {
       return "";
    }
-   rbsid = &rbs[bid];
+   FFJSON& rbsid = rbs[bid];
    if (!strcmp(path, "/captcha")) {
       ffl_notice(FL, "captcha");
       string tempPath(wdir+"/tmp/"+bid+".jpg");
@@ -396,18 +406,39 @@ string ferryfair (FFJSON& ffHttp) {
       return "";
    }
    payload.init(cpld);
-   if (!strcmp(path, "/login")) {
-      ffl_notice(FL, "Login");
+   if (!strcmp(path, "/signin")) {
+      flNtc(FL, "SignIn");
       username=payload["username"];password=payload["password"];
       ffl_notice(FL, "\nUser: %s\nPass: %s", username, password);
-      if (!users[username]) {
-         return mkHttpRes(ffHttp, "{\"login\":\"false\"}", jsonMime);
+      if (!password) {
+         ccp gid = payload["gid"];
+         if (!gid)
+            return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+         CURL* curl = curl_easy_init();
+         if (!curl) return mkHttpRes(ffHttp, "{\"error\":3}", jsonMime);
+         string readBuffer;
+         string url("https://oauth2.googleapis.com/tokeninfo?id_token=");
+         url += gid;
+         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, onCurlResponse);
+         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+
+         CURLcode res = curl_easy_perform(curl);
+         curl_easy_cleanup(curl);
+
+         if (res != CURLE_OK) return mkHttpRes(ffHttp, "{\"error\":4}", jsonMime);
+         FFJSON fres(readBuffer);
+         if (!fres["aud"])
+            return mkHttpRes(ffHttp, "{\"signin\":\"false\"}", jsonMime);
+         username=fres["email"];
       }
-      user=&users[username];
-      cout << "password:" << (ccp)user["password"] << endl;
-      if (user["password"] && !user["inactive"] &&
-          !strcmp(password,user["password"])
-      ) {
+      flNtcCntnu(FL, "username: %s", username);
+      if (!users[username]) {
+         return mkHttpRes(ffHttp, "{\"signin\":\"false\"}", jsonMime);
+      }
+      FFJSON& user = users[username];
+      if ((!user["password"] || !strcmp(password,user["password"]))
+          && !user["inactive"]) {
          rbsid["user"]=user["name"];
          rbsid["ip"]=(ccp)ffHttp["ip"];
          user["bid"]=bid;
@@ -417,9 +448,9 @@ string ferryfair (FFJSON& ffHttp) {
          pFSetToSave.insert(&rbs);
          setSavMtx.unlock();
          return mkHttpRes(
-            ffHttp, reply.stringify(true).c_str(), jsonMime);
+            ffHttp, reply.stringify(true), jsonMime);
       } else {
-         return mkHttpRes(ffHttp, "\{\"login\":\"false\"}", jsonMime);
+         return mkHttpRes(ffHttp, "\{\"signin\":\"false\"}", jsonMime);
       }
    } else if (!strcmp(path, "/pts")) {
       ffl_notice(FL, "pts:");
@@ -458,127 +489,164 @@ string ferryfair (FFJSON& ffHttp) {
    } else if (!strcmp(path, "/signup")) {
       //signup
       bool recovery=false;
-      ffl_notice(FL, "Signup");
-      if (!isValidEmail(payload["email"])) {
-         ffl_warn(FL, "invalid email.");
+      flNtc(FL, "Signup");
+      username = payload["username"];
+      ccp email = payload["email"];
+      ccp gid = payload["gid"];
+      if (!gid && !isValidEmail(payload["email"])) {
+         flWrn(FL, "invalid email.");
          return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+      } else if (!payload["consent"]) {
+         flWrn(FL, "no consent");
+         return mkHttpRes(ffHttp, 
+            "{\"actEmailSent\":-5,\"msg\":\"U didn't consent to this tool"
+            " usage :/\"}", jsonMime);
+      } else if (
+         !gid && (!payload["captcha"] || !rbsid["captcha"] ||
+         strcmp(payload["captcha"], rbsid["captcha"]))!=0
+      ) {
+         flWrn(FL, "Captcha mismatch.");
+         return mkHttpRes(ffHttp, 
+            "{\"actEmailSent\":-4,\"msg\":\"Captcha mismatch, hmm!\"}",
+            jsonMime);
       }
-      if (payload["username"]) {
-         username=payload["username"];
-         ffl_debug(FL, "User: %s\nPass: %s\nEmail: %s",
-                   username, password, (ccp)payload["email"]);
-      } else if (payload["email"]) {
+      FFJSON& user = username?users[username]:email?users[email]:nullFFJSON;
+      if (email) {
          recovery=true;
-         std::map<string,FFJSON*>* emln = users.val.pairs;
-         if (emln->find(string((ccp)payload["email"]))!=emln->end()) {
-            FFJSON* ffemln = (*emln)[string((ccp)payload["email"])];
-            FFJSON::Link* link =
-               ffemln->getFeaturedMember(FFJSON::FM_LINK).link;
-            username=(*link)[0].c_str();
-            ffl_debug(FL, "username: %s", username);
-         } else {
-            ffl_warn(FL, "%s Email not registered.",
-                     (ccp)payload["email"]);
+         if (!user) {
+            flWrn(FL, "%s Email not registered.",email);
             return mkHttpRes(ffHttp, 
                "{\"actEmailSent\":-5,\"msg\":\"Email not registered!\"}",
                jsonMime);
          }
       }
       password=payload["password"];
-      user=&users[username];
-      if (!recovery && user &&
-          (user["activationKey"] && !user["inactive"])) {
-         ffl_warn(FL, "User already exists.");
+      if (!password) {
+         if (!gid)
+            return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+         CURL* curl = curl_easy_init();
+         if (!curl) return mkHttpRes(ffHttp, "{\"error\":3}", jsonMime);
+         string readBuffer;
+         string url("https://oauth2.googleapis.com/tokeninfo?id_token=");
+         url += gid;
+         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, onCurlResponse);
+         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+
+         CURLcode res = curl_easy_perform(curl);
+         curl_easy_cleanup(curl);
+
+         if (res != CURLE_OK) return mkHttpRes(ffHttp, "{\"error\":4}", jsonMime);
+         FFJSON fres(readBuffer);
+         if (!fres["aud"])
+            return mkHttpRes(ffHttp, "{\"signin\":\"false\"}", jsonMime);
+         email=fres["email"];
+      }
+      if (!recovery && user && user["name"]) {
+         flWrn(FL, "User already exists.");
          return mkHttpRes(ffHttp, 
             "{\"actEmailSent\":-1,\"msg\":\"Username already taken, choose an"
             " another :|\"}", jsonMime);
       } else if (!recovery && user["inactive"] &&
-                 strcmp(payload["email"],user["email"])) {
-         ffl_warn(FL, "User exists; mail mismatch");
-         return mkHttpRes(ffHttp, 
-            "{\"actEmailSent\":-5,\"msg\":\"Email not registered!\"}",
+                 strcmp(email,user["email"])) {
+         flWrn(FL, "User exists; mail mismatch");
+         return mkHttpRes(
+            ffHttp, "{\"actEmailSent\":-5,\"msg\":\"Email not registered!\"}",
             jsonMime);
-      } else if (
-         !recovery && users[(ccp)payload["email"]] && !user["email"]
-      ) {
-         ffl_warn(FL, "Email already registered.");
-         return mkHttpRes(ffHttp, 
-            "{\"actEmailSent\":-3,\"msg\":\"Email already registered! Try"
-            " resetting password\"}", jsonMime);
-      } else if (!recovery && !(validUsername(string(username)))) {
-         ffl_warn(FL, "Invalid password");
+      } else if (!recovery && users[email] && !user["email"]) {
+         flWrn(FL, "Email already registered.");
+         return mkHttpRes(
+            ffHttp, "{\"actEmailSent\":-3,\"msg\":\"Email already registered! "
+            "Try resetting password\"}", jsonMime);
+      } else if (!recovery && !(validUsername(username))) {
+         flWrn(FL, "Invalid password");
          return mkHttpRes(ffHttp, 
             "{\"actEmailSent\":-6,\"msg\":\"Invalid password X|\"}",
             jsonMime);
-      } else if (
-         !(password!=nullptr && validMD5(string(password)))
-      ) {
-         ffl_warn(FL, "Invalid password");
+      } else if (!gid && !(password!=nullptr && validMD5(password))) {
+         flWrn(FL, "Invalid password");
          return mkHttpRes(ffHttp, 
             "{\"actEmailSent\":-6,\"msg\":\"Invalid password X|\"}",
             jsonMime);
-      } else if (
-         !payload["captcha"] || !rbsid["captcha"] ||
-         strcmp((ccp)payload["captcha"],(ccp)rbsid["captcha"])!=0
-      ) {
-         ffl_warn(FL, "Captcha mismatch.");
-         return mkHttpRes(ffHttp, 
-            "{\"actEmailSent\":-4,\"msg\":\"Captcha mismatch, hmm!\"}",
-            jsonMime);
-      } else if (!payload["consent"]) {
-         ffl_warn(FL, "Captcha mismatch.");
-         return mkHttpRes(ffHttp, 
-            "{\"actEmailSent\":-5,\"msg\":\"U didn't consent to this tool"
-            " usage :/\"}", jsonMime);
       }
       if (!recovery) {
-         user["email"] = payload["email"];
-         user["password"] = password;
-         users[(ccp)user["email"]].addLink(users,username);
-         user["inactive"]=true;
+         user["email"] = email;
+         if (!gid) {
+            user["password"] = password;
+            user["inactive"] = true;
+         } else {
+            user["inactive"] = false;
+         }
+         users[email].addLink(users,username);
          filesystem::path
-            usrpth(wdir+string("/upload/")+username);
+            usrpth(wdir+"/upload/"+username);
          filesystem::create_directory(usrpth);
       } else {
          user["newpassword"] = password;
+         username=user["name"];
       }
-      string actKey = random_alphnuma_string();
-      user["activationKey"]=actKey;
-      ffl_notice(FL, "actKey: %s",actKey.c_str());
-      to=user["email"];
-      sprintf(subj, "User activation link");
-      sprintf(mesg, "Open %s://%s/activate?user=%s&key=%s to activate "
-              "%s", proto, (ccp)ffHttp["host"]["fqdn"], username,
-              (ccp)user["activationKey"], username);
-      // TODO
-      // mg_connect(&mail_mgr, mail_server, mailfn, NULL);
-      // while(!s_quit)
-      //    mg_mgr_poll(&mail_mgr, 100);
-      string sfrom(admin);
-      sfrom+="@";
-      sfrom+=from;
-      sfrom+=".com";
-      if (sendMail(mailServer, mailPort, "plain", admin, adminPass, sfrom, to,
-                   subj, mesg)!=0) {
-         return mkHttpRes(
-            ffHttp, "{\"error\":\"sendMailFailed\"}", jsonMime);
-      };
-      s_quit=false;
-      FFJSON::FeaturedMember fm;
-      fm.m_sFileName = new char[11+strlen(username)];
-      sprintf(fm.m_sFileName, "users/%s.txo", username);
+      if (!gid) {
+         string actKey = random_alphnuma_string();
+         user["activationKey"]=actKey;
+         ffl_notice(FL, "actKey: %s",actKey.c_str());
+         to=email;
+         sprintf(subj, "User activation link");
+         sprintf(
+            mesg, "Open %s://%s/activate?user=%s&key=%s to activate "
+            "%s", proto, (ccp)ffHttp["host"]["fqdn"], username,
+            (ccp)user["activationKey"], username);
+         string sfrom(admin);
+         sfrom+="@";
+         sfrom+=from;
+         sfrom+=".com";
+         if (sendMail(mailServer, mailPort, "plain", admin, adminPass,
+                      sfrom, to, subj, mesg)!=0) {
+            return mkHttpRes(
+               ffHttp, "{\"error\":\"sendMailFailed\"}", jsonMime);
+         }
+      }
+      
       if (!recovery) {
-         user.setEFlag(FFJSON::CASTFILE);
-         user.setEFlag(FFJSON::FILE);
-         user.insertFeaturedMember(fm, FFJSON::FM_FILE);
+         FFJSON::FeaturedMember fm,pfm;
+         pfm = users.getFeaturedMember(FFJSON::FM_FILE);
+         int pfnl=strlen(pfm.m_sFileName)-1;
+         while (pfm.m_sFileName[pfnl]!='/' && pfnl>=0) {
+            --pfnl;
+         }
+         fm.m_sFileName = new char[pfnl+14+strlen(username)];
+         sprintf(fm.m_sFileName, "%.*s/./users/%s.txo", pfnl, pfm.m_sFileName,
+                 username);
+         flDbg(HL, "userFile: %s", fm.m_sFileName);
+         if (gid) {
+            user["name"]=username;
+            user["inactive"]=false;
+            user["things"].init("[]");
+            user["smsgs"].init("[]");
+            user["reps"].init("[]");
+            user["lmts"]=lepoch;
+            user["bid"]=bid;
+            rbsid["ts"]=now;
+            rbsid["user"]=username;
+            rbsid["ip"]=(ccp)ffHttp["ip"];
+            rbsid["urts"]=lepoch;
+         }
+         (*user).setEFlag(FFJSON::CASTFILE);
+         (*user).setEFlag(FFJSON::FILE);
+         (*user).insertFeaturedMember(fm, FFJSON::FM_FILE);
          setSavMtx.lock();
          pFSetToSave.insert(&users);
          setSavMtx.unlock();
       }
       setSavMtx.lock();
-      pFSetToSave.insert(user.val.fptr);
+      pFSetToSave.insert(&user);
       pFSetToSave.insert(&rbs);
       setSavMtx.unlock();
+      if (gid) {
+         reply=*user;
+         reply["actEmailSent"]=2;
+         reply["msg"]="Welcome to FerryFair!";
+         return mkHttpRes(ffHttp, reply.stringify(true), jsonMime);
+      }
       return mkHttpRes(ffHttp, 
          "{\"actEmailSent\":2,\"msg\":\"Activation mail sent to ur email"
          " :D\"}", jsonMime);
@@ -616,9 +684,9 @@ string ferryfair (FFJSON& ffHttp) {
       return "";
    }
    username = rbsid["user"];
-   user = &users[username];
-   if (strcmp((ccp)user["bid"],bid.c_str())) {
-      goto logout;
+   FFJSON& user = users[username];
+   if (strcmp(user["bid"],bid.c_str())) {
+      goto signOut;
    }
 
    if (!strcmp(path, "/upload")) {
@@ -632,17 +700,6 @@ string ferryfair (FFJSON& ffHttp) {
       int chnkSz= atoi((ccp)ffHttp["query"]["chunkSize"]);
       int ttlSz = atoi((ccp)ffHttp["query"]["totalSize"]);
       int thngi = -1;
-      // if (fofst!=0) {
-      //    FFJSON& ptgs=user["pendingThings"];
-      //    if(thingId!=(int)ptgs["thingId"]){
-      //       mg_http_reply(c, -1, 400, headers, "{%Q:%Q}", "error",
-      //                     "noSuchThingId" );
-      //       goto done;                  
-      //    };
-      //    picId=ptgs["picId"];
-      //    thngi=ptgs["thngi"];
-      //    goto gotThingId;
-      // }
       FFJSON& uthings = user["things"];
       if (thingId < 0) {
          if (uthings && uthings.size>=maxThings) {
@@ -661,13 +718,6 @@ string ferryfair (FFJSON& ffHttp) {
          }
       } else {
          thngi=getIdChildInd(uthings, thingId);
-         // int tSize = user["things"].size-1;
-         // for (int i=(thingId<tSize?thingId:tSize); i>=0; --i) {
-         //    if ((int)user["things"][i]["id"]==thingId) {
-         //       thngi=i;
-         //       break;
-         //    }
-         // }
          if (thngi<0) {
             return mkHttpRes(ffHttp, "{\"error\":\"noSuchThingId\"}", jsonMime, -1, 400);
          }
@@ -698,12 +748,6 @@ string ferryfair (FFJSON& ffHttp) {
          }
          FFJSON& ups = uthings[thngi]["pics"];
          ups[picId]["partial"] = true;
-         // if (fofst+chnkSz<ttlSz) {
-         //    FFJSON& ptgs=user["pendingThings"];
-         //    ptgs["thingId"]=thingId;
-         //    ptgs["picId"]=picId;
-         //    ptgs["thngi"]=thngi;
-         // }
          ofmode = std::ios::trunc;
       } else {
          ofmode = std::ios::app;
@@ -722,15 +766,11 @@ string ferryfair (FFJSON& ffHttp) {
       }
       int wrByteCount = ffHttp["content-length"];
       upfile.write(cpld, wrByteCount);
-      // mg_http_upload(
-      //    c, hm, &mg_fs_posix, upldpth.c_str(), 2999999, msg);
       if (fofst+chnkSz >= ttlSz) {
-//            user.erase("pendingThings");
          uthings[thngi]["pics"][picId].erase("partial");
          uthings[thngi]["pics"][picId]["ts"]=lepoch;
-//            printf("pendingThings\n");
          setSavMtx.lock();
-         pFSetToSave.insert(user.val.fptr);
+         pFSetToSave.insert(&user);
          setSavMtx.unlock();
       }
       sprintf(msg, "{\"thingId\":%d,\"picId\":%d}", thingId, picId);
@@ -854,7 +894,7 @@ string ferryfair (FFJSON& ffHttp) {
          }
       }
       setSavMtx.lock();
-      pFSetToSave.insert(user.val.fptr);
+      pFSetToSave.insert(&user);
       pFSetToSave.insert(fnameints);
       setSavMtx.unlock();
       return mkHttpRes(ffHttp, reply.stringify(true).c_str(), jsonMime);
@@ -929,7 +969,7 @@ string ferryfair (FFJSON& ffHttp) {
       }
       payload["status"]=1;
       setSavMtx.lock();
-      pFSetToSave.insert(user.val.fptr);
+      pFSetToSave.insert(&user);
       setSavMtx.unlock();
      rqs://mark query as read
       FFJSON& fRs = payload["Rs"];
@@ -962,7 +1002,7 @@ string ferryfair (FFJSON& ffHttp) {
       }
       payload["status"]=1;
       setSavMtx.lock();
-      pFSetToSave.insert(user.val.fptr);
+      pFSetToSave.insert(&user);
       setSavMtx.unlock();
      rrs://mark received replies as read
       FFJSON& frrs = payload["rrs"];
@@ -980,7 +1020,7 @@ string ferryfair (FFJSON& ffHttp) {
       }
       payload["status"]=1;
       setSavMtx.lock();
-      pFSetToSave.insert(user.val.fptr);
+      pFSetToSave.insert(&user);
       setSavMtx.unlock();
      news://fetch if there are new queries
       urts = (long)rbsid["urts"];
@@ -1077,7 +1117,7 @@ string ferryfair (FFJSON& ffHttp) {
          ++it;
       }
       setSavMtx.lock();
-      pFSetToSave.insert(user.val.fptr);
+      pFSetToSave.insert(&user);
       setSavMtx.unlock();
       payload["status"]=1;
      owldone:

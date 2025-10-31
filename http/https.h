@@ -16,11 +16,14 @@ enum HTTPLOG {
    SM = 1<<15
 };
 static atomic<bool> g_running{true};
-string mkHttpRes (FFJSON& ffHttp, ccp body,
-                  ccp ctype = "text/plain", int bsz=-1,
-                  const int code = 200,
-                  ccp codeMsg = "OK",
-                  ccp addlHdrs = "");
+string mkHttpRes (
+   FFJSON& ffHttp, ccp body, ccp ctype = "text/plain", int bsz=-1,
+   const int code = 200, ccp codeMsg = "OK", ccp addlHdrs = "");
+inline string mkHttpRes (
+   FFJSON& ffHttp, string body, ccp ctype = "text/plain",
+   const int code = 200, ccp codeMsg = "OK", ccp addlHdrs = "") {
+   return mkHttpRes(ffHttp, body.c_str(), ctype, body.length(), code, codeMsg, addlHdrs);
+}
 class ThreadPool {
 public:
    ThreadPool () {};
