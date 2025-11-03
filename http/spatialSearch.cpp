@@ -64,8 +64,8 @@ vector<uint> nametouint (vector<string>& mstr) {
    uint bitCode=0;
    vector<uint> r;
    for (int k=0;k<mstr.size();++k) {
-      map<string,FFJSON*>::iterator it = nameints->find(mstr[k]);
-      int d=0;   
+      map<string,FFJSON*>::iterator it = nameints->lower_bound(mstr[k]);
+      int d=0;
       if (it==nameints->end()) {
          d=nameints->size();
       } else {
