@@ -4,6 +4,9 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <sys/prctl.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -52,8 +55,8 @@ FFJSON cfg;
 
 int child_exit_status = 0;
 FF_LOG_TYPE fflAllowedType = (FF_LOG_TYPE) (FFL_ERR | FFL_NOTICE | FFL_DEBUG |
-                                            FFL_INFO);
-unsigned int fflAllowedBlks = (uint)(HL);
+                                            FFL_INFO | FFL_WARN);
+unsigned int fflAllowedBlks = (uint)(HL|FL);
 thread_local int tid = 0;
 
 using namespace std;
@@ -70,8 +73,8 @@ void handle_sigint (int) {
       exit(1);
    }
    g_running = false;
-   ffl_debug(HL, "interrupted! g_running: %d", g_running.load());
-   ffl_notice(HL, "Shutting down...");
+   flDbg(HL, "interrupted! g_running: %d", g_running.load());
+   flNtc(HL, "Shutting down...");
 }
 
 string gzipCompress (
@@ -147,7 +150,7 @@ void ThreadPool::start (size_t n) {
          while (true) {
             function<void()> job; {
                unique_lock<mutex> lk(mutex_);
-               ffl_debug(HL, "jobs in queue: %d", jobs_.size());
+               flDbg(HL, "jobs in queue: %d", jobs_.size());
                if (jobs_.empty() && !jc) {
                   cvJoin_.notify_all();
                }
@@ -238,7 +241,7 @@ void parseHost (crdwr read, FFJSON& host) {
          case '\r':
             continue;
          case '\n':
-            ffl_info_contnu(HL,"%s\n", buf.c_str());
+            flInfCntnu(HL,"%s\n", buf.c_str());
             fqdn=buf;
             return;
          case ' ':
@@ -273,12 +276,13 @@ void parseCookie (crdwr read, FFJSON& ffCookie) {
             while (buf->back()==' ')
                buf->pop_back();
             ffCookie[key]=value;
-            ffl_info_contnu(HL,"%s=%s",key.c_str(),value.c_str());
+            flInfCntnu(HL,"%s=%s",key.c_str(),value.c_str());
+            key.clear(); value.clear();
             if (c=='\n') {
-               ffl_info_contnu(HL,"\n");
+               flInfCntnu(HL,"\n");
                return;
             } else {
-               ffl_info_contnu(HL,";");
+               flInfCntnu(HL,";");
                buf=&key;
             }
             break;
@@ -300,14 +304,14 @@ void parseAcceptEncoding (crdwr read, FFJSON& ffAEnc) {
       switch (c) {
          case ',':
             ffAEnc[]=enc;
-            ffl_info_contnu(HL, "%s,", enc.c_str());
+            flInfCntnu(HL, "%s,", enc.c_str());
             enc.clear();
          case ' ':
          case '\r':
             continue;
          case '\n':
             ffAEnc[]=enc;
-            ffl_info_contnu(HL, "%s\n", enc.c_str());
+            flInfCntnu(HL, "%s\n", enc.c_str());
             return;
          default:
             enc+=c;
@@ -321,8 +325,9 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
    unsigned int i=0;
    unsigned int pairStartPin=i;
    char c;
-   char buf[1024];
-   ffl_info(HL, "request: ");
+   static const int bufSize = 1024;
+   char buf[bufSize];
+   flInf(HL, "request: ");
    int li=0;
    int spCnt=0;
    int ci=0,hend = 0,bodyBegin=0,query=0;
@@ -336,7 +341,7 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
             uint8_t* pbuf = new uint8_t[inL+1];
             ssize_t r = read((char*)pbuf, inL);
             if (r<=0) {
-               ffl_debug(HL,"end r: %zd", r);
+               flDbg(HL,"end r: %zd", r);
                delete[] pbuf;
                return;
             }
@@ -353,6 +358,10 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
          }
          return;
       } else {
+         if (ci>=bufSize) {
+            flWrn(HL, "HTTP Header exceeded bufSize: %d", bufSize);
+            return;
+         }
          ssize_t r = read(&c, 1);
          if (r<=0) {
             return;
@@ -362,11 +371,11 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
          case '\n':
             buf[ci]='\0';
             if (!li) {
-               ffl_info_contnu(HL, "version: %s\n", buf);
+               flInfCntnu(HL, "version: %s\n", buf);
                ffHttp["version"]=(ccp)buf;
             } else if (hend) {
                ffHttp[(ccp)buf]=(ccp)(buf+hend);
-               ffl_info_contnu(HL, "%s\n", (ccp)(buf+hend));
+               flInfCntnu(HL, "%s\n", (ccp)(buf+hend));
             } else if (!bodyBegin) {
                if (!ffHttp["content-length"])
                   return;
@@ -390,7 +399,7 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
                   if(!isValidMethod(buf)) {
                      return;
                   }
-                  ffl_info_contnu(HL, "method: %s\n", buf);
+                  flInfCntnu(HL, "method: %s\n", buf);
                   ffHttp["method"]=(ccp)buf;
                   ci=0;
                   ++spCnt;
@@ -398,10 +407,11 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
                case 1:
                   buf[ci]='\0';
                   if (!query) {
-                     ffl_info_contnu(HL, "path: %s\n", buf);
+                     flInfCntnu(HL, "path: %s\n", buf);
                      ffHttp["path"]=(ccp)buf;
                   } else {
                      ffHttp["query"][(ccp)buf]=(ccp)buf+query;
+                     flInfCntnu(HL," %s: %s\n", buf, buf+query);
                      query=1;
                   }
                   ci=0;
@@ -412,11 +422,16 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
             }
          case '?':
             if (spCnt==1) {
+               if (query) {
+                  flWrn(HL, "malformed query");
+                  return;  
+               }
                buf[ci]='\0';
-               ffl_info_contnu(HL, "path: %s\n", buf);
+               flInfCntnu(HL, "path: %s\n", buf);
                ffHttp["path"]=(ccp)buf;
                ci=0;
                query=1;
+               flInfCntnu(HL, "query:");
                continue;
             }
             break;
@@ -432,6 +447,7 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
             if (!li) {
                buf[ci]='\0';
                ffHttp["query"][(ccp)buf]=(ccp)buf+query;
+               flInfCntnu(HL," %s: %s,", buf, buf+query);
                query=1;
                ci=0;
                continue;
@@ -440,17 +456,23 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
          case ':':
             if (li && !hend) {
                buf[ci]='\0';
-               ffl_info_contnu(HL,"%s: ",buf);
+               flInfCntnu(HL,"%s: ",buf);
                tolower((ccp)buf);
-               if (!strcmp(buf,"cookie")) {
-                  parseCookie(read, ffHttp["cookie"]);
-               } else if (!strcmp(buf,"host")) {
-                  parseHost(read, ffHttp["host"]);
-               } else if (!strcmp(buf,"accept-encoding")) {
-                  parseAcceptEncoding(read, ffHttp["accept-encoding"]);
-               } else {
-                  hend=++ci;
-                  continue;
+               size_t key = fnv1a(buf);
+               FFJSON& fvalue = ffHttp[(ccp)buf];
+               switch (key) {
+                  case "cookie"_hash:
+                     parseCookie(read, fvalue);
+                     break;
+                  case "host"_hash:
+                     parseHost(read, fvalue);
+                     break;
+                  case "accept-encoding"_hash:
+                     parseAcceptEncoding(read, fvalue);
+                     break;
+                  default:
+                     hend=++ci;
+                     continue;
                }
                ci=0;
                continue;
@@ -459,7 +481,6 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
      theDefault:
       buf[ci]=c;
       ++ci;
-      
    }
 }
 
@@ -604,6 +625,8 @@ struct IpTrack_ {
 };
 unordered_map<string, IpTrack_> ipTracks;
 FTS_ oneMin = {60,0};
+FTS_ halfMin = {30,0};
+
 string httpHandle (FFJSON& ffHttp) {
    FFJSON& fpath = ffHttp["path"];
    if (!fpath)
@@ -628,7 +651,7 @@ string httpHandle (FFJSON& ffHttp) {
       path+=((ccp)fpath)+1;
    else
       path+="index.html";
-   ffl_info(HL,"serving %s", path.c_str());
+   flInf(HL,"serving %s", path.c_str());
    fs::path fspath(path);
    res = ferryfair(ffHttp);
    if (res.length()) {
@@ -672,7 +695,8 @@ string httpHandle (FFJSON& ffHttp) {
    } else {
      serveFile:
       if (!fs::exists(fspath)) {
-         path += "index.html";
+         path = string((ccp)vhost["rootdir"]);
+         path += "/index.html";
          fspath=fs::path(path);
          if (!fs::exists(fspath))
             goto iptrack;
@@ -692,8 +716,8 @@ string httpHandle (FFJSON& ffHttp) {
       ipt.firstReqTime=now;
    }
    ++ipt.count;
-   if (oneMin < (now-ipt.firstReqTime)) {
-      if (ipt.count>15) {
+   if (halfMin < (now-ipt.firstReqTime)) {
+      if (ipt.count>7) {
          flNtc(HL, "blocking %s", (ccp)ffHttp["ip"]);
          blockIp((ccp)ffHttp["ip"]);
       } else if (ipt.count <2) {
@@ -731,12 +755,12 @@ void handleConnection (struct sockaddr_in cli, int client_fd,
      readagain:
       ssize_t r = rd(buf, bufSize);
       if (r<0 && retry>0) {
-         ffl_debug(HL, "r: %zd", r);
+         flDbg(HL, "r: %zd", r);
          if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
             --retry;
-            ffl_debug(HL, "retry %d", retry);
+            flDbg(HL, "retry %d", retry);
             this_thread::sleep_for(chrono::milliseconds(retryMS));
-            ffl_debug(HL, "retry %d woke", retry);
+            flDbg(HL, "retry %d woke", retry);
             goto readagain;
          }
       }
@@ -747,7 +771,7 @@ void handleConnection (struct sockaddr_in cli, int client_fd,
    if (!ffHttp["version"]) {
       goto handledone;
    }
-   ffl_info(HL, "%s %s %s %s fd=%d", (ccp)ffHttp["ip"], (ccp)ffHttp["version"],
+   flInf(HL, "%s %s %s %s fd=%d", (ccp)ffHttp["ip"], (ccp)ffHttp["version"],
             (ccp)ffHttp["method"], (ccp)ffHttp["path"], client_fd);
    res = httpHandle(ffHttp);
    if (!res.empty()) {
@@ -766,18 +790,18 @@ void handleConnection (struct sockaddr_in cli, int client_fd,
            writeagain:
             ssize_t w = wd(buf+off, bufSize - off);
             if (w<=0) {
-               ffl_debug(
+               flDbg(
                   HL, "fd: %d, write socket error: %d(%s)@%zd/%zd", client_fd,
                   errno, strerror(errno), off , bufSize);
                if (retry>0 && (errno==EAGAIN || errno==EINTR)) {
-                  ffl_debug(HL, "fd: %d, w: %zd", client_fd, w);
+                  flDbg(HL, "fd: %d, w: %zd", client_fd, w);
                   --retry;
                   this_thread::sleep_for(chrono::milliseconds(retryMS));
-                  ffl_debug(HL, "fd: %d, write retry %d woke",
+                  flDbg(HL, "fd: %d, write retry %d woke",
                             client_fd, retry);
                   goto writeagain;
                } else {
-                  ffl_debug(HL,"fd: %d, write error, closing at %d",
+                  flDbg(HL,"fd: %d, write error, closing at %d",
                             client_fd, off);
                   return off;
                }
@@ -795,7 +819,7 @@ void handleConnection (struct sockaddr_in cli, int client_fd,
       SSL_free(ssl);
    }
    ::close(client_fd);
-   ffl_debug(HL, "%d fd closed", client_fd);
+   flDbg(HL, "%d fd closed", client_fd);
    return;
  }
 
@@ -809,7 +833,7 @@ int create_listen_socket (uint16_t port) {
    addr.sin_family = AF_INET;
    addr.sin_addr.s_addr = INADDR_ANY;
    addr.sin_port = htons(port);
-   ffl_info(HL, "listening on %d", port);
+   flInf(HL, "listening on %d", port);
    if (::bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
       ::close(fd); return -1;
    }
@@ -855,7 +879,7 @@ void accept_loop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
    while (g_running) {
       struct sockaddr_in cli{};
       socklen_t sl = sizeof(cli);
-      ffl_debug(HL, "listening on %d...", listen_fd);
+      flDbg(HL, "listening on %d...", listen_fd);
       int c = accept(listen_fd, (struct sockaddr*)&cli, &sl);
       if (c < 0) {
          if (errno == EINTR) {
@@ -869,7 +893,7 @@ void accept_loop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
          ssl = SSL_new(ctx);
          SSL_set_fd(ssl, c);
       }
-      ffl_debug(HL, "got %d...", c);
+      flDbg(HL, "got %d...", c);
       pool.enqueue([cli, ssl, c](){
          handleConnection(cli, c, ssl);
       });
@@ -898,23 +922,29 @@ void usage_and_exit (const char *p) {
    exit(1);
 }
 
-int main (int argc, char **argv) {
-   cfg.init("file://http.ffjson|OBJECT");
-   ffl_debug(HL, "%s\n", cfg.prettyString().c_str());
-   ffl_debug(HL, "EAGAIN(%zd) EINTR(%zd) EINVAL(%zd)\n",
-             EAGAIN, EINTR, EINVAL);
-   cfg["threadCount"]=2*thread::hardware_concurrency();
+int run () {
+   if (cfg["daemon"]) {
+      int ferr = open ("https.log", O_WRONLY | O_APPEND, 0600);
+      if (ferr < 0) {
+         flErr(HL, "couldn't open https.log");
+         return 1;
+      }
+      dup2(ferr, 1);
+      dup2(ferr, 2);
+      close(ferr);
+   }
+   FFJSON& fCfgThrdCnt = cfg["threadCount"];
+   if ((int)fCfgThrdCnt<=0)
+      fCfgThrdCnt=2*thread::hardware_concurrency();
    if (!(cfg["cert"] && cfg["key"] && cfg["ca"])) {
-      ffl_err(HL, "improper cfg");
+      flErr(HL, "improper cfg");
       return 0;
    }
 
-   signal(SIGINT, handle_sigint);
-   signal(SIGPIPE, SIG_IGN);
-   ffl_notice(HL, "Starting server. docroot=%s threads=%d",
-              (ccp)cfg["rootdir"], (int)cfg["threadCount"]);
+   flNtc(HL, "Starting server. docroot=%s threads=%d",
+              (ccp)cfg["rootdir"], (int)fCfgThrdCnt);
 
-   tpoolPtr = new ThreadPool((int)cfg["threadCount"]);
+   tpoolPtr = new ThreadPool((int)fCfgThrdCnt);
    initFerryFair(cfg);
 
    int httpFd = create_listen_socket((uint16_t)(int)cfg["httpPort"]);
@@ -943,7 +973,7 @@ int main (int argc, char **argv) {
       accept_loop(httpsFd, *tpoolPtr, sslCtx);
    });
    thread saveTxoT(saveTxo);
-   ffl_debug(HL, "main sleeping..");
+   flDbg(HL, "main sleeping..");
    while (g_running) {
       this_thread::sleep_for(chrono::milliseconds(2000));
    }
@@ -952,14 +982,61 @@ int main (int argc, char **argv) {
    ::shutdown(httpsFd, SHUT_RDWR);
    ::close(httpFd);
    ::close(httpsFd);
-   ffl_debug(HL,"joining t1");
+   flDbg(HL,"joining t1");
    if (t1.joinable()) t1.join();
    if (t2.joinable()) t2.join();
-   ffl_debug(HL,"freeing ssl_ctx");
+   flDbg(HL,"freeing ssl_ctx");
    SSL_CTX_free(sslCtx);
    delete tpoolPtr;
    saveTxoStop=true;
    saveTxoT.join();
-   ffl_notice(HL, "bye!");
+   return 0;
+}
+int main (int argc, char **argv) {
+   cfg.init("file://http.ffjson|OBJECT");
+   flDbg(HL, "%s\n", cfg.prettyString().c_str());
+   flDbg(HL, "EAGAIN(%zd) EINTR(%zd) EINVAL(%zd)\n",
+             EAGAIN, EINTR, EINVAL);
+   signal(SIGINT, handle_sigint);
+   signal(SIGPIPE, SIG_IGN);
+   if (cfg["daemon"]) {
+      struct stat statbuf;
+      int stat_r = stat("https.log", &statbuf);
+      int ferr = open (
+         "httpd.log", O_CREAT | O_WRONLY |
+         ((stat_r == -1 || statbuf.st_size > 5000000) ?
+          O_TRUNC : O_APPEND), 0600
+      );
+      dup2(ferr, 1);
+      dup2(ferr, 2);
+      close(ferr);
+     createChild:
+      pid_t pid = fork();
+      if (pid) {
+         //monitor child
+         int status;
+         waitpid(pid, &status, 0);
+         if (WIFSIGNALED(status)) {
+            int sig = WTERMSIG(status);
+            flNtc(HL, "Child [%d] terminated by signal %d (%s)\n",
+                  pid, sig, strsignal(sig));
+
+            if (sig == SIGSEGV) {
+               flErr(HL, "Child crashed (SIGSEGV), reforking...\n");
+               goto createChild;  // restart loop
+            }
+         }
+         if (WIFEXITED(status)) {
+            flNtc(HL, "Child [%d] exited normally with code %d\n",
+                  pid, WEXITSTATUS(status));
+         }
+         close(ferr);
+      } else {
+         run();
+      }
+   } else {
+      run();
+   }
+   flNtc(HL, "bye!");
    return 0;
 }

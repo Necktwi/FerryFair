@@ -54,6 +54,9 @@ struct NdNPrn {
    void print () const;
 };
 typedef unsigned uchar;
+enum OP {
+   OR, AND
+};
 struct Pts {
    Circle c = {0};
    vector<NdNPrn> pts;
@@ -61,7 +64,8 @@ struct Pts {
    NdNPrn cnd;
    int ni=-1;
    int nni=-1;
-   int pni=-1;
+   int pni=0;
+   OP op=AND;
    uint minPts=20;
 };
 struct CompareByDistanceToCenter;
@@ -158,7 +162,8 @@ struct QuadNode {
    void seti (vector<uint>& ina);
    bool copyi (vector<uint>& ina);
    uint hasName (vector<uint>& ina,
-                 vector<map<QuadNode*,uint>::iterator> vit);
+                 vector<map<QuadNode*,uint>::iterator> vit,
+                 bool allIna = false);
    bool updateIntNames (QuadNode* tQN = nullptr, uint8_t tind = 0,
                         QuadNode* pQN = nullptr, uint8_t ind = 0);
    ~QuadNode ();
@@ -180,6 +185,7 @@ int getIdChildInd (FFJSON& arr, int id);
 extern map<string, FFJSON*>* nameints;
 extern FFJSON* fnameints;
 extern map<const string*, uint> mitpos;
+extern mutex mitposMtx;
 extern QuadHldr thnsTree;
 struct CompNameWt {
    bool operator () (const map<string, FFJSON*>::iterator it1,

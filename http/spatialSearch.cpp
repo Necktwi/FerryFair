@@ -13,6 +13,7 @@ map<set<FFJSON*>*, vector<uint>> mapffset;
 map<string, FFJSON*>* nameints;
 FFJSON* fnameints;
 map<const string*, uint> mitpos;
+mutex mitposMtx;
 map<QuadHldr*, CntMut_> qhModMutMap;
 mutex qhMapMut;
 
@@ -58,7 +59,7 @@ vector<string> metaname (string name) {
    }
    return r;
 }
-
+// returns vector of size >= size of qpmapvec
 vector<uint> nametouint (vector<string>& mstr) {
    uint bitCode=0;
    vector<uint> r;
@@ -194,16 +195,25 @@ QuadNode* QuadHldr::qn () {
    return r;
 }
 uint QuadNode::hasName (vector<uint>& ina,
-                        vector<map<QuadNode*,uint>::iterator> vit) {
+                        vector<map<QuadNode*,uint>::iterator> vit, bool allIna
+) {
    if (!ina.size()) {
       return -1;
    }
    uint count=vit.size();
    uint size = ina.size();
-   size = size<count? size:count;
+   if (size>count) {
+      if (allIna)
+         return 0;
+      size=count;
+   }
    count = 0;
    for (int i=0;i<size;++i) {
-      count += countSetBits(ina[i] & vit[i]->second);
+      uint mchBits = ina[i] & vit[i]->second;
+      if (!allIna || (mchBits==ina[i]))
+         count += countSetBits(mchBits);
+      else
+         return 0;
    }
    return count;
 }
@@ -216,19 +226,28 @@ vector<uint> qpIna (vector<map<QuadNode*,uint>::iterator> vit) {
    return ina;
 }
 
-int8_t ffHasName (FFJSON& ff, vector<uint>& ina) {
+int8_t ffHasName (FFJSON& ff, vector<uint>& ina, bool allIna = false) {
    if (!ina.size()) {
       return -1;
    }
-   vector<string> mstr = metaname((ccp)ff["name"]);
+   string tname((ccp)ff["name"]);
+   tname += " ";
+   tname += (ccp)ff["user"]["name"];
+   vector<string> mstr = metaname(tname);
    vector<uint> nina = nametouint(mstr);
    int8_t count=0;
    int smallest=ina.size();
    if(smallest>nina.size()) {
+      if (allIna)
+         return 0;
       smallest=nina.size();
    }
    for (int i=0;i<smallest;++i) {
-      count += countSetBits(ina[i] & nina[i]);
+      uint mchBits = ina[i] & nina[i];
+      if (!allIna || (mchBits == ina[i]))
+         count += countSetBits(mchBits);
+      else
+         return 0;
    }
    return count;
 }
@@ -608,7 +627,7 @@ uint QuadHldr::addChildrenOnEdge (
    }
    QuadNode* resqp = (QuadNode*)get<0>(bpxor(fp, pQN));
    vector<map<QuadNode*,uint>::iterator> qit = qpfind((QuadNode*)resqp);
-   if (!(qit.size() && resqp->hasName(pts.ina,qit))) {
+   if (!(qit.size() && resqp->hasName(pts.ina,qit,pts.op==AND))) {
       uint ncnt = addThis(pts, {(int8_t)-d.x,(int8_t)-d.y}, dx, ds,
                           pQN,ind,noChk);
       return ncnt;
@@ -654,7 +673,7 @@ uint QuadHldr::addChildrenOnEdge (
          QuadNode* resqp = (QuadNode*)get<0>(bpxor(qh->fp, tQN));
          vector<map<QuadNode*,uint>::iterator> qit =
             qpfind((QuadNode*)resqp);
-         if (qit.size() && resqp->hasName(pts.ina,qit)) {
+         if (qit.size() && resqp->hasName(pts.ina,qit,pts.op==AND)) {
             int z = qh->addChildrenOnEdge(pts, d, tQN, tind, dx/2,
                                           ds-dx/4,-1);
             if (z==-1) {
@@ -721,8 +740,8 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
             int8_t iix, iiy, lind, pind;
             vector<map<QuadNode*,uint>::iterator> qit =
                qpfind((QuadNode*)presqp);
-            if (!(qit.size() && ((QuadNode*)presqp)->hasName(pts.ina,qit)) ||
-               ndprn.qh->fp==nullptr) {
+            if (!(qit.size() && ((QuadNode*)presqp)->
+                  hasName(pts.ina,qit,pts.op==AND))||ndprn.qh->fp==nullptr) {
                ndprn.qh->addThis(pts, d, ndprn.dx, ndprn.ds, ndprn.prn,
                                  ndprn.ind);
                if (notChild) {
@@ -838,7 +857,7 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
                   while (sfit!=sf.end()) {
                      //break;
                      --moreElms;
-                     int8_t matchcount = ffHasName(**sfit, pts.ina);
+                     int8_t matchcount = ffHasName(**sfit, pts.ina,pts.op==AND);
                      if (matchcount) {
                         pts.pts[pts.pni] = {(QuadHldr*)*sfit,(QuadNode*)-1,
                            nd.dx,nd.ds,{matchcount,0},0};
@@ -854,7 +873,7 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
                   }
                } else {
                   uint8_t matchcount =
-                     (uint8_t)ffHasName((*(FFJSON*)resqp),pts.ina);
+                     (uint8_t)ffHasName((*(FFJSON*)resqp),pts.ina,pts.op==AND);
                   if (matchcount) {
                      pts.pts[pts.pni] = pts.pts[pts.ni];
                      pts.pts[pts.pni].d.x = matchcount;
@@ -903,21 +922,21 @@ uint QuadHldr::getPointsFromQuad (
          set<FFJSON*>& sf = *sit->first;
          set<FFJSON*>::iterator sfit = sf.begin();
          while (sfit!=sf.end()) {
-            int8_t matchcount = ffHasName(**sfit, pts.ina);
+            int8_t matchcount = ffHasName(**sfit, pts.ina,pts.op==AND);
             if (matchcount) {
                pts.pts.push_back(
                   {(QuadHldr*)*sfit,(QuadNode*)-1,dx,dx,{matchcount,0},0});
             }
             ++sfit;
          }
-      } else if (ffHasName(*(FFJSON*)resfp, pts.ina)) {
+      } else if (ffHasName(*(FFJSON*)resfp, pts.ina,pts.op==AND)) {
          pts.pts.push_back({this,pQN});
       }
       pts.cnd = {this, pQN, dx, 0, 0, ind};
       return findNeighbours(pts, tQN, tind, pQN, ind, dx);
    } else {
       QuadNode* resqp = (QuadNode*)resfp;
-      uint8_t matchcount = (uint8_t)resqp->hasName(pts.ina,qit);
+      uint8_t matchcount = (uint8_t)resqp->hasName(pts.ina,qit,pts.op==AND);
       if (!matchcount) {
          pts.cnd = {this, pQN, dx, 0, 0, ind};
          return findNeighbours(pts, tQN, tind, pQN, ind, dx);

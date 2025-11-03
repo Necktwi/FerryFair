@@ -13,7 +13,8 @@ enum HTTPLOG {
    FL = 1<<12,
    SL = 1<<13,
    SLL = 1<<14,
-   SM = 1<<15
+   SM = 1<<15,
+   FLL = 1<<16
 };
 static atomic<bool> g_running{true};
 string mkHttpRes (
@@ -51,5 +52,10 @@ extern ThreadPool* tpoolPtr;
 extern set<FFJSON*> pFSetToSave;
 extern mutex setSavMtx;
 extern atomic<bool> saveTxoStop;
-
+constexpr uint32_t fnv1a (const char *s, uint32_t hash = 2166136261u) {
+   return (*s == 0) ? hash : fnv1a(s + 1, (hash ^ uint32_t(*s)) * 16777619u);
+}
+constexpr uint32_t operator "" _hash (const char *s, size_t) {
+   return fnv1a(s);
+}
 #endif
