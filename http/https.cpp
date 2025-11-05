@@ -924,7 +924,11 @@ void usage_and_exit (const char *p) {
 
 int run () {
    if (cfg["daemon"]) {
-      int ferr = open ("https.log", O_WRONLY | O_APPEND, 0600);
+      FTS_ ts;
+      ts.update();
+      char f[64];
+      sprintf(f, "https-%zu.log", ts.tv_sec);
+      int ferr = open (f, O_WRONLY | O_APPEND | O_CREAT, 0600);
       if (ferr < 0) {
          flErr(HL, "couldn't open https.log");
          return 1;
@@ -1001,11 +1005,9 @@ int main (int argc, char **argv) {
    signal(SIGPIPE, SIG_IGN);
    if (cfg["daemon"]) {
       struct stat statbuf;
-      int stat_r = stat("https.log", &statbuf);
+      int stat_r = stat("httpd.log", &statbuf);
       int ferr = open (
-         "httpd.log", O_CREAT | O_WRONLY |
-         ((stat_r == -1 || statbuf.st_size > 5000000) ?
-          O_TRUNC : O_APPEND), 0600
+         "httpd.log", O_CREAT | O_WRONLY | O_APPEND, 0600
       );
       dup2(ferr, 1);
       dup2(ferr, 2);
@@ -1037,6 +1039,6 @@ int main (int argc, char **argv) {
    } else {
       run();
    }
-   flNtc(HL, "bye!");
+   flNtc(HL, "bye!----------------------------------");
    return 0;
 }
