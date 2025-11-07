@@ -492,7 +492,7 @@ string mkHttpRes (
    FFJSON& ffHttp, ccp body, ccp ctype, int bsz, const int code,
    ccp codeMsg, ccp addlHdrs
 ) {
-   MkHttpArgs ma(ffHttp, body, ctype, bsz, code, codeMsg, addlHdrs);
+   MkHttpArgs ma(&ffHttp, body, ctype, bsz, code, codeMsg, addlHdrs);
    return mkHttpRes(ma);
 }
 string mkHttpRes (MkHttpArgs& args) {
@@ -726,6 +726,7 @@ string httpHandle (FFJSON& ffHttp) {
       resStr << reqFile.rdbuf();
       string res = resStr.str();
       mhArgs.body=res.c_str();
+      mhArgs.bsz=res.length();
       mhArgs.ctype = get_mime_type(fspath).c_str();
       return mkHttpRes(mhArgs);
    }
