@@ -38,4 +38,4 @@ vhosts: {
 readRetry: 300,
 retryMS: 70,
 threadCount: 0,
-daemon: true
+daemon: false

@@ -14,9 +14,27 @@ enum HTTPLOG {
    SL = 1<<13,
    SLL = 1<<14,
    SM = 1<<15,
-   FLL = 1<<16
+   FLL = 1<<16,
+   HSL = 1<<17
 };
 static atomic<bool> g_running{true};
+struct MkHttpArgs {
+   FFJSON* ffHttp = nullptr;
+   ccp body = nullptr;
+   ccp ctype = "text/plain";
+   int bsz=-1;
+   const int code = 200;
+   ccp codeMsg = "OK";
+   ccp addlHdrs = "";
+   bool cchCtrl = false;
+   MkHttpArgs (
+      FFJSON* ffHttp, ccp body, ccp ctype = "text/plain", int bsz=-1,
+      const int code = 200, ccp codeMsg = "OK", ccp addlHdrs = "") :
+      ffHttp(ffHttp), body(body), ctype(ctype), bsz(bsz), code(code),
+      codeMsg(codeMsg), addlHdrs(addlHdrs) {};
+   MkHttpArgs () {};
+};
+string mkHttpRes (struct MkHttpArgs& ma);
 string mkHttpRes (
    FFJSON& ffHttp, ccp body, ccp ctype = "text/plain", int bsz=-1,
    const int code = 200, ccp codeMsg = "OK", ccp addlHdrs = "");

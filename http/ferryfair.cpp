@@ -1155,6 +1155,8 @@ string ferryfair (FFJSON& ffHttp) {
       return mkHttpRes(ffHttp, payload.stringify(true).c_str(), jsonMime);
    }
    }
+   if (tUsr)
+      return "1";
    return "";
 }
 

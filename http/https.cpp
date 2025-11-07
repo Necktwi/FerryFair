@@ -56,7 +56,7 @@ FFJSON cfg;
 int child_exit_status = 0;
 FF_LOG_TYPE fflAllowedType = (FF_LOG_TYPE) (FFL_ERR | FFL_NOTICE | FFL_DEBUG |
                                             FFL_INFO | FFL_WARN);
-unsigned int fflAllowedBlks = (uint)(HL|FL);
+unsigned int fflAllowedBlks = (uint)(HL|FL|HSL);
 thread_local int tid = 0;
 
 using namespace std;
@@ -157,19 +157,23 @@ void ThreadPool::start (size_t n) {
                cv_.wait(lk, [this] {
                   return stopping_ || !jobs_.empty();
                });
-               if (stopping_ && jobs_.empty())
+               if (stopping_ && jobs_.empty()) {
+                  flDbg(HL, "tid: %d, exit", tid);
                   return;
+               }
                job = move(jobs_.front());
                jobs_.pop();
             }
             try {
                ++jc;
+               flDbg(HL, "tid: %d, start!", tid);
                job();
+               flDbg(HL, "tid: %d, done!", tid);
                --jc;
             } catch (const exception &e) {
-               ffl_err(HL, "worker exception: %s", e.what());
+               flErr(HL, "worker exception: %s", e.what());
             } catch (...) {
-               ffl_err(HL, "worker exception: unknown");
+               flErr(HL, "worker exception: unknown");
             }
          }
       });
@@ -484,28 +488,33 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
    }
 }
 
-string mkHttpRes (FFJSON& ffHttp, ccp body,
-                  ccp ctype, int bsz,
-                  const int code,
-                  ccp codeMsg,
-                  ccp addlHdrs) {
+string mkHttpRes (
+   FFJSON& ffHttp, ccp body, ccp ctype, int bsz, const int code,
+   ccp codeMsg, ccp addlHdrs
+) {
+   MkHttpArgs ma(ffHttp, body, ctype, bsz, code, codeMsg, addlHdrs);
+   return mkHttpRes(ma);
+}
+string mkHttpRes (MkHttpArgs& args) {
    ostringstream oss;
-   oss << "HTTP/1.0 " << code << " " << codeMsg << "\r\n";
-   oss << "Content-Type: " << ctype << "\r\n";
-   oss << addlHdrs;
+   oss << "HTTP/1.0 " << args.code << " " << args.codeMsg << "\r\n";
+   oss << "Content-Type: " << args.ctype << "\r\n";
+   oss << args.addlHdrs;
    oss << "Connection: close\r\n";
-   oss << "Cache-Control: public, max-age=3600\r\n";
-   int ocl = bsz==-1?strlen(body):bsz;
-   FFJSON& accEnc = ffHttp["accept-encoding"];
+   if (!args.cchCtrl) {
+      oss << "Cache-Control: public, max-age=3600\r\n";
+   }
+   int ocl = args.bsz==-1?strlen(args.body):args.bsz;
+   FFJSON& accEnc = (*args.ffHttp)["accept-encoding"];
    if (ocl>1024 && accEnc && accEnc["gzip"] &&
-       !strstr(ctype,"image")) {
-      string gz = gzipCompress(body, ocl);
+       !strstr(args.ctype,"image")) {
+      string gz = gzipCompress(args.body, ocl);
       oss << "Content-Encoding: gzip\r\n";
       oss << "Content-Length: " << gz.size() << "\r\n\r\n";
       oss << gz;
    } else {
       oss << "Content-Length: " << ocl << "\r\n\r\n";
-      oss.write(body,ocl);
+      oss.write(args.body,ocl);
    }
    return oss.str();
 }
@@ -646,6 +655,7 @@ string httpHandle (FFJSON& ffHttp) {
    string path((ccp)vhost["rootdir"]);
    int plen = fpath.size;
    string res;
+   MkHttpArgs mhArgs;
    path+="/";
    if (plen>1)
       path+=((ccp)fpath)+1;
@@ -655,11 +665,23 @@ string httpHandle (FFJSON& ffHttp) {
    fs::path fspath(path);
    res = ferryfair(ffHttp);
    if (res.length()) {
-      if (res=="1")
-         goto serveFile;
+      if (res=="1") {
+         path = string((ccp)vhost["rootdir"]);
+         path += "/index.html";
+         fspath=fs::path(path);
+         goto serveIndex;
+      }
       return res;
    }
+   mhArgs.ffHttp=&ffHttp;
    if (fs::is_directory(fspath)) {
+      path += "/index.html";
+      fs::path fsindex(path);
+      if (fs::exists(fsindex)) {
+         fspath=fsindex;
+         mhArgs.cchCtrl=true;
+         goto serveFile;
+      }
       vector<Entry> entries;
       for (auto &de : fs::directory_iterator(fspath)) {
          Entry e;
@@ -691,26 +713,26 @@ string httpHandle (FFJSON& ffHttp) {
          dirHtml += "<td>" + mtime + "</td></tr>";
       }
       dirHtml += "</table></body></html>";
-      return mkHttpRes(ffHttp, dirHtml, "text/html");
+      mhArgs.body=dirHtml.c_str();
+      mhArgs.ctype = "text/html";
+      return mkHttpRes(mhArgs);
    } else {
+     serveIndex:
+      if (!fs::exists(fspath))
+         goto iptrack;
      serveFile:
-      if (!fs::exists(fspath)) {
-         path = string((ccp)vhost["rootdir"]);
-         path += "/index.html";
-         fspath=fs::path(path);
-         if (!fs::exists(fspath))
-            goto iptrack;
-      }
       ifstream reqFile(path);
       ostringstream resStr;
       resStr << reqFile.rdbuf();
       string res = resStr.str();
-      return mkHttpRes(ffHttp, res, get_mime_type(fspath).c_str());
+      mhArgs.body=res.c_str();
+      mhArgs.ctype = get_mime_type(fspath).c_str();
+      return mkHttpRes(mhArgs);
    }
   iptrack:
    FTS_ now; now.update();
    IpTrack_& ipt = ipTracks[(ccp)ffHttp["ip"]];
-   flDbg(HL, "track: %s requested %s %d times",
+   flNtc(HL, "track: %s requested %s %d times",
          (ccp)ffHttp["ip"], (ccp)ffHttp["path"], ipt.count);
    if (!ipt.firstReqTime) {
       ipt.firstReqTime=now;
@@ -724,32 +746,33 @@ string httpHandle (FFJSON& ffHttp) {
          ipt.firstReqTime=now;
       }
    }
-   return mkHttpRes(ffHttp, "NaNa!");
+   mhArgs.body="NaNa!";
+   return mkHttpRes(mhArgs);
 }
 
-void handleConnection (struct sockaddr_in cli, int client_fd,
+void handleConnection (struct sockaddr_in cli, int clientFd,
                         SSL* ssl = nullptr) {
    if (ssl && SSL_accept(ssl) <= 0) {
       ffl_err(HL, "SSL accept failed: %s",
               ERR_error_string(ERR_get_error(), nullptr));
       SSL_shutdown(ssl);
       SSL_free(ssl);
-      ::close(client_fd); return;
+      ::close(clientFd); return;
    }
    FFJSON ffHttp;
    char ip_str[INET_ADDRSTRLEN];
    inet_ntop(AF_INET, &cli.sin_addr, ip_str, sizeof(ip_str));
    ffHttp["ip"] = (ccp)ip_str;
    
-   //makeNonBlocking(client_fd);
-   crdwr nr = [client_fd] (char* buf, size_t bufSize)->size_t {
-      return recv(client_fd, buf, bufSize, 0);
+   //makeNonBlocking(clientFd);
+   crdwr nr = [clientFd] (char* buf, size_t bufSize)->size_t {
+      return recv(clientFd, buf, bufSize, 0);
    };
    crdwr sr = [ssl] (char* buf, size_t bufSize)->size_t {
       return SSL_read(ssl, buf, bufSize);
    };
    crdwr rd = ssl ? sr : nr;
-   crdwr rr = [&rd, client_fd] (char* buf, size_t bufSize)->size_t {
+   crdwr rr = [&rd, clientFd] (char* buf, size_t bufSize)->size_t {
       int retry = cfg["readRetry"];
       static int retryMS = cfg["retryMS"];
      readagain:
@@ -772,17 +795,59 @@ void handleConnection (struct sockaddr_in cli, int client_fd,
       goto handledone;
    }
    flInf(HL, "%s %s %s %s fd=%d", (ccp)ffHttp["ip"], (ccp)ffHttp["version"],
-            (ccp)ffHttp["method"], (ccp)ffHttp["path"], client_fd);
+         (ccp)ffHttp["method"], (ccp)ffHttp["path"], clientFd);
    res = httpHandle(ffHttp);
    if (!res.empty()) {
-      crdwr nw = [client_fd] (char* buf, size_t bufSize)->size_t {
-         return write(client_fd, buf, bufSize);
+      crdwr nw = [clientFd] (char* buf, size_t bufSize)->size_t {
+         size_t total = 0;
+         static int timeout_ms = 5000;
+         // make socket non-blocking
+         int flags = fcntl(clientFd, F_GETFL, 0);
+         if (flags == -1) return false;
+         fcntl(clientFd, F_SETFL, flags | O_NONBLOCK);
+
+         while (total < bufSize) {
+            fd_set wfds;
+            FD_ZERO(&wfds);
+            FD_SET(clientFd, &wfds);
+
+            struct timeval tv;
+            tv.tv_sec = timeout_ms / 1000;
+            tv.tv_usec = (timeout_ms % 1000) * 1000;
+
+            int rv = select(clientFd + 1, nullptr, &wfds, nullptr, &tv);
+            if (rv == 0) {
+               flDbg(HSL, "timedOut");
+               return total; // timeout
+            } else if (rv < 0) {
+               if (errno == EINTR) continue;
+               perror("select");
+               flDbg(HSL, "selectErr");
+               return total;
+            }
+
+            if (FD_ISSET(clientFd, &wfds)) {
+               ssize_t sent = send(clientFd, buf + total, bufSize - total, 0);
+               if (sent > 0) {
+                  total += sent;
+               } else if (sent < 0) {
+                  if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
+                  perror("send");
+                  flDbg(HSL, "sendErr");
+                  return total;
+               } else {
+                  flDbg(HSL, "connectionClose");
+                  return total;
+               }
+            }
+         }
+         return total;
       };
       crdwr sw = [ssl] (char* buf, size_t bufSize)->size_t {
          return SSL_write(ssl, buf, bufSize);
       };
       crdwr wd = ssl ? sw : nw;
-      crdwr rw = [&wd, client_fd] (char* buf, size_t bufSize)->size_t {
+      crdwr rw = [&wd, clientFd] (char* buf, size_t bufSize)->size_t {
          int retry = cfg["readRetry"];
          static int retryMS = cfg["retryMS"];
          size_t off = 0;
@@ -791,18 +856,18 @@ void handleConnection (struct sockaddr_in cli, int client_fd,
             ssize_t w = wd(buf+off, bufSize - off);
             if (w<=0) {
                flDbg(
-                  HL, "fd: %d, write socket error: %d(%s)@%zd/%zd", client_fd,
+                  HL, "fd: %d, write socket error: %d(%s)@%zd/%zd", clientFd,
                   errno, strerror(errno), off , bufSize);
                if (retry>0 && (errno==EAGAIN || errno==EINTR)) {
-                  flDbg(HL, "fd: %d, w: %zd", client_fd, w);
+                  flDbg(HL, "fd: %d, w: %zd", clientFd, w);
                   --retry;
                   this_thread::sleep_for(chrono::milliseconds(retryMS));
                   flDbg(HL, "fd: %d, write retry %d woke",
-                            client_fd, retry);
+                            clientFd, retry);
                   goto writeagain;
                } else {
                   flDbg(HL,"fd: %d, write error, closing at %d",
-                            client_fd, off);
+                            clientFd, off);
                   return off;
                }
                off += w;
@@ -818,8 +883,8 @@ void handleConnection (struct sockaddr_in cli, int client_fd,
       SSL_shutdown(ssl);
       SSL_free(ssl);
    }
-   ::close(client_fd);
-   flDbg(HL, "%d fd closed", client_fd);
+   ::close(clientFd);
+   flDbg(HL, "%d fd closed", clientFd);
    return;
  }
 
@@ -883,7 +948,7 @@ void accept_loop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
       int c = accept(listen_fd, (struct sockaddr*)&cli, &sl);
       if (c < 0) {
          if (errno == EINTR) {
-            continue;
+            return;
          };
          ffl_err(HL, "accept failed: %s", strerror(errno));
          continue;
@@ -926,9 +991,9 @@ int run () {
    if (cfg["daemon"]) {
       FTS_ ts;
       ts.update();
-      char f[64];
-      sprintf(f, "https-%zu.log", ts.tv_sec);
-      int ferr = open (f, O_WRONLY | O_APPEND | O_CREAT, 0600);
+      char log[64];
+      sprintf(log, "https-%zu.log", ts.tv_sec);
+      int ferr = open(log, O_WRONLY | O_CREAT, 0600);
       if (ferr < 0) {
          flErr(HL, "couldn't open https.log");
          return 1;
@@ -968,8 +1033,6 @@ int run () {
       ffl_err(HL, "Failed to create SSL_CTX");
       return 1;
    }
-
-   
    thread t1([httpFd] () {
       accept_loop(httpFd, *tpoolPtr);
    });
@@ -991,8 +1054,10 @@ int run () {
    if (t2.joinable()) t2.join();
    flDbg(HL,"freeing ssl_ctx");
    SSL_CTX_free(sslCtx);
+   flDbg(HL, "deleting thread pool");
    delete tpoolPtr;
    saveTxoStop=true;
+   flDbg(HL, "saving pending files");
    saveTxoT.join();
    return 0;
 }
@@ -1007,38 +1072,38 @@ int main (int argc, char **argv) {
       struct stat statbuf;
       int stat_r = stat("httpd.log", &statbuf);
       int ferr = open (
-         "httpd.log", O_CREAT | O_WRONLY | O_APPEND, 0600
-      );
+         "httpd.log", O_CREAT | O_WRONLY | O_TRUNC, 0600);
       dup2(ferr, 1);
       dup2(ferr, 2);
       close(ferr);
+      flInf(HL, "forking a http server...");
      createChild:
       pid_t pid = fork();
       if (pid) {
          //monitor child
          int status;
+         flInf(HL, "forked! waiting on http server to exit.");
          waitpid(pid, &status, 0);
          if (WIFSIGNALED(status)) {
             int sig = WTERMSIG(status);
-            flNtc(HL, "Child [%d] terminated by signal %d (%s)\n",
+            flNtc(HL, "server [%d] terminated by signal %d (%s)",
                   pid, sig, strsignal(sig));
 
             if (sig == SIGSEGV) {
-               flErr(HL, "Child crashed (SIGSEGV), reforking...\n");
+               flErr(HL, "reforking after crash...");
                goto createChild;  // restart loop
             }
          }
          if (WIFEXITED(status)) {
-            flNtc(HL, "Child [%d] exited normally with code %d\n",
+            flNtc(HL, "server(pid:[%d]) exited normally with code %d\n",
                   pid, WEXITSTATUS(status));
          }
-         close(ferr);
       } else {
          run();
       }
    } else {
       run();
    }
-   flNtc(HL, "bye!----------------------------------");
+   flNtc(HL, "bye!------------------------------------------------");
    return 0;
 }

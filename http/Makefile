@@ -7,9 +7,9 @@ FFJLIB=-L../../FFJSON/build/Linux/${ARCH}/debug/
 FFLLIB=-L../../logger/build/Linux/${ARCH}/debug/
 FBLIB=-L../../ferrybase/build/Linux/${ARCH}/debug/
 TCPP?=/opt/rocm/llvm/bin/clang++
-DBG=_DEBUG0
+DBG=_DEBUG
 DBGF=-g -O0
-DBGF=-O3
+#DBGF=-O3
 
 smtpClient.o: smtpClient.cpp
 	${TCPP} -c -std=c++23 ${DBGF} -D${DBG} -I${FFINC} -I${FBINC} -I${FFLINC} -I${FFJINC} $^ -o $@
