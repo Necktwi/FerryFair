@@ -202,7 +202,7 @@ static size_t onCurlResponse (void* contents, size_t size, size_t nmemb, string*
     output->append((char*)contents, totalSize);
     return totalSize;
 }
-
+vector<FFJSON*> usersId;
 string ferryfair (FFJSON& ffHttp) {
    FFJSON reply;
    static FFJSON& ffcfg = *pffcfg;
@@ -277,6 +277,8 @@ string ferryfair (FFJSON& ffHttp) {
          user["name"]=username;
          user["inactive"]=false;
          if (!user["things"]) {
+            user["id"]=users.size;
+            usersId.push_back(&user);
             user["things"].init("[]");
             user["smsgs"].init("[]");
             user["reps"].init("[]");
@@ -1189,6 +1191,11 @@ void makeThngsTree () {
          continue;
       }
       string user = it.getIndex();
+      int id = (*it)["id"];
+      while (usersId.size()<=id) {
+         usersId.push_back(nullptr);
+      }
+      usersId[id]=&(*it);
       //adds users to nameints
       //vector<string> musr = metaname(user);
       FFJSON& uthings = (*it)["things"];

@@ -7,6 +7,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
+#include <sys/resource.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -75,6 +76,42 @@ void handle_sigint (int) {
    g_running = false;
    flDbg(HL, "interrupted! g_running: %d", g_running.load());
    flNtc(HL, "Shutting down...");
+}
+
+static void enableCoreDumps () {
+   struct rlimit rl;
+   rl.rlim_cur = RLIM_INFINITY;
+   rl.rlim_max = RLIM_INFINITY;
+   if (setrlimit(RLIMIT_CORE, &rl) != 0)
+      perror("setrlimit(RLIMIT_CORE)");
+}
+
+static void moveCoreFile (pid_t pid) {
+   const char *core_names[] = {
+      "core", "core.dump", "core.%d", "core.%d.dump"
+   };
+   for (const char *pattern : core_names) {
+      char src[64], dst[128];
+      snprintf(src, sizeof(src), pattern, pid);
+
+      struct stat st;
+      if (stat(src, &st) == 0) {
+         time_t now = time(nullptr);
+         struct tm tm;
+         localtime_r(&now, &tm);
+
+         snprintf(dst, sizeof(dst),
+                  "core.httpd.%d.%04d%02d%02d_%02d%02d%02d.dump",
+                  pid, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+                  tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+         if (rename(src, dst) == 0)
+            flNtc(HL, "core file renamed to: %s\n", dst);
+         else
+            perror("rename core file");
+         return;
+      }
+   }
 }
 
 string gzipCompress (
@@ -523,13 +560,13 @@ enum ftype {
    FSFILE, SLINK, BLINK, DIR
 };
 static bool blockIp (ccp ip) {
-   string command = string("sudo iptables -A INPUT -s ") + ip + " -j DROP";
+   string command = string("blockHttpIp ") + ip;
    int result = system(command.c_str());
    return (result == 0);
 }
 
 static bool unblockIp (ccp ip) {
-   string command = string("sudo iptables -D INPUT -s ") + ip + " -j DROP";
+   string command = string("unBlockHttpIp ") + ip;
    int result = system(command.c_str());
    return (result == 0);
 }    
@@ -1070,6 +1107,7 @@ int main (int argc, char **argv) {
    signal(SIGINT, handle_sigint);
    signal(SIGPIPE, SIG_IGN);
    if (cfg["daemon"]) {
+      enableCoreDumps();
       struct stat statbuf;
       int stat_r = stat("httpd.log", &statbuf);
       int ferr = open (
@@ -1091,6 +1129,7 @@ int main (int argc, char **argv) {
                   pid, sig, strsignal(sig));
 
             if (sig == SIGSEGV) {
+               moveCoreFile(pid);
                flErr(HL, "reforking after crash...");
                goto createChild;  // restart loop
             }
