@@ -314,8 +314,9 @@ void parseCookie (crdwr read, FFJSON& ffCookie) {
             continue;
          case ';':
          case '\n':
-            while (buf->back()==' ')
-               buf->pop_back();
+            if (buf->length())
+               while (buf->back()==' ')
+                  buf->pop_back();
             ffCookie[key]=value;
             flInfCntnu(HL,"%s=%s",key.c_str(),value.c_str());
             key.clear(); value.clear();
@@ -838,7 +839,6 @@ void handleConnection (struct sockaddr_in cli, int clientFd,
    if (!res.empty()) {
       crdwr nw = [clientFd] (char* buf, size_t bufSize)->size_t {
          size_t total = 0;
-         static int timeout_ms = 5000;
          // make socket non-blocking
          int flags = fcntl(clientFd, F_GETFL, 0);
          if (flags == -1) return false;
@@ -849,10 +849,9 @@ void handleConnection (struct sockaddr_in cli, int clientFd,
             FD_ZERO(&wfds);
             FD_SET(clientFd, &wfds);
 
-            struct timeval tv;
-            tv.tv_sec = timeout_ms / 1000;
-            tv.tv_usec = (timeout_ms % 1000) * 1000;
-
+            static struct timeval tv = {
+               10, 0
+            };
             int rv = select(clientFd + 1, nullptr, &wfds, nullptr, &tv);
             if (rv == 0) {
                flDbg(HSL, "timedOut");

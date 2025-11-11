@@ -1,12 +1,14 @@
 ARCH?=x86_64
 BTYPE?=debug
+OS?=Linux
 FFJINC=../../FFJSON
 FFLINC=../../logger
 FBINC=../../ferrybase
 FFINC=../..
-FFJLIB=-L../../FFJSON/build/Linux/${ARCH}/${BTYPE}/
-FFLLIB=-L../../logger/build/Linux/${ARCH}/${BTYPE}/
-FBLIB=-L../../ferrybase/build/Linux/${ARCH}/${BTYPE}/
+BD=${OS}/${ARCH}/${BTYPE}/
+FFJLIB=-L../../FFJSON/build/${BD}
+FFLLIB=-L../../logger/build/${BD}
+FBLIB=-L../../ferrybase/build/${BD}
 TCPP?=/opt/rocm/llvm/bin/clang++
 DBG?=_DEBUG
 DBGF?=-g -O0
@@ -37,7 +39,7 @@ all: https.o ferryfair.o cap.o smtpClient.o spatialSearch.o
 	${TCPP} -pthread -std=c++23 -fPIE ${DBGF} -D${DBG}\
    -Wno-unqualified-std-cast-call -I${FFJINC} -I${FFLINC} -I${FBINC} -I${FFINC}\
    -I.. $^ ${FFJLIB} ${FFLLIB} ${FBLIB} -lFFJSON -llogger -lferrybase -lssl -lcrypto -ljpeg -lz -lrt -licui18n -licuuc -licudata -lcurl\
-   -o https_${ARCH}
+   -o https_${OS}_${ARCH}
 
 critcalSection.o:
 	${TCPP} -c -masm=intel criticalSection.s -o criticalSection.o
@@ -45,4 +47,4 @@ test: criticalSection.o
 	${TCPP} -std=c++23 -g -O0 criticalSection.o test.cpp -o test
 
 clean:
-	rm -rf *.o https_${ARCH} test
+	rm -rf *.o https_${OS}_${ARCH} test
