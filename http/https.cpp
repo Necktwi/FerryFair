@@ -43,6 +43,7 @@
 #include <sys/epoll.h>
 #include <errno.h>
 #include <sys/socket.h>
+#include <curl/curl.h>
 
 #include <FFJSON.h>
 #include <logger.h>
@@ -76,6 +77,10 @@ void handle_sigint (int) {
    g_running = false;
    flDbg(HL, "interrupted! g_running: %d", g_running.load());
    flNtc(HL, "Shutting down...");
+}
+
+void handleSigpipe (int) {
+   flDbg(HL, "sig pipe received.");
 }
 
 static void enableCoreDumps () {
@@ -909,8 +914,8 @@ void handleConnection (struct sockaddr_in cli, int clientFd,
                             clientFd, off);
                   return off;
                }
-               off += w;
             }
+            off += w;
          }
          return off;
       };
@@ -1052,6 +1057,8 @@ int run () {
    flNtc(HL, "Starting server. docroot=%s threads=%d",
               (ccp)cfg["rootdir"], (int)fCfgThrdCnt);
 
+   curl_global_init(CURL_GLOBAL_DEFAULT);
+   
    tpoolPtr = new ThreadPool((int)fCfgThrdCnt);
    initFerryFair(cfg);
 
@@ -1095,6 +1102,7 @@ int run () {
    SSL_CTX_free(sslCtx);
    flDbg(HL, "deleting thread pool");
    delete tpoolPtr;
+   curl_global_cleanup();
    saveTxoStop=true;
    flDbg(HL, "saving pending files");
    saveTxoT.join();
@@ -1106,7 +1114,8 @@ int main (int argc, char **argv) {
    flDbg(HL, "EAGAIN(%zd) EINTR(%zd) EINVAL(%zd)\n",
              EAGAIN, EINTR, EINVAL);
    signal(SIGINT, handle_sigint);
-   signal(SIGPIPE, SIG_IGN);
+   //signal(SIGPIPE, SIG_IGN);
+   signal(SIGPIPE, handleSigpipe);
    if (cfg["daemon"]) {
       enableCoreDumps();
       struct stat statbuf;

@@ -197,10 +197,12 @@ static ccp jsonMime = "application/json";
 static ccp txtMime = "text/plain";
 
 ccp yay = "{\"error\":\"yay\"}";
-static size_t onCurlResponse (void* contents, size_t size, size_t nmemb, string* output) {
-    size_t totalSize = size * nmemb;
-    output->append((char*)contents, totalSize);
-    return totalSize;
+static size_t onCurlResponse (void* contents, size_t size, size_t nmemb,
+                              string* output) {
+   size_t totalSize = size * nmemb;
+   flDbg(FL,"%.*s", totalSize, contents);
+   output->append((char*)contents, totalSize);
+   return totalSize;
 }
 vector<FFJSON*> usersId;
 string ferryfair (FFJSON& ffHttp) {
@@ -420,6 +422,7 @@ string ferryfair (FFJSON& ffHttp) {
       username=payload["username"];password=payload["password"];
       flNtc(FL, "\nUser: %s\nPass: %s", username, password);
       ccp gid = payload["gid"];
+      FFJSON fres;
       if (!password) {
          if (!gid)
             return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
@@ -428,9 +431,12 @@ string ferryfair (FFJSON& ffHttp) {
          string readBuffer;
          string url("https://oauth2.googleapis.com/tokeninfo?id_token=");
          url += gid;
+         flDbg(FL, "gurl: %s", url.c_str());
+         curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
          curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
          curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, onCurlResponse);
          curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+         curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
 
          CURLcode res = curl_easy_perform(curl);
          curl_easy_cleanup(curl);
@@ -438,17 +444,17 @@ string ferryfair (FFJSON& ffHttp) {
          if (res != CURLE_OK)
             return mkHttpRes(ffHttp, "{\"error\":4}", jsonMime);
          flDbg(FL,"gglBuf: %s", readBuffer.c_str());
-         FFJSON fres(readBuffer);
+         fres.init(readBuffer);
          if (!fres["aud"])
             return mkHttpRes(ffHttp, "{\"signin\":\"false\"}", jsonMime);
          username=fres["email"];
       }
-      flNtcCntnu(FL, "username: %s", username);
+      flNtcCntnu(FL, "username: %s\n", username);
       if (!users[username]) {
          return mkHttpRes(ffHttp, "{\"signin\":\"false\"}", jsonMime);
       }
       FFJSON& user = users[username];
-      if ((gid || !user["password"] || !strcmp(password,user["password"]))
+      if ((gid || (user["password"] && !strcmp(password,user["password"])))
           && !user["inactive"]) {
          rbsid["user"]=user["name"];
          rbsid["ip"]=(ccp)ffHttp["ip"];
