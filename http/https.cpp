@@ -756,6 +756,7 @@ string httpHandle (FFJSON& ffHttp) {
       return mkHttpRes(mhArgs);
    } else {
      serveIndex:
+      flDbg(HL,"fspath: %s",fspath.c_str());
       if (!fs::exists(fspath))
          goto iptrack;
      serveFile:
@@ -765,6 +766,7 @@ string httpHandle (FFJSON& ffHttp) {
       string res = resStr.str();
       mhArgs.body=res.c_str();
       mhArgs.bsz=res.length();
+      mhArgs.ffHttp = &ffHttp;
       mhArgs.ctype = get_mime_type(fspath).c_str();
       return mkHttpRes(mhArgs);
    }

@@ -242,11 +242,13 @@ string ferryfair (FFJSON& ffHttp) {
       ++path;
    }
    if (path[0]=='.' || strstr(path,"red")) {
+      flDbg(FL, "path: %s", path);
       return mkHttpRes(ffHttp, "NaNa!", txtMime, -1, 404);
    }
    FFJSON& query = ffHttp["query"];
    if ((ccp)query["req"]) {
       req = fnv1a((ccp)query["req"]);
+      flDbg(FL, "req: %zu", req);
    }
    FFJSON& tUsr = path?users[path]:nullFFJSON;
    cpld = ffHttp["payload"];
@@ -383,8 +385,13 @@ string ferryfair (FFJSON& ffHttp) {
    }
   bidcheck2:
    FFJSON& rbsid = rbs[bid];
-   if (!rbsid)
-      return "";
+   if (!rbsid) {
+      if (tUsr) {
+         return "1";
+      } else {
+         return "";
+      }
+   }
    switch (req) {
    case "signOut"_hash: {
      signOut:
@@ -430,6 +437,7 @@ string ferryfair (FFJSON& ffHttp) {
 
          if (res != CURLE_OK)
             return mkHttpRes(ffHttp, "{\"error\":4}", jsonMime);
+         flDbg(FL,"gglBuf: %s", readBuffer.c_str());
          FFJSON fres(readBuffer);
          if (!fres["aud"])
             return mkHttpRes(ffHttp, "{\"signin\":\"false\"}", jsonMime);
@@ -693,8 +701,12 @@ string ferryfair (FFJSON& ffHttp) {
    }
    }
    username = rbsid["user"];
-   if (!username)
+   if (!username) {
+      if (tUsr) {
+         return "1";
+      }
       return "";
+   }
    FFJSON& user = users[username];
    switch (req) {
    case "updateThing"_hash: {
