@@ -374,7 +374,6 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
    char c;
    static const int bufSize = 1024;
    char buf[bufSize];
-   flInf(HL, "request: ");
    int li=0;
    int spCnt=0;
    int ci=0,hend = 0,bodyBegin=0,query=0;
@@ -799,7 +798,7 @@ string httpHandle (FFJSON& ffHttp) {
 void handleConnection (struct sockaddr_in cli, int clientFd,
                         SSL* ssl = nullptr) {
    if (ssl && SSL_accept(ssl) <= 0) {
-      ffl_err(HL, "SSL accept failed: %s",
+      flErr(HL, "SSL accept failed: %s",
               ERR_error_string(ERR_get_error(), nullptr));
       SSL_shutdown(ssl);
       SSL_free(ssl);
@@ -809,7 +808,7 @@ void handleConnection (struct sockaddr_in cli, int clientFd,
    char ip_str[INET_ADDRSTRLEN];
    inet_ntop(AF_INET, &cli.sin_addr, ip_str, sizeof(ip_str));
    ffHttp["ip"] = (ccp)ip_str;
-   
+   flInf(HL, " %s, %d------",  ip_str, clientFd);
    //makeNonBlocking(clientFd);
    crdwr nr = [clientFd] (char* buf, size_t bufSize)->size_t {
       return recv(clientFd, buf, bufSize, 0);
@@ -840,8 +839,6 @@ void handleConnection (struct sockaddr_in cli, int clientFd,
    if (!ffHttp["version"]) {
       goto handledone;
    }
-   flInf(HL, "%s %s %s %s fd=%d", (ccp)ffHttp["ip"], (ccp)ffHttp["version"],
-         (ccp)ffHttp["method"], (ccp)ffHttp["path"], clientFd);
    res = httpHandle(ffHttp);
    if (!res.empty()) {
       crdwr nw = [clientFd] (char* buf, size_t bufSize)->size_t {
@@ -958,9 +955,8 @@ SSL_CTX* create_ssl_ctx (const string &cert_file, const string &key_file) {
    const SSL_METHOD *method = TLS_server_method();
    SSL_CTX *ctx = SSL_CTX_new(method);
    if (!ctx) return nullptr;
-   if (
-      SSL_CTX_use_certificate_file(
-         ctx, cert_file.c_str(), SSL_FILETYPE_PEM) <= 0) {
+   if (SSL_CTX_use_certificate_file(
+          ctx, cert_file.c_str(), SSL_FILETYPE_PEM) <= 0) {
       ERR_print_errors_fp(stderr);
       SSL_CTX_free(ctx);
       return nullptr;
@@ -994,7 +990,7 @@ void accept_loop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
          if (errno == EINTR) {
             return;
          };
-         ffl_err(HL, "accept failed: %s", strerror(errno));
+         flErr(HL, "accept failed: %s", strerror(errno));
          continue;
       }
       SSL* ssl = nullptr;
@@ -1030,6 +1026,17 @@ void usage_and_exit (const char *p) {
            " [--https-port N] [--docroot PATH] [--threads N]", p);
    exit(1);
 }
+// MUST run before any thread creation
+static void disableSigpipe () {
+   struct sigaction sa{};
+   sa.sa_handler = SIG_IGN;
+   sigaction(SIGPIPE, &sa, NULL);
+
+   sigset_t set;
+   sigemptyset(&set);
+   sigaddset(&set, SIGPIPE);
+   pthread_sigmask(SIG_BLOCK, &set, NULL);
+}
 
 int run () {
    if (cfg["daemon"]) {
@@ -1053,7 +1060,7 @@ int run () {
       flErr(HL, "improper cfg");
       return 0;
    }
-
+   disableSigpipe();
    flNtc(HL, "Starting server. docroot=%s threads=%d",
               (ccp)cfg["rootdir"], (int)fCfgThrdCnt);
 
@@ -1114,8 +1121,8 @@ int main (int argc, char **argv) {
    flDbg(HL, "EAGAIN(%zd) EINTR(%zd) EINVAL(%zd)\n",
              EAGAIN, EINTR, EINVAL);
    signal(SIGINT, handle_sigint);
-   //signal(SIGPIPE, SIG_IGN);
-   signal(SIGPIPE, handleSigpipe);
+   signal(SIGPIPE, SIG_IGN);
+   //signal(SIGPIPE, handleSigpipe);
    if (cfg["daemon"]) {
       enableCoreDumps();
       struct stat statbuf;
@@ -1154,6 +1161,6 @@ int main (int argc, char **argv) {
    } else {
       run();
    }
-   flNtc(HL, "bye!------------------------------------------------");
+   flNtc(HL, "bye!----------");
    return 0;
 }
