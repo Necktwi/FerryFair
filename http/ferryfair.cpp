@@ -766,10 +766,10 @@ string ferryfair (FFJSON& ffHttp) {
                moded=true;
             } else {
                string uname(funame?(ccp)funame:"");
-               tolower(cname);
-               tolower(uname);
                FFJSON::trimWhites(cname);
                FFJSON::trimWhites(uname);
+               tolower(cname);
+               tolower(uname);
                if (!uname.length()) {
                   nameChanged=true;
                   funame=fcname;
