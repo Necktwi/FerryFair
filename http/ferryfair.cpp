@@ -245,7 +245,7 @@ string ferryfair (FFJSON& ffHttp) {
    }
    if (path[0]=='.' || strstr(path,"red")) {
       flDbg(FL, "path: %s", path);
-      return mkHttpRes(ffHttp, "NaNa!", txtMime, -1, 404);
+      return "2";
    }
    FFJSON& query = ffHttp["query"];
    if ((ccp)query["req"]) {
@@ -1224,7 +1224,7 @@ void makeThngsTree () {
                (*tit)["location"].isType(FFJSON::UNDEFINED))) {
             FFJSON* pF = &*tit;
             flDbg(FL, "inserting %d", ic);
-            tpoolPtr->enqueue([pF, ic] {
+            tpoolPtr->enqueue([pF, ic] (int tid) {
                FFJSON& rF = *pF;
                string tname((ccp)rF["name"]);
                tname += " ";
@@ -1235,7 +1235,7 @@ void makeThngsTree () {
                float lx = rF["location"][1];
                float ly = rF["location"][0];
                thnsTree.insert(rF, ina, 0, lx, ly);
-               flDbg(FL, "inserted %d", ic);
+               flDbg(FL, "%d inserted %d", tid, ic);
             });
             //uint level = thnsTree.insert(*tit, ina, 0, lx, ly);
             ++ic;

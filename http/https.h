@@ -6,6 +6,7 @@
 #include <thread>
 #include <FFJSON.h>
 #include <condition_variable>
+#include <FerryTimeStamp.h>
 
 extern FFJSON cfg;
 enum HTTPLOG {
@@ -49,12 +50,14 @@ public:
    ThreadPool (size_t n);
    ~ThreadPool ();
    void init (size_t n);
-   void enqueue(function<void()> job);
+   void enqueue(function<void(int)> job);
    void join ();
+   void printThrdStats ();
 
 private:
    vector<thread> workers_;
-   queue<function<void()>> jobs_;
+   vector<char> isRunning_;
+   queue<function<void(int)>> jobs_;
    mutex mutex_;
    condition_variable cv_;
    condition_variable cvJoin_;
@@ -73,7 +76,7 @@ extern atomic<bool> saveTxoStop;
 constexpr uint32_t fnv1a (const char *s, uint32_t hash = 2166136261u) {
    return (*s == 0) ? hash : fnv1a(s + 1, (hash ^ uint32_t(*s)) * 16777619u);
 }
-constexpr uint32_t operator "" _hash (const char *s, size_t) {
+constexpr uint32_t operator ""_hash (const char *s, size_t) {
    return fnv1a(s);
 }
 #endif

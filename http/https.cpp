@@ -44,6 +44,7 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include <curl/curl.h>
+#include <poll.h>
 
 #include <FFJSON.h>
 #include <logger.h>
@@ -60,6 +61,8 @@ FF_LOG_TYPE fflAllowedType = (FF_LOG_TYPE) (FFL_ERR | FFL_NOTICE | FFL_DEBUG |
                                             FFL_INFO | FFL_WARN);
 unsigned int fflAllowedBlks = (uint)(HL|FL|HSL);
 thread_local int tid = 0;
+
+#define hlDbg(str, ...) flDbg(HL, "tid: %d; "str, tid, __VA_ARGS__)
 
 using namespace std;
 namespace fs = std::filesystem;
@@ -177,22 +180,35 @@ void ThreadPool::init (size_t n) {
       started = true;
    }
 }
-void ThreadPool::enqueue(function<void()> job) {
+void ThreadPool::enqueue(function<void(int)> job) {
    {
       unique_lock<mutex> lk(mutex_);
       jobs_.push(move(job));
    }
    cv_.notify_one();
 }
+#ifdef _DEBUG
+void ThreadPool::printThrdStats () {
+   char buf[512];
+   char* b = buf;
+   for (int i=0; i<workers_.size(); ++i) {
+      b += sprintf(b, "%d: %d, ", i, isRunning_[i]);
+   }
+   b-=2;
+   *b='\0';
+   flInf(HL, buf);
+}
+#elif
+void ThreadPool::printThrdStats () {}
+#endif
 
 void ThreadPool::start (size_t n) {
    for (size_t i=0; i<n; ++i) {
       workers_.emplace_back([this,i] () {
          tid = i;
          while (true) {
-            function<void()> job; {
+            function<void(int)> job; {
                unique_lock<mutex> lk(mutex_);
-               flDbg(HL, "jobs in queue: %d", jobs_.size());
                if (jobs_.empty() && !jc) {
                   cvJoin_.notify_all();
                }
@@ -208,9 +224,10 @@ void ThreadPool::start (size_t n) {
             }
             try {
                ++jc;
-               flDbg(HL, "tid: %d, start!", tid);
-               job();
-               flDbg(HL, "tid: %d, done!", tid);
+               isRunning_[tid]=1;
+               job(tid);
+               isRunning_[tid]=0;
+               printThrdStats();
                --jc;
             } catch (const exception &e) {
                flErr(HL, "worker exception: %s", e.what());
@@ -219,6 +236,7 @@ void ThreadPool::start (size_t n) {
             }
          }
       });
+      isRunning_.push_back(0);
    }
 }
 
@@ -712,6 +730,8 @@ string httpHandle (FFJSON& ffHttp) {
          path += "/index.html";
          fspath=fs::path(path);
          goto serveIndex;
+      } else if (res=="2") {
+         goto iptrack;
       }
       return res;
    }
@@ -794,21 +814,23 @@ string httpHandle (FFJSON& ffHttp) {
    mhArgs.body="NaNa!";
    return mkHttpRes(mhArgs);
 }
+int waitForRead (int fd, int timeoutMs) {
+    struct pollfd p = { fd, POLLIN, 0 };
+    return poll(&p, 1, timeoutMs);
+}
 
-void handleConnection (struct sockaddr_in cli, int clientFd,
-                        SSL* ssl = nullptr) {
-   if (ssl && SSL_accept(ssl) <= 0) {
-      flErr(HL, "SSL accept failed: %s",
-              ERR_error_string(ERR_get_error(), nullptr));
-      SSL_shutdown(ssl);
-      SSL_free(ssl);
-      ::close(clientFd); return;
-   }
+int waitForWrite (int fd, int timeoutMs) {
+    struct pollfd p = { fd, POLLOUT, 0 };
+    return poll(&p, 1, timeoutMs);
+}
+
+void handleConnection (int tid, struct sockaddr_in cli, int clientFd,
+                       SSL* ssl = nullptr) {
    FFJSON ffHttp;
    char ip_str[INET_ADDRSTRLEN];
    inet_ntop(AF_INET, &cli.sin_addr, ip_str, sizeof(ip_str));
    ffHttp["ip"] = (ccp)ip_str;
-   flInf(HL, " %s, %d------",  ip_str, clientFd);
+   flInf(HL, "tid: %d, %s, %d------", tid, ip_str, clientFd);
    //makeNonBlocking(clientFd);
    crdwr nr = [clientFd] (char* buf, size_t bufSize)->size_t {
       return recv(clientFd, buf, bufSize, 0);
@@ -823,12 +845,10 @@ void handleConnection (struct sockaddr_in cli, int clientFd,
      readagain:
       ssize_t r = rd(buf, bufSize);
       if (r<0 && retry>0) {
-         flDbg(HL, "r: %zd", r);
          if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
             --retry;
-            flDbg(HL, "retry %d", retry);
-            this_thread::sleep_for(chrono::milliseconds(retryMS));
-            flDbg(HL, "retry %d woke", retry);
+            waitForRead(clientFd, retryMS);
+            flDbgCntnu(HL, "retry: %d, r: %zd, ", retry, r);
             goto readagain;
          }
       }
@@ -842,47 +862,7 @@ void handleConnection (struct sockaddr_in cli, int clientFd,
    res = httpHandle(ffHttp);
    if (!res.empty()) {
       crdwr nw = [clientFd] (char* buf, size_t bufSize)->size_t {
-         size_t total = 0;
-         // make socket non-blocking
-         int flags = fcntl(clientFd, F_GETFL, 0);
-         if (flags == -1) return false;
-         fcntl(clientFd, F_SETFL, flags | O_NONBLOCK);
-
-         while (total < bufSize) {
-            fd_set wfds;
-            FD_ZERO(&wfds);
-            FD_SET(clientFd, &wfds);
-
-            static struct timeval tv = {
-               10, 0
-            };
-            int rv = select(clientFd + 1, nullptr, &wfds, nullptr, &tv);
-            if (rv == 0) {
-               flDbg(HSL, "timedOut");
-               return total; // timeout
-            } else if (rv < 0) {
-               if (errno == EINTR) continue;
-               perror("select");
-               flDbg(HSL, "selectErr");
-               return total;
-            }
-
-            if (FD_ISSET(clientFd, &wfds)) {
-               ssize_t sent = send(clientFd, buf + total, bufSize - total, 0);
-               if (sent > 0) {
-                  total += sent;
-               } else if (sent < 0) {
-                  if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
-                  perror("send");
-                  flDbg(HSL, "sendErr");
-                  return total;
-               } else {
-                  flDbg(HSL, "connectionClose");
-                  return total;
-               }
-            }
-         }
-         return total;
+         return send(clientFd, buf, bufSize, 0);
       };
       crdwr sw = [ssl] (char* buf, size_t bufSize)->size_t {
          return SSL_write(ssl, buf, bufSize);
@@ -896,15 +876,11 @@ void handleConnection (struct sockaddr_in cli, int clientFd,
            writeagain:
             ssize_t w = wd(buf+off, bufSize - off);
             if (w<=0) {
-               flDbg(
-                  HL, "fd: %d, write socket error: %d(%s)@%zd/%zd", clientFd,
-                  errno, strerror(errno), off , bufSize);
                if (retry>0 && (errno==EAGAIN || errno==EINTR)) {
-                  flDbg(HL, "fd: %d, w: %zd", clientFd, w);
+                  waitForRead(clientFd, retryMS);
+                  flDbgCntnu(HL, "fd: %d, w: %zd, e: %d %zd/%zd retry",
+                             clientFd, w, errno, off, bufSize);
                   --retry;
-                  this_thread::sleep_for(chrono::milliseconds(retryMS));
-                  flDbg(HL, "fd: %d, write retry %d woke",
-                            clientFd, retry);
                   goto writeagain;
                } else {
                   flDbg(HL,"fd: %d, write error, closing at %d",
@@ -925,9 +901,9 @@ void handleConnection (struct sockaddr_in cli, int clientFd,
       SSL_free(ssl);
    }
    ::close(clientFd);
-   flDbg(HL, "%d fd closed", clientFd);
+   flDbg(HL, "tid:%d: %d fd closed", tid, clientFd);
    return;
- }
+}
 
 // ---------------- Networking & SSL setup ----------------
 int create_listen_socket (uint16_t port) {
@@ -993,14 +969,30 @@ void accept_loop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
          flErr(HL, "accept failed: %s", strerror(errno));
          continue;
       }
+      flDbg(HL, "got %d...", c);
+
       SSL* ssl = nullptr;
       if (ctx) {
          ssl = SSL_new(ctx);
          SSL_set_fd(ssl, c);
+         int r = SSL_accept(ssl);
+         if (r<0) {
+            flErr(HL, "tid %d: SSL accept failed: %d: %s", tid, r,
+                  ERR_error_string(SSL_get_error(ssl, r), nullptr));
+            SSL_shutdown(ssl);
+            SSL_free(ssl);
+            ::close(c);
+            flDbg(HL, "tid:%d: %d fd closed", tid, c);
+            continue;
+         }
       }
-      flDbg(HL, "got %d...", c);
-      pool.enqueue([cli, ssl, c](){
-         handleConnection(cli, c, ssl);
+      // make socket non-blocking
+      int flags = fcntl(c, F_GETFL, 0);
+      if (flags == -1) continue;
+      fcntl(c, F_SETFL, flags | O_NONBLOCK);
+
+      pool.enqueue([cli, ssl, c] (int tid) {
+         handleConnection(tid, cli, c, ssl);
       });
    }
 }
