@@ -77,6 +77,16 @@ struct CntMut_ {
    mutex m;
    int count=0;
 };
+struct FFQuad_ {
+   FFJSON& rF;
+   vector<uint>& ina;
+   float lx = 0;
+   float ly = 0;
+   bool deleteLeaf = false;
+   FFQuad_ (FFJSON& rF, vector<uint>& ina, float lx = 0, float ly = 0,
+            bool deleteLeaf = false) : rF(rF), ina(ina), lx(lx), ly(ly),
+                                       deleteLeaf(deleteLeaf) {}
+};
 union QuadHldr {
    QuadHldr () {
       qp=nullptr;
@@ -95,10 +105,9 @@ union QuadHldr {
    set<FFJSON*>* sp;
    QuadNode* qn ();
    uint insert (
-      FFJSON& rF, vector<uint>& ina, bool deleteLeaf = false,
-      float lx= 0.0, float ly=0.0, float x = 0.0, float y = 0.0,
-      uint level = 0, QuadNode* tQN = nullptr, int8_t tind=0,
-      QuadNode* pQN = nullptr, int8_t ind=0, int8_t sn = 0
+      FFQuad_& fq, float x = 0.0, float y = 0.0, uint level = 0,
+      QuadNode* tQN = nullptr, int8_t tind=0, QuadNode* pQN = nullptr,
+      int8_t ind=0, int8_t sn = 0
    );
    uint getPointsFromQuad (
       Pts& pts, uint level=0, float x=0, float y=0,
@@ -153,9 +162,8 @@ struct QuadNode {
    QuadHldr ws;
    QuadNode ();
    uint insert (
-      FFJSON& rF, vector<uint>& ina, float lx, float ly, float x = 0.0,
-      float y = 0.0, uint level = 0, QuadNode* pQN = nullptr, int8_t ind=0,
-      bool deleteLeaf = false, int8_t sn = 0
+      FFQuad_& fq, float x = 0.0, float y = 0.0, uint level = 0,
+      QuadNode* pQN = nullptr, int8_t ind=0, int8_t sn = 0
    );
    void del (QuadNode* tQN = nullptr, int8_t tind = 0,
              QuadNode* pQN = nullptr, int8_t ind = 0);
@@ -192,5 +200,5 @@ struct CompNameWt {
                      const map<string, FFJSON*>::iterator it2) const;
 };
 extern CompNameWt cmpNmWt;
-
+int8_t ffHasName (FFJSON& ff, vector<uint>& ina, bool allIna = false);
 #endif

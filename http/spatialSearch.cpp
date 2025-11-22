@@ -226,7 +226,7 @@ vector<uint> qpIna (vector<map<QuadNode*,uint>::iterator> vit) {
    return ina;
 }
 
-int8_t ffHasName (FFJSON& ff, vector<uint>& ina, bool allIna = false) {
+int8_t ffHasName (FFJSON& ff, vector<uint>& ina, bool allIna) {
    if (!ina.size()) {
       return -1;
    }
@@ -310,7 +310,7 @@ QuadNode::~QuadNode () {
 
 CntMut_& QuadHldr::lock (int l) {
    qhMapMut.lock();
-   ffl_debug(SLL, "tid: %02d: locking %p@%d", tid, this, l);
+   ffl_debug(SLLL, "tid: %02d: locking %p@%d", tid, this, l);
    CntMut_& cntMut = qhModMutMap[this];
    ++cntMut.count;
    qhMapMut.unlock();
@@ -320,7 +320,7 @@ CntMut_& QuadHldr::lock (int l) {
 
 void QuadHldr::unlock (CntMut_* p = nullptr) {
    qhMapMut.lock();
-   ffl_debug(SLL, "tid: %02d: unlocking %p", tid, this);
+   ffl_debug(SLLL, "tid: %02d: unlocking %p", tid, this);
    if (!p)
       p = &qhModMutMap[this];
    --p->count;
@@ -328,49 +328,51 @@ void QuadHldr::unlock (CntMut_* p = nullptr) {
    p->m.unlock();
 }
 
-uint QuadNode::insert (
-   FFJSON& rF, vector<uint>& ina, float lx, float ly, float x, float y,
-   uint level, QuadNode* pQN, int8_t ind, bool deleteLeaf, int8_t sn
-) {
+uint QuadNode::insert (FFQuad_& fq, float x, float y, uint level,
+                       QuadNode* pQN, int8_t ind, int8_t sn) {
    QuadHldr* qh = (QuadHldr*)this;
    CntMut_* pcm = nullptr;
    if (!sn) {
       pcm = &qh->lock(__LINE__);
-      this->seti(ina);
+      this->seti(fq.ina);
       qh->unlock(pcm);
    }
-   uint returnv=0;
-   int8_t qind = lx>= x?0:1;
-   int8_t xs=qind==0?1:-1;
-   qind<<=1;
-   int8_t ys = ly >= y?1:-1;
-   qind |= ys>=0?0:1;
-   ffl_debug(SL, "%p, %f,%f,%f,%f,%d,%d,%d\n", this, x,y,lx,ly,xs,ys,qind);
-   qh+=qind;
-   float dx = 180/(pow(2,level+1));
-   float dy = 90/(pow(2,level+1));
-   return qh->insert(
-      rF, ina, deleteLeaf, lx, ly, x+xs*dx, y+ys*dy, level+1, this, qind,
-      pQN, ind, sn);
+   uint returnv= 0;
+   int8_t qind= fq.lx>= x ? 0: 1;
+   int8_t xs= qind== 0 ? 1: -1;
+   qind<<= 1;
+   int8_t ys= fq.ly>= y ? 1: -1;
+   qind|= ys>= 0 ? 0: 1;
+   flDbg(SL, "%p, %f, %f, %d, %d, %d\n", this, x, y, xs, ys, qind);
+   qh+= qind;
+   float dx= 180/(pow(2, level+1));
+   float dy= 90/(pow(2, level+1));
+   return qh->insert(fq, x+xs*dx, y+ys*dy, level+1, this, qind, pQN, ind, sn);
 }
 
 uint QuadHldr::insert (
-   FFJSON& rF, vector<uint>& ina, bool deleteLeaf, float lx, float ly,
-   float x, float y, uint level, QuadNode* tQN, int8_t tind, QuadNode* pQN,
-   int8_t ind,int8_t sn
+   FFQuad_& fq, float x, float y, uint level, QuadNode* tQN, int8_t tind,
+   QuadNode* pQN, int8_t ind, int8_t sn
 ) {
+   FFJSON& rF=fq.rF;vector<uint>& ina=fq.ina;float& lx=fq.lx,ly=fq.ly;
+   bool& deleteLeaf = fq.deleteLeaf;
    uint ret = level;
    map<set<FFJSON*>*, vector<uint>>::iterator sit;
    vector<map<QuadNode*,uint>::iterator> qit;
    void* resfp;
    set<FFJSON*>* ressfp;
    ffl_debug(SL, "qh: %p, x,y: %lf,%lf\n", this, x, y);
+#ifdef _DEBUG
+   if (&fq.rF==(void*)0x5555556a4980) {
+      flDbg(SLL, "qh: %p", this);
+   }
+#endif
    CntMut_* pcm = nullptr;
    if (!sn)
       pcm = &lock(__LINE__);
    if (fp==nullptr) {
-      fp = (FFJSON*)fpxor(&rF, pQN, ind);
-      ffl_debug(SL, "rF:%p,%s inserted\n", &rF,rF["location"].stringify().c_str());
+      fp = (FFJSON*)fpxor(&fq.rF, pQN, ind);
+      flDbg(SL, "rF:%p,%s inserted\n", &rF,rF["location"].stringify().c_str());
       goto retn;
    }
    resfp = get<0>(bpxor(fp, pQN));
@@ -436,9 +438,9 @@ uint QuadHldr::insert (
          }
       }
       qp->seti(ina);
-      qp->insert(*(FFJSON*)resfp,ina,llx,lly,x,y,level,tQN,tind,deleteLeaf,1);
-      ret =
-         qp->insert(rF,ina,lx,ly,x,y,level,tQN,tind,deleteLeaf,1);
+      FFQuad_ tfq(*(FFJSON*)resfp, ina, llx, lly, deleteLeaf);
+      qp->insert(tfq, x, y, level, tQN, tind, 1);
+      ret = qp->insert(fq, x, y, level, tQN, tind, 1);
       qp = (QuadNode*)fpxor(qp,pQN,ind);
       ffl_debug(SL, "rF: %p inserted in %p\n", &rF, pQN);
       goto retn;
@@ -449,8 +451,7 @@ uint QuadHldr::insert (
             unlock(pcm);
             pcm=nullptr;
          }
-      ret = qpres->insert(
-         rF, ina, lx, ly, x, y, level, tQN, tind, deleteLeaf, sn);
+      ret = qpres->insert(fq, x, y, level, tQN, tind, sn);
       if (deleteLeaf) {
          if (ret) {
             QuadHldr* qh = (QuadHldr*)qpres;
@@ -823,6 +824,7 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
      cntnuFind:
       while (pts.ni<pts.pts.size() && pts.pni<pts.minPts) {
          NdNPrn nd = pts.pts[pts.ni];
+         flDbg(SLL, "pts.ni: %d, nd.qh: %p", pts.ni, nd.qh);
          tQN=nd.qh->qn();
          tind=nd.qh-(QuadHldr*)tQN;
          //pts.nni=pts.pts.size();
@@ -907,6 +909,7 @@ uint QuadHldr::getPointsFromQuad (
    Pts& pts, uint level, float x, float y, QuadNode* tQN,
    int8_t tind, QuadNode* pQN, int8_t ind
 ) {
+   flDbg(SLL, "qh: %p", this);
    float dx = 180/(pow(2,level+1));
    if (fp==nullptr) {
       pts.cnd = {this, pQN, dx, 0, 0, ind};

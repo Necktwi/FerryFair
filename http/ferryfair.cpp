@@ -205,6 +205,42 @@ static size_t onCurlResponse (void* contents, size_t size, size_t nmemb,
    return totalSize;
 }
 vector<FFJSON*> usersId;
+string ffSearch (FFJSON& payload, FFJSON& rbsid, FFJSON& tUsr, FFJSON& reply,
+               FFJSON& ffHttp) {
+   FFJSON& fsrch = payload["search"];
+   if (!fsrch) {
+      return "2";         
+   }
+   string srchStr = (ccp)payload["search"];
+   BidThings_& bts = bidThings[rbsid.val.fptr];
+   set<FFJSON*>& mdts = bts.mdts;
+   Pts& pts = bts.search;
+   pts = Pts();
+   if (tUsr) {
+      srchStr+=" ";
+      srchStr+=(ccp)tUsr["name"];
+   }
+   vector<string> mstr = metaname(srchStr.c_str());
+   pts.ina = nametouint(mstr);
+   if (!payload["geoposition"].isType(FFJSON::UNDEFINED) &&
+       payload["geoposition"].size==2
+   ) {
+      pts.c.x=(float)payload["geoposition"][1];
+      pts.c.y=(float)payload["geoposition"][0];
+      rbsid["geoposition"] = payload["geoposition"];
+   }
+   int pni = pts.pni;
+   flInf(FL, "searching %s at %s\n",srchStr.c_str(),
+         payload["geoposition"].stringify().c_str());
+   cvSrch.wait(modLk, []{return modQhCv.load()==0;});
+   ++searchCv;
+   thnsTree.getPointsFromQuad(pts);
+   --searchCv;
+   cvMod.notify_all();
+   addSearchNoDups(pts, reply, mdts, pni);
+   reply["things"][0];
+   return mkHttpRes(ffHttp, reply.stringify(true).c_str(), jsonMime);
+}
 string ferryfair (FFJSON& ffHttp) {
    FFJSON reply;
    static FFJSON& ffcfg = *pffcfg;
@@ -671,39 +707,7 @@ string ferryfair (FFJSON& ffHttp) {
          " :D\"}", jsonMime);
    }
    case "search"_hash: {
-      FFJSON& fsrch = payload["search"];
-      if (!fsrch) {
-            return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);         
-      }
-      string srchStr = (ccp)payload["search"];
-      BidThings_& bts = bidThings[rbsid.val.fptr];
-      set<FFJSON*>& mdts = bts.mdts;
-      Pts& pts = bts.search;
-      pts = Pts();
-      if (tUsr) {
-         srchStr+=" ";
-         srchStr+=(ccp)tUsr["name"];
-      }
-      vector<string> mstr = metaname(srchStr.c_str());
-      pts.ina = nametouint(mstr);
-      if (!payload["geoposition"].isType(FFJSON::UNDEFINED) &&
-          payload["geoposition"].size==2
-      ) {
-         pts.c.x=(float)payload["geoposition"][1];
-         pts.c.y=(float)payload["geoposition"][0];
-         rbsid["geoposition"] = payload["geoposition"];
-      }
-      int pni = pts.pni;
-      flInf(FL, "searching %s at %s\n",srchStr.c_str(),
-               payload["geoposition"].stringify().c_str());
-      cvSrch.wait(modLk, []{return modQhCv.load()==0;});
-      ++searchCv;
-      thnsTree.getPointsFromQuad(pts);
-      --searchCv;
-      cvMod.notify_all();
-      addSearchNoDups(pts, reply, mdts, pni);
-      reply["things"][0];
-      return mkHttpRes(ffHttp, reply.stringify(true).c_str(), jsonMime);      
+      return ffSearch(payload, rbsid, tUsr, reply, ffHttp);
    }
    }
    username = rbsid["user"];
@@ -810,7 +814,8 @@ string ferryfair (FFJSON& ffHttp) {
                   ina = nametouint(mstr);
                   cvMod.wait(modLk, [] {return searchCv.load()==0;});
                   ++modQhCv;
-                  thnsTree.insert(uthings[j], ina, true);
+                  FFQuad_ fq(uthings[j], ina, 0, 0, true);
+                  thnsTree.insert(fq);
                   --modQhCv;
                   cvSrch.notify_all();
                }
@@ -843,7 +848,8 @@ string ferryfair (FFJSON& ffHttp) {
                ina=nametouint(mstr);
             }
             if (locChanged||nameChanged) {
-               thnsTree.insert(futhing, ina);
+               FFQuad_ fq(futhing, ina);
+               thnsTree.insert(fq);
             }
             if (moded) {
                futhing["lastModed"]=lepoch;
@@ -923,17 +929,17 @@ string ferryfair (FFJSON& ffHttp) {
       } else {
          ofmode = ios::in|ios::out|ios::ate;
       }
-      char msg[30];
       ofstream upfile(upldpth.c_str(), ofmode | std::ios::binary);
       if (!upfile.is_open()) {
-         sprintf(msg, "{\"error\":\"createFailed\"}");
-         return mkHttpRes(ffHttp, msg, jsonMime, -1, 400);
-         
+         reply["error"]="createFailed";
+         return mkHttpRes(ffHttp, reply.stringify(1).c_str(), jsonMime, -1,
+                          400);
       }
       int initial_size = (int)(long long)upfile.tellp();
       if (initial_size!=fofst) {
-         sprintf(msg, "{\"lastChunk\":%d}", initial_size);
-         return mkHttpRes(ffHttp, msg, jsonMime, -1, 400);
+         reply["lastChunk"] = initial_size;
+         return mkHttpRes(ffHttp, reply.stringify(1).c_str(), jsonMime, -1,
+                          400);
       }
       int wrByteCount = ffHttp["content-length"];
       upfile.write(cpld, wrByteCount);
@@ -945,8 +951,9 @@ string ferryfair (FFJSON& ffHttp) {
          setSavMtx.unlock();
       }
       upfile.close();
-      sprintf(msg, "{\"thingId\":%d,\"picId\":%d}", thingId, picId);
-      return mkHttpRes(ffHttp, msg, jsonMime);
+      reply["thingId"]=thingId;
+      reply["picId"]=picId;
+      return mkHttpRes(ffHttp, reply.stringify(1).c_str(), jsonMime);
    }
    case "owl"_hash: {
       FFJSON& things = user["things"];
@@ -1203,6 +1210,9 @@ void makeThngsTree () {
    FFJSON::Iterator it = users.begin();
    FFJSON::Iterator tit;
    int ic=0;
+   vector<string> bmstr = metaname("flat gowtham");
+   vector<uint> bina = nametouint(bmstr);
+               
    while (it!= users.end()) {
       if (it->isType(FFJSON::LINK)) {
          ++it;
@@ -1229,14 +1239,36 @@ void makeThngsTree () {
                string tname((ccp)rF["name"]);
                tname += " ";
                tname += (ccp)rF["user"]["name"];
-               flDbg(FLL,"inserting %s", tname.c_str());
+               flDbg(FL,"inserting %p: %s", pF, tname.c_str());
                vector<string> mstr = metaname(tname);
                vector<uint> ina = nametouint(mstr);
+               for (int i=0; i<ina.size(); ++i)
+                  flDbgCntnu(FLL,"%x ", ina[i]);
+               flDbgCntnu(FLL, "\n");
                float lx = rF["location"][1];
                float ly = rF["location"][0];
-               thnsTree.insert(rF, ina, 0, lx, ly);
+               FFQuad_ fq(rF, ina, lx, ly);
+               thnsTree.insert(fq);
                flDbg(FL, "%d inserted %d", tid, ic);
             });
+            FFJSON& rF = *pF;
+            string tname((ccp)rF["name"]);
+            tname += (ccp)rF["user"]["name"];
+            vector<string> mstr = metaname(tname);
+            vector<uint> ina = nametouint(mstr);
+            bool found = true;
+            if (bina.size()>ina.size())
+               goto skipFor;
+            for (int i=0; i<bina.size(); ++i) {
+               if (bina[i]&ina[i]!=bina[i])
+                  found=false;
+            }
+            if (found) {
+               int8_t matchCount = ffHasName(*pF, bina);
+               flDbg(FL, "matchCount: %d", matchCount);
+               goto insertEnd;
+            }
+           skipFor:
             //uint level = thnsTree.insert(*tit, ina, 0, lx, ly);
             ++ic;
          }
@@ -1248,6 +1280,7 @@ void makeThngsTree () {
       }
       ++it;
    }
+  insertEnd:
    setSavMtx.lock();
    pFSetToSave.insert(fnameints);
    setSavMtx.unlock();
@@ -1267,7 +1300,7 @@ void initFerryFair (FFJSON& cfg) {
    mailPort = ffcfg["secret"]["mailPort"];
    makeThngsTree();
    Pts pts;
-   vector<string> mstr = metaname("Touch");
+   vector<string> mstr = metaname("flat gowtham");
    //vector<string> mstr = metaname("Indulehka Bringha Hair Oil");
    pts.ina=nametouint(mstr);
    //Circle c = {180.0, 90.0, 10.5};
@@ -1276,7 +1309,7 @@ void initFerryFair (FFJSON& cfg) {
    //pts.c = {77.7584640, 12.9826816, 10.5};
    //pts.c = {77.7645299,12.9941367, 10.5};
    //pts.c = {77.7644272, 12.9940713, 10.5};
-   pts.c = {77.7644577, 12.9941273, 10.5};
+   pts.c = {77.7644869, 12.9940933, 10.5}; // flat
    flDbg(FL, "c: %f,%f\n", pts.c.x, pts.c.y);
    FerryTimeStamp ftsStart;
    FerryTimeStamp ftsEnd;
@@ -1287,7 +1320,7 @@ void initFerryFair (FFJSON& cfg) {
    thnsTree.getPointsFromQuad(pts);
    ftsEnd.update();
    ftsDiff = ftsEnd - ftsStart;
-   cout << "%TEST_FINISHED% time=" << ftsDiff << " test21\n" << endl;
+   cout << "timeToFind= " << ftsDiff << endl;
    std::vector<NdNPrn>::iterator it = pts.pts.begin();
    it = pts.pts.begin();
    auto itend = it+pts.pni;
@@ -1298,7 +1331,7 @@ void initFerryFair (FFJSON& cfg) {
       } else {
          fp = (FFJSON*)get<0>(getNode(*it));
       }
-      printf("%s\n",(*fp)["location"].stringify().c_str());
+      printf("%s\n", (*fp)["location"].stringify().c_str());
       ++it;
    }
 }

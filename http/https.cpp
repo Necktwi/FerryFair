@@ -59,7 +59,7 @@ FFJSON cfg;
 int child_exit_status = 0;
 FF_LOG_TYPE fflAllowedType = (FF_LOG_TYPE) (FFL_ERR | FFL_NOTICE | FFL_DEBUG |
                                             FFL_INFO | FFL_WARN);
-unsigned int fflAllowedBlks = (uint)(HL|FL|HSL);
+unsigned int fflAllowedBlks = (uint)(HL|FL);
 thread_local int tid = 0;
 
 #define hlDbg(str, ...) flDbg(HL, "tid: %d; "str, tid, __VA_ARGS__)
@@ -285,12 +285,6 @@ bool isValidMethod (char* buf) {
    }
    return false;
 }
-int makeNonBlocking (int fd) {
-   int flags = fcntl(fd, F_GETFL, 0);
-   if (flags == -1) return -1;
-   return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-}
-
 using crdwr = function<size_t(char*, size_t)>;
 void parseHost (crdwr read, FFJSON& host) {
    char c;
@@ -583,13 +577,13 @@ enum ftype {
    FSFILE, SLINK, BLINK, DIR
 };
 static bool blockIp (ccp ip) {
-   string command = string("blockHttpIp ") + ip;
+   string command = string("./blockHttpIp ") + ip;
    int result = system(command.c_str());
    return (result == 0);
 }
 
 static bool unblockIp (ccp ip) {
-   string command = string("unBlockHttpIp ") + ip;
+   string command = string("./unBlockHttpIp ") + ip;
    int result = system(command.c_str());
    return (result == 0);
 }    
@@ -716,6 +710,7 @@ string httpHandle (FFJSON& ffHttp) {
    int plen = fpath.size;
    string res;
    MkHttpArgs mhArgs;
+   mhArgs.ffHttp=&ffHttp;
    path+="/";
    if (plen>1)
       path+=((ccp)fpath)+1;
@@ -735,7 +730,6 @@ string httpHandle (FFJSON& ffHttp) {
       }
       return res;
    }
-   mhArgs.ffHttp=&ffHttp;
    if (fs::is_directory(fspath)) {
       path += "/index.html";
       fs::path fsindex(path);

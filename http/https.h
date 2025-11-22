@@ -16,7 +16,8 @@ enum HTTPLOG {
    SLL = 1<<14,
    SM = 1<<15,
    FLL = 1<<16,
-   HSL = 1<<17
+   HSL = 1<<17,
+   SLLL = 1<<18
 };
 static atomic<bool> g_running{true};
 struct MkHttpArgs {
