@@ -1,0 +1,4 @@
+#!/bin/bash
+
+echo "Unblocking $1"
+iptables -D INPUT -s $1 -j DROP

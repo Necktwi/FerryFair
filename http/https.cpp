@@ -577,13 +577,13 @@ enum ftype {
    FSFILE, SLINK, BLINK, DIR
 };
 static bool blockIp (ccp ip) {
-   string command = string("./blockHttpIp ") + ip;
+   string command = string("sudo ./blockHttpIp ") + ip;
    int result = system(command.c_str());
    return (result == 0);
 }
 
 static bool unblockIp (ccp ip) {
-   string command = string("./unBlockHttpIp ") + ip;
+   string command = string("sudo ./unBlockHttpIp ") + ip;
    int result = system(command.c_str());
    return (result == 0);
 }    
