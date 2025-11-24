@@ -53,6 +53,42 @@
 #include <mystdlib.h>
 #include "https.h"
 #include "ferryfair.h"
+#include <mutex>                                                      
+#include <sstream>                                                    
+                                                                      
+// In-memory store for push subscriptions (for demonstration purposes)
+// In a real application, you would use a database.                   
+static std::vector<std::string> s_subscriptions;                      
+// Your VAPID public and private keys.                                
+// Generate them once and keep them safe.                             
+// You can use an online generator like                               
+// https://www.stevesouders.com/bin/vapid.php                              
+static const char *s_vapid_public_key = "YOUR_VAPID_PUBLIC_KEY";      
+static const char *s_vapid_private_key = "YOUR_VAPID_PRIVATE_KEY";    
+
+// For OpenSSL thread-safety in multi-threaded applications
+static std::mutex *ssl_mutexes = nullptr;
+
+static void lockingFunc (int mode, int n, const char *file, int line) {
+   if (mode & CRYPTO_LOCK) {
+      ssl_mutexes[n].lock();
+   } else {
+      ssl_mutexes[n].unlock();
+   }
+}
+
+static unsigned long threadIdFunc (void) {                            
+   // This is not guaranteed to be unique on all platforms, but is
+   // efficient for OpenSSL's locking needs.                                 
+    return (unsigned long)std::hash<std::thread::id>()(
+       std::this_thread::get_id());
+}
+
+static void setupOsslLocking (void) {                             
+   ssl_mutexes = new std::mutex[CRYPTO_num_locks()];
+   CRYPTO_set_id_callback(threadIdFunc);
+   CRYPTO_set_locking_callback(lockingFunc);
+}
 
 FFJSON cfg;
 
@@ -62,7 +98,7 @@ FF_LOG_TYPE fflAllowedType = (FF_LOG_TYPE) (FFL_ERR | FFL_NOTICE | FFL_DEBUG |
 unsigned int fflAllowedBlks = (uint)(HL|FL);
 thread_local int tid = 0;
 
-#define hlDbg(str, ...) flDbg(HL, "tid: %d; "str, tid, __VA_ARGS__)
+//#define hlDbg(str, ...) flDbg(HL, "tid: %d; "str, tid, __VA_ARGS__)
 
 using namespace std;
 namespace fs = std::filesystem;
@@ -954,13 +990,14 @@ void accept_loop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
    while (g_running) {
       struct sockaddr_in cli{};
       socklen_t sl = sizeof(cli);
-      flDbg(HL, "listening on %d...", listen_fd);
+      flDbg(HL, "ssl: %p, listening on %d...", ctx, listen_fd);
       int c = accept(listen_fd, (struct sockaddr*)&cli, &sl);
       if (c < 0) {
+         flErr(HL, "accept failed: %s, ssl: %p", strerror(errno), ctx);
          if (errno == EINTR) {
+            flNtc(HL, "ctx: %p, interrupted!", ctx);
             return;
          };
-         flErr(HL, "accept failed: %s", strerror(errno));
          continue;
       }
       flDbg(HL, "got %d...", c);
@@ -1102,6 +1139,7 @@ int run () {
    return 0;
 }
 int main (int argc, char **argv) {
+   setupOsslLocking();
    cfg.init("file://http.ffjson|OBJECT");
    flDbg(HL, "%s\n", cfg.prettyString().c_str());
    flDbg(HL, "EAGAIN(%zd) EINTR(%zd) EINVAL(%zd)\n",
