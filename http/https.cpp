@@ -961,8 +961,8 @@ SSL_CTX* create_ssl_ctx (const string &cert_file, const string &key_file) {
    const SSL_METHOD *method = TLS_server_method();
    SSL_CTX *ctx = SSL_CTX_new(method);
    if (!ctx) return nullptr;
-   if (SSL_CTX_use_certificate_file(
-          ctx, cert_file.c_str(), SSL_FILETYPE_PEM) <= 0) {
+   if (SSL_CTX_use_certificate_chain_file(
+          ctx, cert_file.c_str()) <= 0) {
       ERR_print_errors_fp(stderr);
       SSL_CTX_free(ctx);
       return nullptr;
@@ -1004,6 +1004,21 @@ void accept_loop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
 
       SSL* ssl = nullptr;
       if (ctx) {
+         struct timeval timeout;
+         timeout.tv_sec = 5;  // 5-second timeout
+         timeout.tv_usec = 0;
+         if (setsockopt(c, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout))
+             < 0) {
+            flErr(HL, "Failed to set socket rcv timeout");
+            ::close(c);
+            continue;
+         }
+         if (setsockopt(c, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout))
+             < 0) {
+            flErr(HL, "Failed to set socket snd timeout");
+            ::close(c);
+            continue;
+         }
          ssl = SSL_new(ctx);
          SSL_set_fd(ssl, c);
          int r = SSL_accept(ssl);
@@ -1104,7 +1119,7 @@ int run () {
    }
 
    SSL_CTX* sslCtx = create_ssl_ctx(
-      string((ccp)cfg["cert"]), string((ccp)cfg["key"]));
+      string((ccp)cfg["ca"]), string((ccp)cfg["key"]));
    if (!sslCtx) {
       ffl_err(HL, "Failed to create SSL_CTX");
       return 1;
