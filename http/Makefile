@@ -10,9 +10,12 @@ FFJLIB=-L../../FFJSON/build/${BD}
 FFLLIB=-L../../logger/build/${BD}
 FBLIB=-L../../ferrybase/build/${BD}
 TCPP?=/opt/rocm/llvm/bin/clang++
-DBG?=_DEBUG
-DBGF?=-g -O0
-#DBGF=-O3
+DBGF=-O3
+DBG=_DEBUG0
+ifeq ($(BTYPE),debug)
+	DBG=_DEBUG
+	DBGF=-g -O0
+endif
 
 smtpClient.o: smtpClient.cpp
 	${TCPP} -c -std=c++23 ${DBGF} -D${DBG} -I${FFINC} -I${FBINC} -I${FFLINC} -I${FFJINC} $^ -o $@
