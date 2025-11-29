@@ -234,7 +234,7 @@ void ThreadPool::printThrdStats () {
    *b='\0';
    flInf(HL, buf);
 }
-#elif
+#else
 void ThreadPool::printThrdStats () {}
 #endif
 
