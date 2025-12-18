@@ -1291,7 +1291,7 @@ void initFerryFair (FFJSON& cfg) {
    wdir=(ccp)cfg["rootdir"];
    FFJSON& ffcfg = cfg["cfg"];
    ffcfg.init(string("file://")+wdir+"/config.txo|OBJECT");
-   flDbg(FL, "wdir: %s", wdir);
+   flDbg(FL, "wdir: %s", wdir.c_str());
    pffcfg=&ffcfg;
    admin = ffcfg["secret"]["admin"];
    adminPass = ffcfg["secret"]["adminPass"];
