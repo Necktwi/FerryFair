@@ -1,4 +1,3 @@
-#include "https.h"
 #include "spatialSearch.h"
 #include <myconverters.h>
 #include <metaphone3.h>
@@ -84,7 +83,7 @@ vector<uint> nametouint (vector<string>& mstr) {
    return r;
 }
 void xorina (vector<uint>& dina, vector<uint>& sina) {
-   for (int i=0; i<sina.size();++i) {
+   for (int i=0; i<sina.size(); ++i) {
       if (i==dina.size()) {
          dina.push_back(sina[i]);
       } else {
@@ -310,7 +309,6 @@ QuadNode::~QuadNode () {
 
 CntMut_& QuadHldr::lock (int l) {
    qhMapMut.lock();
-   ffl_debug(SLLL, "tid: %02d: locking %p@%d", tid, this, l);
    CntMut_& cntMut = qhModMutMap[this];
    ++cntMut.count;
    qhMapMut.unlock();
@@ -320,7 +318,6 @@ CntMut_& QuadHldr::lock (int l) {
 
 void QuadHldr::unlock (CntMut_* p = nullptr) {
    qhMapMut.lock();
-   ffl_debug(SLLL, "tid: %02d: unlocking %p", tid, this);
    if (!p)
       p = &qhModMutMap[this];
    --p->count;
@@ -416,7 +413,10 @@ uint QuadHldr::insert (
       float lly = (float)tmp["location"][0];
       if (llx==lx && lly==ly) {
          if (!isS) {
-            xorinaname(ina, (ccp)tmp["name"]);
+            string tname((ccp)tmp["name"]);
+            tname += " ";
+            tname += (ccp)tmp["user"]["name"];
+            xorinaname(ina, tname.c_str());
             sp = new set<FFJSON*>();
             mapffset[sp]=ina;
             sp->insert(&tmp);
@@ -434,7 +434,10 @@ uint QuadHldr::insert (
          if (isS) {
             xorina(ina, sit->second);
          } else {
-            xorinaname(ina, (ccp)tmp["name"]);
+            string tname((ccp)tmp["name"]);
+            tname += " ";
+            tname += (ccp)tmp["user"]["name"];
+            xorinaname(ina, tname.c_str());
          }
       }
       qp->seti(ina);

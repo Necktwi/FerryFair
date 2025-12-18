@@ -14,14 +14,11 @@ extern FFJSON cfg;
 enum HTTPLOG {
    HL = 1<<11,
    FL = 1<<12,
-   SL = 1<<13,
-   SLL = 1<<14,
    SM = 1<<15,
    FLL = 1<<16,
    HSL = 1<<17,
-   SLLL = 1<<18
 };
-static atomic<bool> g_running{true};
+static atomic<bool> atmcRunning{true};
 struct MkHttpArgs {
    FFJSON* ffHttp = nullptr;
    ccp body = nullptr;

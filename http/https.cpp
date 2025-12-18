@@ -109,12 +109,12 @@ set<FFJSON*> pFSetToSave;
 mutex setSavMtx;
 atomic<bool> saveTxoStop{0};
 
-void handle_sigint (int) {
-   if (!g_running) {
+void handleSigInt (int) {
+   if (!atmcRunning) {
       exit(1);
    }
-   g_running = false;
-   flDbg(HL, "interrupted! g_running: %d", g_running.load());
+   atmcRunning = false;
+   flDbg(HL, "interrupted! atmcRunning: %d", atmcRunning.load());
    flNtc(HL, "Shutting down...");
 }
 
@@ -295,24 +295,6 @@ void ThreadPool::join () {
 
 ThreadPool* tpoolPtr;
 // ---------------- Utilities ----------------
-string url_decode (const string &s) {
-   string out;
-   out.reserve(s.size());
-   for(size_t i=0;i<s.size();++i){
-      char c = s[i];
-      if (c == '%') {
-         if (i + 2 < s.size()) {
-            char hex[3] = { s[i+1], s[i+2], 0 };
-            char decoded = (char) strtol(hex, nullptr, 16);
-            out.push_back(decoded);
-            i += 2;
-         }
-      } else if (c == '+') out.push_back(' ');
-      else out.push_back(c);
-   }
-   return out;
-}
-
 // write all bytes to fd
 bool isValidMethod (char* buf) {
    static const char* methods = "get post";
@@ -630,7 +612,7 @@ struct Entry {
    uintmax_t size;
    fs::file_time_type mtime;
 };
-string url_encode (ccp s) {
+string urlEncode (ccp s) {
    static const char *hex = "0123456789ABCDEF";
    string out;
    int sz = strlen(s);
@@ -651,7 +633,7 @@ string url_encode (ccp s) {
    }
    return out;
 }
-string time_to_string (const fs::file_time_type &ft) {
+string timeToString (const fs::file_time_type &ft) {
    using namespace std::chrono;
    // portable conversion: convert from fs clock to system_clock
    auto sctp = time_point_cast<system_clock::duration>(
@@ -665,7 +647,7 @@ string time_to_string (const fs::file_time_type &ft) {
    return string(buf);
 }
 
-string html_escape (ccp s) {
+string htmlEscape (ccp s) {
    std::string out;
    int sz = strlen(s);
    out.reserve(sz);
@@ -683,7 +665,7 @@ string html_escape (ccp s) {
    return out;
 }
 
-string get_mime_type(const fs::path& path) {
+string getMimeType (const fs::path& path) {
    static const unordered_map<string, string> mime {
       {".html", "text/html"},
       {".htm",  "text/html"},
@@ -788,17 +770,17 @@ string httpHandle (FFJSON& ffHttp) {
          return a.name < b.name;
       });
       string dirHtml = "<html><head><title>";
-      dirHtml += html_escape(path.c_str())+"</title></head><body><table>";
+      dirHtml += htmlEscape(path.c_str())+"</title></head><body><table>";
       dirHtml += "<tr><th>Name</th><th>Size</th><th>Modified</th></tr>";
       for (auto &e : entries) {
-         string disp = html_escape(
+         string disp = htmlEscape(
             (e.name +
              (e.type==DIR? "/":e.type==SLINK?"->":e.type==BLINK?"->x":"")
             ).c_str());
          string href = e.type!=BLINK?
-            url_encode((e.name + (e.type==DIR ? "/":"")).c_str()):"";
+            urlEncode((e.name + (e.type==DIR ? "/":"")).c_str()):"";
          string sizeStr = e.type!=FSFILE? "-":to_string(e.size);
-         string mtime = time_to_string(e.mtime);
+         string mtime = timeToString(e.mtime);
          dirHtml += "<tr>";
          dirHtml += "<td><a href=\"" + href + "\">" + disp + "</a></td>";
          dirHtml += "<td>" + sizeStr + "</td>";
@@ -821,7 +803,7 @@ string httpHandle (FFJSON& ffHttp) {
       mhArgs.body=res.c_str();
       mhArgs.bsz=res.length();
       mhArgs.ffHttp = &ffHttp;
-      mhArgs.ctype = get_mime_type(fspath).c_str();
+      mhArgs.ctype = getMimeType(fspath).c_str();
       return mkHttpRes(mhArgs);
    }
   iptrack:
@@ -986,8 +968,8 @@ SSL_CTX* create_ssl_ctx (const string &cert_file, const string &key_file) {
    return ctx;
 }
 
-void accept_loop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
-   while (g_running) {
+void acceptLoop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
+   while (atmcRunning) {
       struct sockaddr_in cli{};
       socklen_t sl = sizeof(cli);
       flDbg(HL, "ssl: %p, listening on %d...", ctx, listen_fd);
@@ -1125,14 +1107,14 @@ int run () {
       return 1;
    }
    thread t1([httpFd] () {
-      accept_loop(httpFd, *tpoolPtr);
+      acceptLoop(httpFd, *tpoolPtr);
    });
    thread t2([httpsFd, &sslCtx] () {
-      accept_loop(httpsFd, *tpoolPtr, sslCtx);
+      acceptLoop(httpsFd, *tpoolPtr, sslCtx);
    });
    thread saveTxoT(saveTxo);
    flDbg(HL, "main sleeping..");
-   while (g_running) {
+   while (atmcRunning) {
       this_thread::sleep_for(chrono::milliseconds(2000));
    }
 
@@ -1159,7 +1141,7 @@ int main (int argc, char **argv) {
    flDbg(HL, "%s\n", cfg.prettyString().c_str());
    flDbg(HL, "EAGAIN(%zd) EINTR(%zd) EINVAL(%zd)\n",
              EAGAIN, EINTR, EINVAL);
-   signal(SIGINT, handle_sigint);
+   signal(SIGINT, handleSigInt);
    signal(SIGPIPE, SIG_IGN);
    //signal(SIGPIPE, handleSigpipe);
    if (cfg["daemon"]) {

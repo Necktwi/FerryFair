@@ -205,8 +205,9 @@ static size_t onCurlResponse (void* contents, size_t size, size_t nmemb,
    return totalSize;
 }
 vector<FFJSON*> usersId;
-string ffSearch (FFJSON& payload, FFJSON& rbsid, FFJSON& tUsr, FFJSON& reply,
-               FFJSON& ffHttp) {
+string ffSearch (
+   FFJSON& payload, FFJSON& rbsid, FFJSON& tUsr, FFJSON& reply,
+   FFJSON& ffHttp) {
    FFJSON& fsrch = payload["search"];
    if (!fsrch) {
       return "2";         
@@ -1290,7 +1291,7 @@ void initFerryFair (FFJSON& cfg) {
    wdir=(ccp)cfg["rootdir"];
    FFJSON& ffcfg = cfg["cfg"];
    ffcfg.init(string("file://")+wdir+"/config.txo|OBJECT");
-   flDbg(FL, "wdir: %s", (ccp)cfg["rootdir"]);
+   flDbg(FL, "wdir: %s", wdir);
    pffcfg=&ffcfg;
    admin = ffcfg["secret"]["admin"];
    adminPass = ffcfg["secret"]["adminPass"];

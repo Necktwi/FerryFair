@@ -9,6 +9,11 @@
 #include <queue>
 #include <math.h>
 
+enum SLOG {
+   SL = 1<<13,
+   SLL = 1<<14,
+   SLLL = 1<<18
+};
 struct QuadNode;
 struct Circle {
    float x;
