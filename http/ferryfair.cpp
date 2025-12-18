@@ -1187,10 +1187,9 @@ string ferryfair (FFJSON& ffHttp) {
    return "";
 }
 
-void makeThngsTree () {
+void makeThngsTree (Txo& cfg) {
    QuadNode q;
-   fnameints =
-      &cfg["vhosts"]["www"]["cfg"]["nameints"];
+   fnameints = &cfg["nameints"];
    nameints = fnameints->val.pairs;
    map<string, FFJSON*>::iterator nit = nameints->begin();
    multiset<map<string, FFJSON*>::iterator, CompNameWt> namewtset(cmpNmWt);
@@ -1206,7 +1205,7 @@ void makeThngsTree () {
       ++i;
       ++mit;
    }
-   FFJSON& users = cfg["vhosts"]["www"]["cfg"]["users"];
+   FFJSON& users = cfg["users"];
    FFJSON::Iterator it = users.begin();
    FFJSON::Iterator tit;
    int ic=0;
@@ -1233,7 +1232,7 @@ void makeThngsTree () {
          if (!((*tit)["name"].isType(FFJSON::UNDEFINED) ||
                (*tit)["location"].isType(FFJSON::UNDEFINED))) {
             FFJSON* pF = &*tit;
-            flDbg(FL, "inserting %d", ic);
+            //flDbg(FL, "inserting %d", ic);
             tpoolPtr->enqueue([pF, ic] (int tid) {
                FFJSON& rF = *pF;
                string tname((ccp)rF["name"]);
@@ -1249,25 +1248,25 @@ void makeThngsTree () {
                float ly = rF["location"][0];
                FFQuad_ fq(rF, ina, lx, ly);
                thnsTree.insert(fq);
-               flDbg(FL, "%d inserted %d", tid, ic);
+               //flDbg(FL, "%d inserted %d", tid, ic);
             });
-            FFJSON& rF = *pF;
-            string tname((ccp)rF["name"]);
-            tname += (ccp)rF["user"]["name"];
-            vector<string> mstr = metaname(tname);
-            vector<uint> ina = nametouint(mstr);
-            bool found = true;
-            if (bina.size()>ina.size())
-               goto skipFor;
-            for (int i=0; i<bina.size(); ++i) {
-               if (bina[i]&ina[i]!=bina[i])
-                  found=false;
-            }
-            if (found) {
-               int8_t matchCount = ffHasName(*pF, bina);
-               flDbg(FL, "matchCount: %d", matchCount);
-               goto insertEnd;
-            }
+            // FFJSON& rF = *pF;
+            // string tname((ccp)rF["name"]);
+            // tname += (ccp)rF["user"]["name"];
+            // vector<string> mstr = metaname(tname);
+            // vector<uint> ina = nametouint(mstr);
+            // bool found = true;
+            // if (bina.size()>ina.size())
+            //    goto skipFor;
+            // for (int i=0; i<bina.size(); ++i) {
+            //    if (bina[i]&ina[i]!=bina[i])
+            //       found=false;
+            // }
+            // if (found) {
+            //    int8_t matchCount = ffHasName(*pF, bina);
+            //    flDbg(FL, "matchCount: %d", matchCount);
+            //    goto insertEnd;
+            // }
            skipFor:
             //uint level = thnsTree.insert(*tit, ina, 0, lx, ly);
             ++ic;
@@ -1288,17 +1287,18 @@ void makeThngsTree () {
 }
 
 void initFerryFair (FFJSON& cfg) {
+   wdir=(ccp)cfg["rootdir"];
    FFJSON& ffcfg = cfg["cfg"];
-   wdir=(ccp)cfg["vhosts"]["www"]["rootdir"];
    ffcfg.init(string("file://")+wdir+"/config.txo|OBJECT");
-   cfg["vhosts"]["www"]["cfg"]=pffcfg=&cfg["cfg"];
+   flDbg(FL, "wdir: %s", (ccp)cfg["rootdir"]);
+   pffcfg=&ffcfg;
    admin = ffcfg["secret"]["admin"];
    adminPass = ffcfg["secret"]["adminPass"];
    prbs = &ffcfg["rbs"];
    pusers = &ffcfg["users"];
    mailServer = ffcfg["secret"]["mailServer"];
    mailPort = ffcfg["secret"]["mailPort"];
-   makeThngsTree();
+   makeThngsTree(ffcfg);
    Pts pts;
    vector<string> mstr = metaname("flat gowtham");
    //vector<string> mstr = metaname("Indulehka Bringha Hair Oil");

@@ -8,6 +8,8 @@
 #include <condition_variable>
 #include <FerryTimeStamp.h>
 
+#define Txo FFJSON
+
 extern FFJSON cfg;
 enum HTTPLOG {
    HL = 1<<11,

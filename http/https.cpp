@@ -216,7 +216,7 @@ void ThreadPool::init (size_t n) {
       started = true;
    }
 }
-void ThreadPool::enqueue(function<void(int)> job) {
+void ThreadPool::enqueue (function<void(int)> job) {
    {
       unique_lock<mutex> lk(mutex_);
       jobs_.push(move(job));
@@ -1105,7 +1105,7 @@ int run () {
    curl_global_init(CURL_GLOBAL_DEFAULT);
    
    tpoolPtr = new ThreadPool((int)fCfgThrdCnt);
-   initFerryFair(cfg);
+   initFerryFair(cfg["vhosts"]["www"]);
 
    int httpFd = create_listen_socket((uint16_t)(int)cfg["httpPort"]);
    if (httpFd < 0) {
