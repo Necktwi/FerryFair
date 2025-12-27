@@ -45,6 +45,8 @@
 #include <sys/socket.h>
 #include <curl/curl.h>
 #include <poll.h>
+#include <mutex>                                                      
+#include <sstream>                                                    
 
 #include <FFJSON.h>
 #include <logger.h>
@@ -53,9 +55,8 @@
 #include <mystdlib.h>
 #include "https.h"
 #include "ferryfair.h"
-#include <mutex>                                                      
-#include <sstream>                                                    
-                                                                      
+#include "htmlParser.cpp"
+
 // In-memory store for push subscriptions (for demonstration purposes)
 // In a real application, you would use a database.                   
 static std::vector<std::string> s_subscriptions;                      
@@ -613,11 +614,11 @@ struct Entry {
    fs::file_time_type mtime;
 };
 string urlEncode (ccp s) {
-   static const char *hex = "0123456789ABCDEF";
+   static const char* hex = "0123456789ABCDEF";
    string out;
    int sz = strlen(s);
    out.reserve(sz *3);
-   for (int i=0;i<sz; ++i) {
+   for (int i=0; i<sz; ++i) {
       unsigned char c = s[i];
       // safe characters (RFC3986 subset)
       if ( (c >= '0' && c <= '9') ||
@@ -692,7 +693,7 @@ string getMimeType (const fs::path& path) {
    auto ext = path.extension().string();
    // lowercase the extension
    for (auto &c : ext) c = static_cast<char>(tolower(c));
-
+   flInf(HL, "ext: %s", ext.c_str());
    auto it = mime.find(ext);
    if (it != mime.end()) {
       return it->second;
@@ -704,10 +705,50 @@ struct IpTrack_ {
    FTS_ firstReqTime;
    int count = 0;
 };
-unordered_map<string, IpTrack_> ipTracks;
+typedef unordered_map<string, IpTrack_> IpTrksMp_;
+IpTrksMp_ ipTracks;
+struct TimeoutFunc_ {
+   FTS_ timeout;
+   void (*func) () = nullptr;
+   void* data = nullptr;
+};
+
+struct CmpTout_ {
+   bool operator () (const TimeoutFunc_* tf1, const TimeoutFunc_* tf2) const {
+      return tf1->timeout < tf2->timeout;
+   }
+} cmpTout;
+typedef set<TimeoutFunc_*, CmpTout_> TmOutSet_;
+TmOutSet_ TmOtFuncSet(cmpTout);
+struct TmOutIpUnblocker_:public TimeoutFunc_ {
+   void func () {
+      unblockIp(ip);
+   }
+   ccp ip;
+};
+
 FTS_ oneMin = {60,0};
 FTS_ halfMin = {30,0};
 
+bool isNJsClient (FFJSON& ffHttp) {
+   ccp ua = ffHttp["user-agent"];
+   flInf(HL, ua);
+   if (strstr(ua, "w3m") || strstr(ua, "curl") || strstr(ua, "Dillo")) {
+      flInf(HL, "NJs");
+      return true;
+   }
+   return false;
+}
+
+string stripJs (string& html) {
+   HTML_ doc(html.c_str());
+   auto jsElms = doc.getElementsByClassName("js");
+   for (auto* elem : jsElms) {
+      elem->remove();
+   }
+   flInf(HL, "stripped js");
+   return doc.stringify();
+}
 string httpHandle (FFJSON& ffHttp) {
    FFJSON& fpath = ffHttp["path"];
    if (!fpath)
@@ -799,11 +840,17 @@ string httpHandle (FFJSON& ffHttp) {
       ifstream reqFile(path);
       ostringstream resStr;
       resStr << reqFile.rdbuf();
+      string ctype = getMimeType(fspath);
+      mhArgs.ctype = ctype.c_str();
       string res = resStr.str();
+      flInf(HL, "checking js %s %s", mhArgs.ctype, ctype.c_str());
+      if (strstr(mhArgs.ctype, "html") && isNJsClient(ffHttp)) {
+         res = stripJs(res);
+         flInf(HL, "%s", res.c_str());
+      }
       mhArgs.body=res.c_str();
       mhArgs.bsz=res.length();
       mhArgs.ffHttp = &ffHttp;
-      mhArgs.ctype = getMimeType(fspath).c_str();
       return mkHttpRes(mhArgs);
    }
   iptrack:
@@ -819,6 +866,11 @@ string httpHandle (FFJSON& ffHttp) {
       if (ipt.count>7) {
          flNtc(HL, "blocking %s", (ccp)ffHttp["ip"]);
          blockIp((ccp)ffHttp["ip"]);
+         TmOutIpUnblocker_* tmOtIpUnBlkr = new TmOutIpUnblocker_();
+         IpTrksMp_::iterator it = ipTracks.find((ccp)ffHttp["ip"]);
+         tmOtIpUnBlkr->ip=it->first.c_str();
+         tmOtIpUnBlkr->timeout=now+7200;
+         TmOtFuncSet.insert(tmOtIpUnBlkr);
       } else if (ipt.count <2) {
          ipt.firstReqTime=now;
       }
@@ -1040,6 +1092,34 @@ void saveTxo () {
    }
 }
 
+
+void serveTimeouts () {
+   FTS_ now;
+   while (atmcRunning) {
+      this_thread::sleep_for(chrono::milliseconds(2000));
+      while (1) {
+         TmOutSet_::iterator it = TmOtFuncSet.begin();
+         if (it==TmOtFuncSet.end())
+            break;
+         TimeoutFunc_* topTmOtFunc = *it;
+         now.update();
+         if (topTmOtFunc->timeout < now) {
+            topTmOtFunc->func();
+            TmOtFuncSet.erase(it);
+            delete topTmOtFunc;
+         } else {
+            break;
+         }
+      }
+   }
+   TmOutSet_::iterator it = TmOtFuncSet.begin();
+   while (it!=TmOtFuncSet.end()) {
+      TimeoutFunc_* topTmOtFunc = *it;
+      topTmOtFunc->func();
+      TmOtFuncSet.erase(it);
+      delete topTmOtFunc;
+   }
+}
 // ---------------- CLI and main ----------------
 void usage_and_exit (const char *p) {
    ffl_err(HL, "Usage: %s --cert cert.pem --key key.pem [--http-port N]"
@@ -1113,6 +1193,7 @@ int run () {
       acceptLoop(httpsFd, *tpoolPtr, sslCtx);
    });
    thread saveTxoT(saveTxo);
+   thread serveTmOtT(serveTimeouts);
    flDbg(HL, "main sleeping..");
    while (atmcRunning) {
       this_thread::sleep_for(chrono::milliseconds(2000));
@@ -1133,6 +1214,7 @@ int run () {
    saveTxoStop=true;
    flDbg(HL, "saving pending files");
    saveTxoT.join();
+   serveTmOtT.join();
    return 0;
 }
 int main (int argc, char **argv) {
@@ -1147,9 +1229,12 @@ int main (int argc, char **argv) {
    if (cfg["daemon"]) {
       enableCoreDumps();
       struct stat statbuf;
-      int stat_r = stat("httpd.log", &statbuf);
+      FTS_ ts;
+      ts.update();
+      char log[64];
+      sprintf(log, "httpd-%zu.log", ts.tv_sec);
       int ferr = open (
-         "httpd.log", O_CREAT | O_WRONLY | O_TRUNC, 0600);
+         log, O_CREAT | O_WRONLY | O_TRUNC, 0600);
       dup2(ferr, 1);
       dup2(ferr, 2);
       close(ferr);

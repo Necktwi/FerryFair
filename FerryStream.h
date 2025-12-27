@@ -38,9 +38,9 @@ public:
 	class Exception : std::exception {
 	public:
 
-		Exception(std::string e);
+//		Exception(std::string e);
 
-		const char* what() const throw ();
+//		const char* what() const throw ();
 
 		//~Exception() throw ();
 
@@ -53,21 +53,21 @@ public:
 
 	FerryStream(const FerryStream& orig);
 
-	FerryStream(ServerSocket::Connection * source, void(*funeral)(int));
+//	FerryStream(ServerSocket::Connection * source, void(*funeral)(int));
 
-	~FerryStream();
+//	~FerryStream();
 
-	void die();
+//	void die();
 
-	bool isConnectionAlive();
+//	bool isConnectionAlive();
 
 private:
-	ServerSocket::Connection * source = NULL;
+//	ServerSocket::Connection * source = NULL;
 	thread* heartThread;
 	bool suicide = false;
 	string buffer = "";
 
-	static void heart(FerryStream* fs);
+//	static void heart(FerryStream* fs);
 	void(*funeral)(int path);
 };
 

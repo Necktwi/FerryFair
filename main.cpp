@@ -339,7 +339,7 @@ int run () {
       dup2(2, 1);
    }
    port = config["port"];
-   ServerSocket* ss = NULL;
+   //ServerSocket* ss = NULL;
    debug = 1;
    b64_hmt = base64_encode((const unsigned char*)JPEGImage::StdHuffmanTable, 420, (size_t*)& b64_hmt_l);
    WSServer* wss = new WSServer(
@@ -351,33 +351,33 @@ int run () {
       config["sslKey"],
       config["sslCA"]
    );
-   try {
-      ss = new ServerSocket(port);
-   }
-   catch (SocketException e) {
-      ffl_err(FPL_MAIN, "Unable to create socket on port: %d", port);
-   }
-   while (ss && !force_exit && (
-             duration == 0 || duration > (time(NULL) - starttime))) {
-      try {
-         ffl_notice(FPL_MAIN, "waiting for a connection on %d ...", port);
-         FerryStream* fs = new FerryStream(ss->accept(),
-            &ferryStreamFuneral);
-         cleanDeadFSList();
-         ffl_notice(FPL_MAIN, "a connection accepted.");
-      } catch (SocketException e) {
-         ffl_warn(FPL_MAIN, "Exception accepting incoming connection: %s",
-            e.description().c_str());
-      } catch (FerryStream::Exception e) {
-         ffl_err(FPL_MAIN, "Exception creating a new FerryStream: %s",
-            e.what());
-      }
-   }
+   // try {
+   //    ss = new ServerSocket(port);
+   // }
+   // catch (SocketException e) {
+   //    ffl_err(FPL_MAIN, "Unable to create socket on port: %d", port);
+   // }
+   // while (ss && !force_exit && (
+   //           duration == 0 || duration > (time(NULL) - starttime))) {
+   //    try {
+   //       ffl_notice(FPL_MAIN, "waiting for a connection on %d ...", port);
+   //       FerryStream* fs = new FerryStream(ss->accept(),
+   //          &ferryStreamFuneral);
+   //       cleanDeadFSList();
+   //       ffl_notice(FPL_MAIN, "a connection accepted.");
+   //    } catch (SocketException e) {
+   //       ffl_warn(FPL_MAIN, "Exception accepting incoming connection: %s",
+   //          e.description().c_str());
+   //    } catch (FerryStream::Exception e) {
+   //       ffl_err(FPL_MAIN, "Exception creating a new FerryStream: %s",
+   //          e.what());
+   //    }
+   // }
    force_exit = 1;
    sleep(5);
    cleanDeadFSList();
    cleanLiveFSList();
-   delete ss;
+   //delete ss;
    delete wss;
    terminate_all_paths();
    free(b64_hmt);

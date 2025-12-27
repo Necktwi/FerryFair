@@ -37,7 +37,7 @@ FerryStream::FerryStream() {
 
 FerryStream::FerryStream(const FerryStream& orig) {
 }
-
+/*
 FerryStream::FerryStream(
    ServerSocket::Connection * source, void(*funeral)(int)) :
    source(source), funeral(funeral)
@@ -250,7 +250,7 @@ void FerryStream::heart(FerryStream* fs) {
 	}
 	deadFSList.push_back(fs);
 }
-
+*/
 std::list<FerryStream*> deadFSList;
 std::list<FerryStream*> liveFSList;
 

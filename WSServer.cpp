@@ -2376,11 +2376,11 @@ WSServer::WSServer (
    FerryTimeStamp ftsStart;
    FerryTimeStamp ftsEnd;
    FerryTimeStamp ftsDiff;
-   ftsStart.Update();
+   ftsStart.update();
    thnsTree.print(pts.c);
    //ina.push_back(0x80);
    thnsTree.getPointsFromQuad(pts);
-   ftsEnd.Update();
+   ftsEnd.update();
    ftsDiff = ftsEnd - ftsStart;
    cout << "%TEST_FINISHED% time=" << ftsDiff << " test21\n" << endl;
    std::vector<NdNPrn>::iterator it = pts.pts.begin();
