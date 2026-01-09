@@ -2,6 +2,7 @@
 #define HTTPS
 
 #include <functional>
+#include <filesystem>
 #include <queue>
 #include <thread>
 #include <FFJSON.h>
@@ -9,6 +10,9 @@
 #include <FerryTimeStamp.h>
 
 #define Txo FFJSON
+#define let auto;
+
+namespace fs = std::filesystem;
 
 extern FFJSON cfg;
 enum HTTPLOG {
@@ -17,29 +21,45 @@ enum HTTPLOG {
    SM = 1<<15,
    FLL = 1<<16,
    HSL = 1<<17,
+   HLL = 1<<18,
+   HLLL = 1<<19
 };
 static atomic<bool> atmcRunning{true};
 struct MkHttpArgs {
-   FFJSON* ffHttp = nullptr;
-   ccp body = nullptr;
-   ccp ctype = "text/plain";
-   int bsz=-1;
-   const int code = 200;
-   ccp codeMsg = "OK";
-   ccp addlHdrs = "";
-   bool cchCtrl = false;
+   FFJSON* ffHttp= nullptr;
+   ccp body= nullptr;
+   ccp ctype= "text/plain";
+   int bsz= -1;
+   int code= 200;
+   ccp codeMsg= "OK";
+   ccp addlHdrs= nullptr;
+   bool cchCtrl= false;
+   ccp insCntnt= nullptr;
+   int insAt= 0;
    MkHttpArgs (
       FFJSON* ffHttp, ccp body, ccp ctype = "text/plain", int bsz=-1,
       const int code = 200, ccp codeMsg = "OK", ccp addlHdrs = "") :
       ffHttp(ffHttp), body(body), ctype(ctype), bsz(bsz), code(code),
       codeMsg(codeMsg), addlHdrs(addlHdrs) {};
    MkHttpArgs () {};
+   void init () {
+      ffHttp= nullptr;
+      body= nullptr;
+      ctype= "text/plain";
+      bsz= -1;
+      int code= 200;
+      codeMsg= "OK";
+      addlHdrs= nullptr;
+      cchCtrl= false;
+   }
 };
-string mkHttpRes (struct MkHttpArgs& ma);
-string mkHttpRes (
+
+char* fileToStr (fs::path& fspath, char* buf= nullptr);
+int mkHttpRes (struct MkHttpArgs& ma);
+int mkHttpRes (
    FFJSON& ffHttp, ccp body, ccp ctype = "text/plain", int bsz=-1,
    const int code = 200, ccp codeMsg = "OK", ccp addlHdrs = "");
-inline string mkHttpRes (
+inline int mkHttpRes (
    FFJSON& ffHttp, string body, ccp ctype = "text/plain",
    const int code = 200, ccp codeMsg = "OK", ccp addlHdrs = "") {
    return mkHttpRes(ffHttp, body.c_str(), ctype, body.length(), code, codeMsg, addlHdrs);

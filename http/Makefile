@@ -49,8 +49,8 @@ ${BD}/spatialSearch.o
 	-lssl -lcrypto -ljpeg -lz -lrt -licui18n -licuuc -licudata \
 	-lcurl -Wl,-unresolved-symbols=ignore-in-shared-libs; \
 
-https: ${BD}/https
-	echo "built $^"
+https: ${BD}/https htmlParser.cpp
+	@echo "built $(word 1, $^)"
 
 ${BD}/critcalSection.o:
 	${TCPP} -c -masm=intel criticalSection.s -o $@

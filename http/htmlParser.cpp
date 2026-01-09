@@ -6,12 +6,15 @@
 
 using namespace std;
 
+// Added new state for raw text blocks
 const int NORMAL = 0;
 const int IN_COMMENT = 1;
 const int IN_DOCTYPE = 2;
 const int IN_CDATA = 3;
 const int IN_TAG = 4;
 const int IN_CLOSE_TAG = 5;
+const int IN_RAW_TEXT = 6;
+
 
 class HTML_ {
 public:
@@ -37,28 +40,30 @@ public:
    }
 
    string stringify () {
+      // If the tag is empty, this is a text node; just return the text.
+      if (tag.empty()) {
+         return text;
+      }
+      
       ostringstream oss;
       oss << doctype << "<" << tag;
       for (auto& a : attrs) {
          oss << " " << a.first << "=\"" << a.second << "\"";
       }
+
       if (self_closing) {
          oss << "/>";
       } else {
          oss << ">";
-         // preserve whitespace in pre/code
+         // If tag is pre or code, output its stored raw text directly.
          if (tag == "pre" || tag == "code") {
             oss << text;
          } else {
-            // trim text
-            size_t start = text.find_first_not_of(" \t\n\r");
-            size_t end = text.find_last_not_of(" \t\n\r");
-            if (start != string::npos) {
-               oss << text.substr(start, end - start + 1);
+            // Otherwise, stringify children which can be elements or text
+            // nodes.
+            for (auto c : children) {
+               oss << c->stringify();
             }
-         }
-         for (auto c : children) {
-            oss << c->stringify();
          }
          oss << "</" << tag << ">";
       }
@@ -69,6 +74,7 @@ public:
       vector<HTML_*> res;
       if (hasClass(className)) res.push_back(this);
       for (auto c : children) {
+         if (c->tag.empty()) continue;
          auto sub = c->getElementsByClassName(className);
          res.insert(res.end(), sub.begin(), sub.end());
       }
@@ -79,6 +85,7 @@ public:
       vector<HTML_*> res;
       if (this->tag == tagName) res.push_back(this);
       for (auto c : children) {
+         if (c->tag.empty()) continue;
          auto sub = c->getElementsByTagName(tagName);
          res.insert(res.end(), sub.begin(), sub.end());
       }
@@ -98,64 +105,46 @@ public:
          siblings.erase(std::remove(siblings.begin(), siblings.end(),
                                     this), siblings.end());
          parent = nullptr;
-         // Note: Manual deletion required to avoid double-free with destructor
       }
    }
 
 private:
+   HTML_() : parent(nullptr), self_closing(false) {}
+
    vector<pair<string, string>> parseAttrs (const string& attr_str) {
       vector<pair<string, string>> attrs;
       size_t i = 0;
       size_t attr_len = attr_str.size();
       while (i < attr_len) {
-         // skip whitespace
          while (i < attr_len && isspace(attr_str[i])) ++i;
          if (i >= attr_len) break;
-         // parse name
+         
          size_t start = i;
          while (i < attr_len && !isspace(attr_str[i]) && attr_str[i] != '=') ++i;
          string name = attr_str.substr(start, i - start);
          if (name.empty()) break;
-         // skip whitespace
+         
          while (i < attr_len && isspace(attr_str[i])) ++i;
          if (i >= attr_len || attr_str[i] != '=') continue;
-         ++i; // skip =
-         // skip whitespace
+         ++i;
+         
          while (i < attr_len && isspace(attr_str[i])) ++i;
          if (i >= attr_len) break;
+         
          char quote = attr_str[i];
          string value;
          if (quote == '"' || quote == '\'') {
-            ++i; // skip quote
+            ++i;
             start = i;
             while (i < attr_len && attr_str[i] != quote) ++i;
             value = attr_str.substr(start, i - start);
-            if (i < attr_len) ++i; // skip closing quote
+            if (i < attr_len) ++i;
          } else {
-            // unquoted value until space or end
             start = i;
             while (i < attr_len && !isspace(attr_str[i])) ++i;
             value = attr_str.substr(start, i - start);
          }
-         // trim and collapse spaces in value
-         value.erase(
-            value.begin(), find_if(
-               value.begin(), value.end(), [](int ch){return !isspace(ch);}));
-         value.erase(find_if(value.rbegin(), value.rend(), [](int ch){return !isspace(ch);}).base(), value.end());
-         string cleaned_value;
-         bool last_space = false;
-         for (char c : value) {
-            if (isspace(c)) {
-               if (!last_space) {
-                  cleaned_value += ' ';
-                  last_space = true;
-               }
-            } else {
-               cleaned_value += c;
-               last_space = false;
-            }
-         }
-         attrs.emplace_back(name, cleaned_value);
+         attrs.emplace_back(name, value);
       }
       return attrs;
    }
@@ -172,109 +161,107 @@ private:
 
    void parse (const string& html) {
       if (html.empty()) return;
-      vector<string> voidTags = {"area", "base", "br", "col", "embed",
-                                 "hr", "img", "input", "link", "meta",
-                                 "param", "source", "track", "wbr"};
+      vector<string> voidTags = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"};
       vector<HTML_*> stack;
       stack.push_back(this);
       HTML_* current = this;
       bool rootSet = false;
       int state = NORMAL;
       string buffer;
-      size_t html_len = html.size();
-      for (size_t i = 0; i < html_len; ++i) {
+      string text_buffer;
+      string raw_tag_to_close;
+
+      auto create_text_node = [&](string& text) {
+          if (text.empty() || !current) return;
+          size_t start = text.find_first_not_of(" \t\n\r");
+          if (start != string::npos) {
+              size_t end = text.find_last_not_of(" \t\n\r");
+              string trimmed_text = text.substr(start, end - start + 1);
+              HTML_* text_node = new HTML_();
+              text_node->tag = "";
+              text_node->text = trimmed_text;
+              text_node->parent = current;
+              current->children.push_back(text_node);
+          }
+          text.clear();
+      };
+
+      for (size_t i = 0; i < html.size(); ++i) {
          char c = html[i];
          switch (state) {
             case NORMAL:
                if (c == '<') {
-                  if (i + 3 < html_len && html.substr(i, 4) == "<!--") {
-                     state = IN_COMMENT;
-                     buffer = "<!--";
-                     i += 3;
-                  } else if (i + 8 < html_len && html.substr(i, 9) == "<!DOCTYPE") {
-                     state = IN_DOCTYPE;
-                     buffer = "<!DOCTYPE";
-                     i += 8;
-                  } else if (i + 8 < html_len && html.substr(i, 9) == "<![CDATA[") {
-                     state = IN_CDATA;
-                     buffer = "<![CDATA[";
-                     i += 8;
-                  } else if (i + 1 < html_len && html[i + 1] == '/') {
-                     state = IN_CLOSE_TAG;
-                     buffer = "";
-                     ++i; // skip /
-                  } else {
-                     state = IN_TAG;
-                     buffer = "";
-                  }
+                  create_text_node(text_buffer);
+                  if (i + 3 < html.size() && html.substr(i, 4) == "<!--") { state = IN_COMMENT; buffer = "<!--"; i += 3; }
+                  else if (i + 8 < html.size() && html.substr(i, 9) == "<!DOCTYPE") { state = IN_DOCTYPE; buffer = "<!DOCTYPE"; i += 8; }
+                  else if (i + 8 < html.size() && html.substr(i, 9) == "<![CDATA[") { state = IN_CDATA; buffer = "<![CDATA["; i += 8; }
+                  else if (i + 1 < html.size() && html[i + 1] == '/') { state = IN_CLOSE_TAG; buffer = ""; ++i; }
+                  else { state = IN_TAG; buffer = ""; }
                } else {
-                  if (current) current->text += c;
+                  text_buffer += c;
                }
                break;
+            
+            case IN_RAW_TEXT:
+                {
+                    string end_tag = "</" + raw_tag_to_close + ">";
+                    if (i + end_tag.length() <= html.size() && html.substr(i, end_tag.length()) == end_tag) {
+                        stack.pop_back();
+                        current = stack.empty() ? nullptr : stack.back();
+                        state = NORMAL;
+                        i += end_tag.length() - 1;
+                    } else {
+                        if (current) current->text += c;
+                    }
+                }
+                break;
 
             case IN_COMMENT:
-               buffer += c;
-               if (i + 2 < html_len && html.substr(i, 3) == "-->") {
-                  preamble += buffer + "-->";
-                  state = NORMAL;
-                  buffer = "";
-                  i += 2;
-               }
-               break;
-
             case IN_DOCTYPE:
-               buffer += c;
-               if (c == '>') {
-                  doctype += buffer;
-                  state = NORMAL;
-                  buffer = "";
-               }
-               break;
-
             case IN_CDATA:
-               buffer += c;
-               if (i + 2 < html_len && html.substr(i, 3) == "]]>") {
-                  preamble += buffer + "]]>";
-                  state = NORMAL;
-                  buffer = "";
-                  i += 2;
-               }
-               break;
+                 buffer += c;
+                 if (state == IN_COMMENT && i + 2 < html.size() && html.substr(i, 3) == "-->") { preamble += buffer + "-->"; state = NORMAL; buffer = ""; i += 2; }
+                 else if (state == IN_DOCTYPE && c == '>') { doctype += buffer; state = NORMAL; buffer = ""; }
+                 else if (state == IN_CDATA && i + 2 < html.size() && html.substr(i, 3) == "]]>") { preamble += buffer + "]]>"; state = NORMAL; buffer = ""; i += 2; }
+                 break;
 
             case IN_TAG:
                if (c == '>') {
                   string tag_content = buffer;
                   bool is_self_closing_by_slash = !tag_content.empty() && tag_content.back() == '/';
-                  
-                  if (is_self_closing_by_slash) {
-                     tag_content.pop_back();
-                  }
+                  if (is_self_closing_by_slash) tag_content.pop_back();
 
                   size_t space_pos = tag_content.find(' ');
                   string tag_name = tag_content.substr(0, space_pos);
                   string attr_part = (space_pos != string::npos) ? tag_content.substr(space_pos + 1) : "";
+                  bool is_void = find(voidTags.begin(), voidTags.end(), tag_name) != voidTags.end();
 
+                  HTML_* node_to_process = nullptr;
                   if (!rootSet) {
                      rootSet = true;
-                     this->tag = tag_name;
-                     this->attrs = parseAttrs(attr_part);
-                     this->self_closing = is_self_closing_by_slash ||
-                                          (find(voidTags.begin(), voidTags.end(), this->tag) != voidTags.end());
+                     node_to_process = this;
                      current = this;
                   } else {
-                     HTML_* child = new HTML_("");
+                     HTML_* child = new HTML_();
                      child->parent = current;
-                     child->tag = tag_name;
-                     child->attrs = parseAttrs(attr_part);
-                     child->self_closing = is_self_closing_by_slash ||
-                                           (find(voidTags.begin(), voidTags.end(), child->tag) != voidTags.end());
                      if (current) current->children.push_back(child);
-                     if (!child->self_closing) {
-                        stack.push_back(child);
-                        current = child;
-                     }
+                     node_to_process = child;
                   }
-                  state = NORMAL;
+                  
+                  node_to_process->tag = tag_name;
+                  node_to_process->attrs = parseAttrs(attr_part);
+                  node_to_process->self_closing = is_self_closing_by_slash || is_void;
+
+                  if (!node_to_process->self_closing) {
+                     if(tag_name == "pre" || tag_name == "code") {
+                        state = IN_RAW_TEXT;
+                        raw_tag_to_close = tag_name;
+                     }
+                     stack.push_back(node_to_process);
+                     current = node_to_process;
+                  }
+                  
+                  state = (state == IN_TAG) ? NORMAL : state;
                   buffer = "";
                } else {
                   buffer += c;
@@ -284,6 +271,7 @@ private:
             case IN_CLOSE_TAG:
                if (c == '>') {
                   string closeTag = buffer;
+                  closeTag.erase(closeTag.find_last_not_of(" \t\n\r") + 1);
                   if (!stack.empty() && stack.back()->tag == closeTag) {
                      stack.pop_back();
                      current = stack.empty() ? nullptr : stack.back();
@@ -296,5 +284,6 @@ private:
                break;
          }
       }
+      create_text_node(text_buffer);
    }
 };

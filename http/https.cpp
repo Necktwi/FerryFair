@@ -35,7 +35,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include <filesystem>
 #include <iomanip>
 #include <ctime>
 #include <algorithm>
@@ -102,7 +101,6 @@ thread_local int tid = 0;
 //#define hlDbg(str, ...) flDbg(HL, "tid: %d; "str, tid, __VA_ARGS__)
 
 using namespace std;
-namespace fs = std::filesystem;
 
 typedef const char* ccp;
 
@@ -304,6 +302,45 @@ bool isValidMethod (char* buf) {
    }
    return false;
 }
+string htmlEscape (ccp s) {
+   std::string out;
+   int sz = strlen(s);
+   out.reserve(sz);
+   for (int i=0;i<sz;++i) {
+      char c = s[i];
+      switch (c) {
+         case '&': out += "&amp;"; break;
+         case '<': out += "&lt;";  break;
+         case '>': out += "&gt;";  break;
+         case '"': out += "&quot;";break;
+         case '\'':out += "&#39;"; break;
+         default: out += c; break;
+      }
+   }
+   return out;
+}
+void urlEscape (char* s) {
+   char* c= s;
+   while (*s!= '\0') {
+      if (*s== '%') {
+         s+=3;
+         *c=*s;
+         *s='\0';
+         ++c;
+         *c= (char)strtol(c, &s, 16);
+         if (*s== '\0') {
+            *s= *(c-1);
+            *(c-1)=*c;
+            continue;
+         }
+      }
+      *c= *s;
+      ++c;
+      ++s;
+   }
+   *c= '\0';
+}
+
 using crdwr = function<size_t(char*, size_t)>;
 void parseHost (crdwr read, FFJSON& host) {
    char c;
@@ -487,27 +524,28 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
                      flInfCntnu(HL, "path: %s\n", buf);
                      ffHttp["path"]=(ccp)buf;
                   } else {
-                     ffHttp["query"][(ccp)buf]=(ccp)buf+query;
+                     urlEscape(buf+query);
+                     ffHttp["query"][(ccp)buf]= (ccp)buf+query;
                      flInfCntnu(HL," %s: %s\n", buf, buf+query);
-                     query=1;
+                     query= 1;
                   }
-                  ci=0;
+                  ci= 0;
                   ++spCnt;
                   continue;
                default:
                   break;
             }
          case '?':
-            if (spCnt==1) {
+            if (spCnt== 1) {
                if (query) {
                   flWrn(HL, "malformed query");
                   return;  
                }
-               buf[ci]='\0';
+               buf[ci]= '\0';
                flInfCntnu(HL, "path: %s\n", buf);
-               ffHttp["path"]=(ccp)buf;
-               ci=0;
-               query=1;
+               ffHttp["path"]= (ccp)buf;
+               ci= 0;
+               query= 1;
                flInfCntnu(HL, "query:");
                continue;
             }
@@ -523,6 +561,7 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
          case '&':
             if (!li) {
                buf[ci]='\0';
+               urlEscape(buf+query);
                ffHttp["query"][(ccp)buf]=(ccp)buf+query;
                flInfCntnu(HL," %s: %s,", buf, buf+query);
                query=1;
@@ -538,18 +577,20 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
                size_t key = fnv1a(buf);
                FFJSON& fvalue = ffHttp[(ccp)buf];
                switch (key) {
-                  case "cookie"_hash:
-                     parseCookie(read, fvalue);
-                     break;
-                  case "host"_hash:
-                     parseHost(read, fvalue);
-                     break;
-                  case "accept-encoding"_hash:
-                     parseAcceptEncoding(read, fvalue);
-                     break;
-                  default:
-                     hend=++ci;
-                     continue;
+               case "cookie"_hash:
+                  parseCookie(read, fvalue);
+                  break;
+               case "host"_hash:
+                  parseHost(read, fvalue);
+                  break;
+               case "accept-encoding"_hash:
+                  parseAcceptEncoding(read, fvalue);
+                  break;
+               // case "user-agent"_hash:
+               //    parseUserAgent(read, fvalue);
+               default:
+                  hend=++ci;
+                  continue;
                }
                ci=0;
                continue;
@@ -561,35 +602,44 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
    }
 }
 
-string mkHttpRes (
+int mkHttpRes (
    FFJSON& ffHttp, ccp body, ccp ctype, int bsz, const int code,
    ccp codeMsg, ccp addlHdrs
 ) {
-   MkHttpArgs ma(&ffHttp, body, ctype, bsz, code, codeMsg, addlHdrs);
+   mhArgs.ffHttp= &ffHttp;
+   mhArgs.body=  body;
+   mhArgs.ctype= ctype;
+   mhArgs.bsz= bsz;
+   mhArgs.code= 200;
+   mhArgs.codeMsg= codeMsg;
+   mhArgs.addlHdrs= addlHdrs;
    return mkHttpRes(ma);
 }
-string mkHttpRes (MkHttpArgs& args) {
-   ostringstream oss;
-   oss << "HTTP/1.0 " << args.code << " " << args.codeMsg << "\r\n";
-   oss << "Content-Type: " << args.ctype << "\r\n";
-   oss << args.addlHdrs;
-   oss << "Connection: close\r\n";
+int mkHttpRes (FFJSON& ffHttp) {
+   MkHttpArgs& args= ffHttp["resArgs"];
+   string& res= ffHttp["res"];
+   res+= "HTTP/1.0 "+ to_string(args.code)+ " "+ args.codeMsg+ "\r\n";
+   res+= "Content-Type: "+ args.ctype+ "\r\n";
+   res+= args.addlHdrs;
+   res+= "Connection: close\r\n";
    if (!args.cchCtrl) {
-      oss << "Cache-Control: public, max-age=3600\r\n";
+      res+= "Cache-Control: public, max-age=3600\r\n";
    }
-   int ocl = args.bsz==-1?strlen(args.body):args.bsz;
+   if (!body)
+      return -1;
+   int ocl= args.bsz== -1? strlen(args.body): args.bsz;
    FFJSON& accEnc = (*args.ffHttp)["accept-encoding"];
    if (ocl>1024 && accEnc && accEnc["gzip"] &&
        !strstr(args.ctype,"image")) {
       string gz = gzipCompress(args.body, ocl);
-      oss << "Content-Encoding: gzip\r\n";
-      oss << "Content-Length: " << gz.size() << "\r\n\r\n";
-      oss << gz;
+      res+= "Content-Encoding: gzip\r\n";
+      res+= "Content-Length: " << gz.size() << "\r\n\r\n";
+      res+= gz;
    } else {
-      oss << "Content-Length: " << ocl << "\r\n\r\n";
-      oss.write(args.body,ocl);
+      res+= "Content-Length: "+ res+ "\r\n\r\n";
+      res+= args.body;
    }
-   return oss.str();
+   return -1;
 }
 
 enum ftype {
@@ -646,24 +696,6 @@ string timeToString (const fs::file_time_type &ft) {
    char buf[64];
    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tm);
    return string(buf);
-}
-
-string htmlEscape (ccp s) {
-   std::string out;
-   int sz = strlen(s);
-   out.reserve(sz);
-   for (int i=0;i<sz;++i) {
-      char c = s[i];
-      switch (c) {
-         case '&': out += "&amp;"; break;
-         case '<': out += "&lt;";  break;
-         case '>': out += "&gt;";  break;
-         case '"': out += "&quot;";break;
-         case '\'':out += "&#39;"; break;
-         default: out += c; break;
-      }
-   }
-   return out;
 }
 
 string getMimeType (const fs::path& path) {
@@ -733,8 +765,10 @@ FTS_ halfMin = {30,0};
 bool isNJsClient (FFJSON& ffHttp) {
    ccp ua = ffHttp["user-agent"];
    flInf(HL, ua);
-   if (strstr(ua, "w3m") || strstr(ua, "curl") || strstr(ua, "Dillo")) {
-      flInf(HL, "NJs");
+   if (strstr(ua, "w3m") || strstr(ua, "nojs") || strstr(ua, "Dillo") ||
+       strstr(ua, "Lynx") || strstr(ua, "Links") || strstr(ua, "Emacs")) {
+      flDbg(HLL, "NJs");
+      ffHttp["noJs"]=true;
       return true;
    }
    return false;
@@ -749,16 +783,31 @@ string stripJs (string& html) {
    flInf(HL, "stripped js");
    return doc.stringify();
 }
-string httpHandle (FFJSON& ffHttp) {
-   FFJSON& fpath = ffHttp["path"];
+char* fileToStr (fs::path& fspath, char* buf) {
+   ifstream in(fspath);
+   streamsize size= in.tellg();
+   in.seekg(0, std::ios::beg);
+   char* buffer= new char[size+ 1];
+   if (in.read(buffer, size)) {
+      buffer[size]= '\0';
+      return buffer;
+   }
+   delete buffer;
+   return nullptr;
+}
+
+int handleHttp (FFJSON& ffHttp) {
+   MkHttpArgs resArgs;
+   ffHttp["resArgs"]= &resArgs;
+   FFJSON& fpath= ffHttp["path"];
    if (!fpath)
       return mkHttpRes(ffHttp, "NaNa!");
-   FFJSON& host = ffHttp["host"];
+   FFJSON& host= ffHttp["host"];
    if (!host)
       return "";
-   ccp fqdn = host["fqdn"];
+   ccp fqdn= host["fqdn"];
    string subdomain(fqdn,(int)host["subs"][0]);
-   FFJSON& vhost = cfg["vhosts"][subdomain]?cfg["vhosts"][subdomain]:cfg;
+   FFJSON& vhost= cfg["vhosts"][subdomain]?cfg["vhosts"][subdomain]:cfg;
    if (vhost["redirect"]) {
       char rhed[64];
       sprintf(rhed, "Location: %s\r\n", (ccp)vhost["redirect"]);
@@ -766,92 +815,88 @@ string httpHandle (FFJSON& ffHttp) {
                        rhed);
    }
    string path((ccp)vhost["rootdir"]);
-   int plen = fpath.size;
-   string res;
+   int plen= fpath.size;
+   int res= 0;
    MkHttpArgs mhArgs;
-   mhArgs.ffHttp=&ffHttp;
-   path+="/";
+   mhArgs.ffHttp= &ffHttp;
+   path+= "/";
    if (plen>1)
-      path+=((ccp)fpath)+1;
+      path+= ((ccp)fpath)+1;
    else
-      path+="index.html";
-   flInf(HL,"serving %s", path.c_str());
+      path+= "index.html";
+   flInf(HL, "serving %s", path.c_str());
    fs::path fspath(path);
-   res = ferryfair(ffHttp);
-   if (res.length()) {
-      if (res=="1") {
-         path = string((ccp)vhost["rootdir"]);
-         path += "/index.html";
-         fspath=fs::path(path);
+   ffHttp["fspath"]= (void*)&fspath;
+   res= ferryfair(ffHttp);
+   if (res) {
+      if (res== 1) {
+         path= string((ccp)vhost["rootdir"]);
+         path+= "/index.html";
+         fspath= fs::path(path);
          goto serveIndex;
-      } else if (res=="2") {
+      } else if (res== 2) {
          goto iptrack;
       }
       return res;
    }
    if (fs::is_directory(fspath)) {
-      path += "/index.html";
+      path+= "/index.html";
       fs::path fsindex(path);
       if (fs::exists(fsindex)) {
-         fspath=fsindex;
-         mhArgs.cchCtrl=true;
+         fspath= fsindex;
+         mhArgs.cchCtrl= true;
          goto serveFile;
       }
       vector<Entry> entries;
       for (auto &de : fs::directory_iterator(fspath)) {
          Entry e;
-         e.name = de.path().filename().string();
-         e.type = de.is_directory()?ftype::DIR:de.is_symlink()?
+         e.name= de.path().filename().string();
+         e.type= de.is_directory()?ftype::DIR:de.is_symlink()?
             fs::exists(fs::status(de))?SLINK:BLINK:FSFILE;
-         e.size = e.type!=FSFILE ? 0 : (de.is_regular_file() ? de.file_size():0);
-         e.mtime = e.type!=BLINK?de.last_write_time():fs::file_time_type();
+         e.size= e.type!=FSFILE ? 0 : (de.is_regular_file() ? de.file_size():0);
+         e.mtime= e.type!=BLINK?de.last_write_time():fs::file_time_type();
          entries.push_back(std::move(e));
       }
       sort(entries.begin(), entries.end(), [](auto &a, auto &b){
          return a.name < b.name;
       });
-      string dirHtml = "<html><head><title>";
-      dirHtml += htmlEscape(path.c_str())+"</title></head><body><table>";
-      dirHtml += "<tr><th>Name</th><th>Size</th><th>Modified</th></tr>";
+      string dirHtml= "<html><head><title>";
+      dirHtml+= htmlEscape(path.c_str())+"</title></head><body><table>";
+      dirHtml+= "<tr><th>Name</th><th>Size</th><th>Modified</th></tr>";
       for (auto &e : entries) {
-         string disp = htmlEscape(
-            (e.name +
-             (e.type==DIR? "/":e.type==SLINK?"->":e.type==BLINK?"->x":"")
+         string disp= htmlEscape(
+            (e.name+
+             (e.type==DIR? "/": e.type== SLINK? "->": e.type== BLINK?"->x": "")
             ).c_str());
-         string href = e.type!=BLINK?
+         string href= e.type!=BLINK?
             urlEncode((e.name + (e.type==DIR ? "/":"")).c_str()):"";
-         string sizeStr = e.type!=FSFILE? "-":to_string(e.size);
-         string mtime = timeToString(e.mtime);
-         dirHtml += "<tr>";
-         dirHtml += "<td><a href=\"" + href + "\">" + disp + "</a></td>";
-         dirHtml += "<td>" + sizeStr + "</td>";
-         dirHtml += "<td>" + mtime + "</td></tr>";
+         string sizeStr= e.type!=FSFILE? "-":to_string(e.size);
+         string mtime= timeToString(e.mtime);
+         dirHtml+= "<tr>";
+         dirHtml+= "<td><a href=\"" + href + "\">" + disp + "</a></td>";
+         dirHtml+= "<td>" + sizeStr + "</td>";
+         dirHtml+= "<td>" + mtime + "</td></tr>";
       }
-      dirHtml += "</table></body></html>";
-      mhArgs.body=dirHtml.c_str();
-      mhArgs.ctype = "text/html";
-      return mkHttpRes(mhArgs);
+      dirHtml+= "</table></body></html>";
+      mhArgs.body= dirHtml.c_str();
+      mhArgs.ctype= "text/html";
+      return mkHttpRes(ffHttp);
    } else {
      serveIndex:
       flDbg(HL,"fspath: %s",fspath.c_str());
       if (!fs::exists(fspath))
          goto iptrack;
      serveFile:
-      ifstream reqFile(path);
-      ostringstream resStr;
-      resStr << reqFile.rdbuf();
-      string ctype = getMimeType(fspath);
-      mhArgs.ctype = ctype.c_str();
-      string res = resStr.str();
-      flInf(HL, "checking js %s %s", mhArgs.ctype, ctype.c_str());
-      if (strstr(mhArgs.ctype, "html") && isNJsClient(ffHttp)) {
-         res = stripJs(res);
-         flInf(HL, "%s", res.c_str());
-      }
-      mhArgs.body=res.c_str();
-      mhArgs.bsz=res.length();
-      mhArgs.ffHttp = &ffHttp;
-      return mkHttpRes(mhArgs);
+      mhArgs.ctype= ctype.c_str();
+      mhArgs.ffHttp= &ffHttp;
+      mkHttpRes(mhArgs);
+      string ctype= getMimeType(fspath);
+      uint fsize= fs::file_size(fspath);
+      string& res= ffHttp["res"];
+      res+= "Content-Length: "+ to_string(fsize)+ "\r\n\r\n";
+      ifstream in(fspath);
+      res.append(istreambuf_iterator<char>(in), istreambuf_iterator<char>());
+      return -1;
    }
   iptrack:
    FTS_ now; now.update();
@@ -912,19 +957,21 @@ void handleConnection (int tid, struct sockaddr_in cli, int clientFd,
          if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
             --retry;
             waitForRead(clientFd, retryMS);
-            flDbgCntnu(HL, "retry: %d, r: %zd, ", retry, r);
+            flDbgCntnu(HLL, "retry: %d, r: %zd, ", retry, r);
             goto readagain;
          }
       }
       return r;
    };
    parseHTTP(rr, ffHttp);
-   string res;
    if (!ffHttp["version"]) {
       goto handledone;
    }
-   res = httpHandle(ffHttp);
-   if (!res.empty()) {
+   FFSJON& fres= ffHttp["res"];
+   string res;
+   fres= &res;
+   handleHttp(ffHttp);
+   if (res.length()) {
       crdwr nw = [clientFd] (char* buf, size_t bufSize)->size_t {
          return send(clientFd, buf, bufSize, 0);
       };
@@ -947,8 +994,8 @@ void handleConnection (int tid, struct sockaddr_in cli, int clientFd,
                   --retry;
                   goto writeagain;
                } else {
-                  flDbg(HL,"fd: %d, write error, closing at %d",
-                            clientFd, off);
+                  flDbg(HL, "fd: %d, write error, closing at %d",
+                        clientFd, off);
                   return off;
                }
             }
@@ -956,7 +1003,7 @@ void handleConnection (int tid, struct sockaddr_in cli, int clientFd,
          }
          return off;
       };
-      rw(res.data(),res.size());
+      rw(res.c_str(), res.length());
    }
    
   handledone:
