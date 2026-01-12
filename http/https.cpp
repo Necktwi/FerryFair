@@ -56,7 +56,6 @@
 #include <mystdlib.h>
 #include "https.h"
 #include "ferryfair.h"
-#include "htmlParser.cpp"
 
 // In-memory store for push subscriptions (for demonstration purposes)
 // In a real application, you would use a database.                   

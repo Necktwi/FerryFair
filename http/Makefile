@@ -51,7 +51,7 @@ ${BD}/spatialSearch.o ${BD}/htmlParser.o
    -Wno-unqualified-std-cast-call -I${FFJINC} -I${FFLINC} -I${FBINC} \
 	-I${FFINC} -I.. $^ -o $@ ${FFJLIB} ${FFLLIB} ${FBLIB} \
 	-lssl -lcrypto -ljpeg -lz -licui18n -licuuc -licudata \
-	-lcurl
+	-lcurl -Wl,-unresolved-symbols=ignore-in-shared-libs
 
 https: ${BD}/https htmlParser.cpp
 	@echo "built $(word 1, $^)"
