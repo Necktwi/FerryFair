@@ -26,7 +26,6 @@ enum HTTPLOG {
 };
 static atomic<bool> atmcRunning{true};
 struct MkHttpArgs {
-   FFJSON* ffHttp= nullptr;
    ccp body= nullptr;
    ccp ctype= "text/plain";
    int bsz= -1;
@@ -34,16 +33,16 @@ struct MkHttpArgs {
    ccp codeMsg= "OK";
    ccp addlHdrs= nullptr;
    bool cchCtrl= false;
+   int ocl= 0;
    ccp insCntnt= nullptr;
    int insAt= 0;
    MkHttpArgs (
-      FFJSON* ffHttp, ccp body, ccp ctype = "text/plain", int bsz=-1,
-      const int code = 200, ccp codeMsg = "OK", ccp addlHdrs = "") :
-      ffHttp(ffHttp), body(body), ctype(ctype), bsz(bsz), code(code),
+      ccp body, ccp ctype = "text/plain", int bsz=-1,
+      const int code = 200, ccp codeMsg = "OK", ccp addlHdrs = nullptr) :
+      body(body), ctype(ctype), bsz(bsz), code(code),
       codeMsg(codeMsg), addlHdrs(addlHdrs) {};
    MkHttpArgs () {};
    void init () {
-      ffHttp= nullptr;
       body= nullptr;
       ctype= "text/plain";
       bsz= -1;
@@ -55,10 +54,11 @@ struct MkHttpArgs {
 };
 
 char* fileToStr (fs::path& fspath, char* buf= nullptr);
-int mkHttpRes (struct MkHttpArgs& ma);
+int mkHttpRes (MkHttpArgs& args, string& res);
 int mkHttpRes (
-   FFJSON& ffHttp, ccp body, ccp ctype = "text/plain", int bsz=-1,
-   const int code = 200, ccp codeMsg = "OK", ccp addlHdrs = "");
+   FFJSON& ffHttp, ccp body= nullptr, ccp ctype= "text/plain", int bsz= -1,
+   const int code= 200, ccp codeMsg= "OK", ccp addlHdrs= "");
+int mkHttpRes (FFJSON& ffHttp, FFJSON& body);
 inline int mkHttpRes (
    FFJSON& ffHttp, string body, ccp ctype = "text/plain",
    const int code = 200, ccp codeMsg = "OK", ccp addlHdrs = "") {

@@ -18,6 +18,7 @@
 #include "spatialSearch.h"
 #include "cap.h"
 #include "smtpClient.h"
+#include "htmlParser.h"
 
 using namespace std;
 
@@ -197,8 +198,9 @@ FFJSON* pusers = nullptr;
 ccp mailServer = nullptr;
 int mailPort = 0;
 
-static ccp jsonMime = "application/json";
-static ccp txtMime = "text/plain";
+static ccp jsonMime= "application/json";
+static ccp txtMime= "text/plain";
+static ccp htmlMime= "text/html";
 static HTML_ thingsHtml;
 
 ccp yay = "{\"error\":\"yay\"}";
@@ -210,148 +212,143 @@ static size_t onCurlResponse (void* contents, size_t size, size_t nmemb,
    return totalSize;
 }
 vector<FFJSON*> usersId;
-string thingToXml (FFJSON& thn) {
-   
-}
-bool ffDefault (string& bid, Txo& rbs, Txo& ffHttp, Txo& reply, Txo& tUsr,
-                Txo& bidThings, Txo& query, MkHttpArgs& mhArgs) {
-   bool bidset= false;
-      if (bid.length())
-         if(rbs[bid])
-            goto gotbid;
-     newbid:
-      bid= random_alphnuma_string();
-      bidset= 1;
-     bidcheck:
-      if (rbs[bid]) {
-         bid= random_alphnuma_string();
-         goto bidcheck;
-      }
-      rbs[bid]["ip"]= (ccp)ffHttp["ip"];
-     gotbid:
-      if (strcmp(rbs[bid]["ip"],ffHttp["ip"])) {
-         goto newbid;
-      }
-      FFJSON& rbsid= rbs[bid];
-      rbsid["ts"]= now;
-      reply["bid"]= bid;
-      BidThings_& bts= bidThings[rbsid.val.fptr];
-     cookieReply:
-      setSavMtx.lock();
-      pFSetToSave.insert(&rbs);
-      setSavMtx.unlock();
-      if (tUsr) {
-         FFJSON& qthn= query["thing"];
-         FFJSON& thns= qthn? tUsr["things"][
-            getIdChildInd(tUsr["things"], atoi(qthn))]: tUsr["things"];
-         if (!cookie["js"]) {
-            if (qthn) {
-               
-            } else {
-               
-            }
-         } else {
-            
+void thingToHtml (FFJSON& thn, string& res) {
+   int numPics= thn["pics"].size;
+   ccp username= thn["user"]["name"];
+   int id= thn[id];
+   if (numPics>0) {
+      HTML_* img= &thingsHtml.getElementById("ThingImg");
+      int i= 0;
+      while(1) {
+         img->setAttribute("src", string("/upload/")+ username+ "/"+
+                           to_string(id)+ "."+  to_string(i)+ ".jpg");
+         ++i;
+         if (i< numPics) {
+            HTML_* p= img->parent;
+            img= img->cloneNode(true);
+            p->insertAdjacentElement("beforeEnd", *img);
          }
-         return 0;
-      } else if (path) {
-         return 0;
-      }
-      fs::path& fspath= *(void*)ffHttp["fspath"];
-      string resStr= fileToStr(fspath);
-      if (!cookie["js"]) {
-         HTML_ root(resStr.c_str());
-         auto elements = root.getElementsByClassName("redirect");
-         for (auto e : elements) {
-            e->remove();
-         }
-         fs::path& fsindex2 = fspath.parent_path()/"html/index.html";
-         HTML_ root2(fsindex2.str());
-         HTML_& srchBar= root2.getElementById("searchBar");
-         HTML_ & nojsBody= root.getElementById("nojsBody");
-         nojsBody.insertAdjacentElement("afterBegin", srchBar);
-      } else {
-         hArgs.body= reply.stringify(true).c_str();
-      }
-      mhArgs.ctype= htmlMime;
-      if (bidset) {
-        sprintf(msg, "Set-Cookie: bid=%", bid.c_str());
-        mhArgs.addlHdrs= msg;
       }
    }
+   HTML_& thnLoc= thingsHtml.getElementById("ThingLocation");
+   thnLoc.tag= "a";
+   string locStr;
+   locStr+= to_string((float)thn["location"][0]);
+   locStr+= ",";
+   locStr+= to_string((float)thn["location"][1]);
+   HTML_* loc= new HTML_(locStr.c_str());
+   thnLoc.insertAdjacentElement("afterBegin", *loc);
+   thnLoc.setAttribute("href", "https://maps.google.com?q="+locStr);
+   HTML_& thnName= thingsHtml.getElementById("ThingName");
+   HTML_* thnAName= new HTML_((ccp)thn["name"]);
+   thnName.insertAdjacentElement("afterBegin", *thnAName);
+   HTML_& thnUsr= thingsHtml.getElementById("ThingUsr");
+   HTML_* thnAUsr= new HTML_(username);
+   thnUsr.insertAdjacentElement("afterBegin", *thnAUsr);
+   HTML_& thnId= thingsHtml.getElementById("ThingId");
+   HTML_* thnAId= new HTML_(to_string((int)thn["id"]).c_str());
+   thnId.insertAdjacentElement("afterBegin", *thnAId);
+   HTML_& thnLstModd= thingsHtml.getElementById("lastModed");
+   time_t ts= thn["lastModed"];
+   struct tm *tm_info = gmtime(&ts);
+   char buf[128];
+   strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", tm_info);
+   HTML_* thnALstModd= new HTML_(buf);
+   thnLstModd.insertAdjacentElement("afterBegin", *thnALstModd);
+   HTML_& thnDtls= thingsHtml.getElementById("ThingDetails");
+   HTML_* thnADtls= new HTML_((ccp)thn["details"]);
+   thnUsr.insertAdjacentElement("afterBegin", *thnADtls);
+   thingsHtml.stringify(res);
 }
-string ffSearch (
+int ffDefault (string& bid, Txo& rbs, Txo& ffHttp, Txo& reply, Txo& tUsr,
+               Txo& query, MkHttpArgs& mhArgs, auto& now,
+               Txo& cookie, ccp path, ccp username, FFJSON& users,
+               long& lepoch) {
+   bool bidset= false;
+   if (bid.length())
+      if(rbs[bid])
+         goto gotbid;
+  newbid:
+   bid= random_alphnuma_string();
+   bidset= 1;
+  bidcheck:
+   if (rbs[bid]) {
+      bid= random_alphnuma_string();
+      goto bidcheck;
+   }
+   rbs[bid]["ip"]= (ccp)ffHttp["ip"];
+  gotbid:
+   if (strcmp(rbs[bid]["ip"],ffHttp["ip"])) {
+      goto newbid;
+   }
+   FFJSON& rbsid= rbs[bid];
+   rbsid["ts"]= now;
+   reply["bid"]= bid;
+   if (bidset) {
+      sprintf(mesg, "Set-Cookie: bid=%", bid.c_str());
+      mhArgs.addlHdrs= mesg;
+   }
+   BidThings_& bts= bidThings[rbsid.val.fptr];
+  cookieReply:
+   setSavMtx.lock();
+   pFSetToSave.insert(&rbs);
+   setSavMtx.unlock();
+   if (tUsr) {
+      FFJSON& qthn= query["thing"];
+      FFJSON& thns= qthn? tUsr["things"][
+         getIdChildInd(tUsr["things"], atoi(qthn))]: tUsr["things"];
+      reply["things"]= &thns;
+   } else if (path) {
+      return 0;
+   }
+   FFJSON& user= users[username];
+   if (user &&
+       !strcmp((ccp)user["bid"],bid.c_str()) && cookie["js"]) {
+     sendUser:
+      rbsid["urts"]= lepoch;
+      set<FFJSON*>& mdts = bts.mdts;
+      addSmtgsToReply(users, user, reply, mdts);
+   }
+   mhArgs.ctype= htmlMime;
+   mkHttpRes(ffHttp);
+   fs::path& fspath= ffHttp["fspath"];
+   uint fsize= fs::file_size(fspath);
+   string& res= ffHttp["res"];
+   res+= "Content-Length: 00000000\r\n\r\n";
+   ifstream in(fspath);
+   res.append(istreambuf_iterator<char>(in), istreambuf_iterator<char>());
+   if (!cookie["js"]) {
+      
+   }
+   return -1;
+}
+
+int ffSearch (
    FFJSON& payload, FFJSON& rbsid, FFJSON& tUsr, FFJSON& reply,
-   FFJSON& ffHttp) {
-   //set<FFJSON*>& mdts = bts.mdts;
-      Pts& pts= bts.all;
-      //    if (!cpld)
-      //   return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
-      //  username = rbsid["user"];
-      // FFJSON& user = username?users[username]:nullFFJSON;
-      pts= Pts();
-      if (!payload["geoposition"].isType(FFJSON::UNDEFINED) &&
-          payload["geoposition"].size== 2
-      ) {
-         pts.c.x= (float)payload["geoposition"][1];
-         pts.c.y= (float)payload["geoposition"][0];
-         rbsid["geoposition"]= payload["geoposition"];
-      }
-      thnsTree.getPointsFromQuad(pts);
-      mdts.clear();
-      for (uint i= 0; i< pts.pni; ++i) {
-         NdNPrn& nd= pts.pts[i];
-         FFJSON* f;
-         if (nd.prn== (QuadNode*)-1) {
-            f= (FFJSON*)nd.qh;
-         } else {
-            auto aa= getNode(nd);
-            f= (FFJSON*)get<0>(aa);
-         }
-         reply["things"][i]= f;
-         mdts.insert(f);
-      }
-      if (username && user &&
-          !strcmp((ccp)user["bid"],bid.c_str())) {
-        sendUser:
-         rbsid["urts"]= lepoch;
-         addSmtgsToReply(users, user, reply, mdts);
-      }
-      FFJSON& fsrch= payload["search"];
-      string srchStr= fsrch? (ccp)fsrch: "";
+   FFJSON& ffHttp, FFJSON& cookie) {
+   FFJSON& fsrch = payload["search"];
+   if (!fsrch) {
+      return 2;
+   }
+   string srchStr= (ccp)fsrch;
    BidThings_& bts= bidThings[rbsid.val.fptr];
    set<FFJSON*>& mdts= bts.mdts;
    Pts& pts= bts.search;
    pts= Pts();
    if (tUsr) {
-      FFJSON& qthn= query["thing"];
-      if (qthn) {
-         FFJSON& uthings= tUsr["things"];
-         int tind= getIdChildInd(uthings, atoi(qthn));
-         FFJSON* thn= &uthings[tind];
-         reply["things"][0]= thn;
-         mdts.clear();
-         mdts.insert(thn);
-         FFJSON q("{things:!}");
-         user.answerObject(&q, nullptr, FerryTimeStamp(), &reply);
-         goto cookieReply;
-      }
-      if (!fsrch) {
-         
-      }
       srchStr+= " ";
       srchStr+= (ccp)tUsr["name"];
    }
-   vector<string> mstr = metaname(srchStr.c_str());
-   pts.ina = nametouint(mstr);
+   vector<string> mstr= metaname(srchStr.c_str());
+   pts.ina= nametouint(mstr);
    if (!payload["geoposition"].isType(FFJSON::UNDEFINED) &&
        payload["geoposition"].size==2
    ) {
-      pts.c.x=(float)payload["geoposition"][1];
-      pts.c.y=(float)payload["geoposition"][0];
-      rbsid["geoposition"] = payload["geoposition"];
+      pts.c.x= (float)payload["geoposition"][1];
+      pts.c.y= (float)payload["geoposition"][0];
+      rbsid["geoposition"]= payload["geoposition"];
    }
-   int pni = pts.pni;
+   int pni= pts.pni;
    flInf(FL, "searching %s at %s\n",srchStr.c_str(),
          payload["geoposition"].stringify().c_str());
    cvSrch.wait(modLk, []{return modQhCv.load()==0;});
@@ -361,8 +358,15 @@ string ffSearch (
    cvMod.notify_all();
    addSearchNoDups(pts, reply, mdts, pni);
    reply["things"][0];
-   return mkHttpRes(ffHttp, reply.stringify(true).c_str(), jsonMime);
+   if (!cookie["js"])
+      mkHttpRes(ffHttp, reply);
+   else {
+      
+   }
+      
+   return -1;
 }
+
 int ferryfair (FFJSON& ffHttp) {
    MkHttpArgs& mhArgs= ffHttp["resArgs"];
    FFJSON reply;
@@ -405,7 +409,7 @@ int ferryfair (FFJSON& ffHttp) {
    if ((path[0]== '.' && strstr(path, ".well-known/")!= path) ||
        strstr(path,"red")) {
       flDbg(FL, "path: %s", path);
-      return "2";
+      return 2;
    }
    FFJSON& query = ffHttp["query"];
    if ((ccp)query["req"]) {
@@ -460,17 +464,19 @@ int ferryfair (FFJSON& ffHttp) {
       }
    }
    default: {
-      if (ffDefault(bid, rbs, ffHttp, reply, tUsr, bidThings, query {
-         return "";
+      int res= ffDefault(bid, rbs, ffHttp, reply, tUsr, query,
+                         mhArgs, now, cookie, path, username, users, lepoch);
+      if (res) {
+         return res;
       }
-   }
+   }}
   bidcheck2:
    FFJSON& rbsid = rbs[bid];
    if (!rbsid) {
       if (tUsr) {
-         return "1";
+         return 1;
       } else {
-         return "";
+         return 0;
       }
    }
    switch (req) {
@@ -750,15 +756,15 @@ int ferryfair (FFJSON& ffHttp) {
          " :D\"}", jsonMime);
    }
    case "search"_hash: {
-      return ffSearch(payload, rbsid, tUsr, reply, ffHttp);
+      return ffSearch(payload, rbsid, tUsr, reply, ffHttp, cookie);
    }
    }
    username = rbsid["user"];
    if (!username) {
       if (tUsr) {
-         return "1";
+         return 1;
       }
-      return "";
+      return 0;
    }
    FFJSON& user = users[username];
    switch (req) {
@@ -1223,8 +1229,8 @@ int ferryfair (FFJSON& ffHttp) {
    }
    }
    if (tUsr)
-      return "1";
-   return "";
+      return 1;
+   return 0;
 }
 
 void makeThngsTree (Txo& cfg) {
@@ -1376,9 +1382,9 @@ void initFerryFair (FFJSON& cfg) {
    }
    fs::path fswdir(wdir);
    fs::path fsThingsHtml= fswdir/"html/things.html";
-   thingsHtml.parse(fsIndexHtml.str().c_str());
-   let elms = thingsHtml.getElementsByClassName("removable hidden");
-   for (let e : elms) {
+   thingsHtml.parse(fsThingsHtml.c_str());
+   auto elms= thingsHtml.getElementsByAnyClassName("removable hidden js");
+   for (auto e : elms) {
       if (!e->hasAnyClass("noJs")) {
          e->remove();
          delete e;

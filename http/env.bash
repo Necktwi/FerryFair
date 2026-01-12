@@ -6,3 +6,4 @@ BDIR="build/${OS}/${ARCH}/${BTYPE}"
 WS="../.."
 export LD_LIBRARY_PATH="$WS/ferrybase/$BDIR:$WS/FFJSON/$BDIR:$WS/logger/$BDIR"
 export TCPP=${TCPP:-clang++}
+export LIBEXT="so.1.0"

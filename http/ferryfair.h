@@ -7,7 +7,7 @@
 
 using namespace std;
 
-string ferryfair (FFJSON& ffHttp);
+int ferryfair (FFJSON& ffHttp);
 void initFerryFair (FFJSON& cfg);
 void saveFerryFair (void* pcfg);
 extern mutex mtxSaveUsers;

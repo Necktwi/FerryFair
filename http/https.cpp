@@ -6,7 +6,9 @@
 #include <sys/stat.h>
 #include <signal.h>
 #include <sys/wait.h>
+#ifdef __linux__
 #include <sys/prctl.h>
+#endif
 #include <sys/resource.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -93,9 +95,6 @@ static void setupOsslLocking (void) {
 FFJSON cfg;
 
 int child_exit_status = 0;
-FF_LOG_TYPE fflAllowedType = (FF_LOG_TYPE) (FFL_ERR | FFL_NOTICE | FFL_DEBUG |
-                                            FFL_INFO | FFL_WARN);
-unsigned int fflAllowedBlks = (uint)(HL|FL);
 thread_local int tid = 0;
 
 //#define hlDbg(str, ...) flDbg(HL, "tid: %d; "str, tid, __VA_ARGS__)
@@ -341,8 +340,9 @@ void urlEscape (char* s) {
    *c= '\0';
 }
 
-using crdwr = function<size_t(char*, size_t)>;
-void parseHost (crdwr read, FFJSON& host) {
+using crd = function<size_t(char*, size_t)>;
+using cwr = function<size_t(ccp, size_t)>;
+void parseHost (crd read, FFJSON& host) {
    char c;
    string buf;
    FFJSON& fqdn = host["fqdn"];
@@ -372,7 +372,7 @@ void parseHost (crdwr read, FFJSON& host) {
       }
    }
 }
-void parseCookie (crdwr read, FFJSON& ffCookie) {
+void parseCookie (crd read, FFJSON& ffCookie) {
    char c;
    string key,value;
    string* buf = &key;
@@ -412,7 +412,7 @@ void parseCookie (crdwr read, FFJSON& ffCookie) {
    }
 }
 
-void parseAcceptEncoding (crdwr read, FFJSON& ffAEnc) {
+void parseAcceptEncoding (crd read, FFJSON& ffAEnc) {
    char c;
    string enc;
    while (read(&c, 1)>0) {
@@ -436,7 +436,7 @@ void parseAcceptEncoding (crdwr read, FFJSON& ffAEnc) {
    return;
 }
 
-void parseHTTP (crdwr read, FFJSON& ffHttp) {
+void parseHTTP (crd read, FFJSON& ffHttp) {
    unsigned int i=0;
    unsigned int pairStartPin=i;
    char c;
@@ -602,42 +602,63 @@ void parseHTTP (crdwr read, FFJSON& ffHttp) {
    }
 }
 
-int mkHttpRes (
-   FFJSON& ffHttp, ccp body, ccp ctype, int bsz, const int code,
-   ccp codeMsg, ccp addlHdrs
-) {
-   mhArgs.ffHttp= &ffHttp;
-   mhArgs.body=  body;
-   mhArgs.ctype= ctype;
-   mhArgs.bsz= bsz;
-   mhArgs.code= 200;
-   mhArgs.codeMsg= codeMsg;
-   mhArgs.addlHdrs= addlHdrs;
-   return mkHttpRes(ma);
-}
-int mkHttpRes (FFJSON& ffHttp) {
-   MkHttpArgs& args= ffHttp["resArgs"];
-   string& res= ffHttp["res"];
+int mkHttpRes (MkHttpArgs& args, string& res) {
    res+= "HTTP/1.0 "+ to_string(args.code)+ " "+ args.codeMsg+ "\r\n";
-   res+= "Content-Type: "+ args.ctype+ "\r\n";
+   res+= "Content-Type: "+ string(args.ctype)+ "\r\n";
    res+= args.addlHdrs;
    res+= "Connection: close\r\n";
    if (!args.cchCtrl) {
       res+= "Cache-Control: public, max-age=3600\r\n";
    }
-   if (!body)
+   if (!args.body)
       return -1;
-   int ocl= args.bsz== -1? strlen(args.body): args.bsz;
-   FFJSON& accEnc = (*args.ffHttp)["accept-encoding"];
-   if (ocl>1024 && accEnc && accEnc["gzip"] &&
-       !strstr(args.ctype,"image")) {
-      string gz = gzipCompress(args.body, ocl);
+   if (args.ocl) {
+      string gz = gzipCompress(args.body, args.ocl);
       res+= "Content-Encoding: gzip\r\n";
-      res+= "Content-Length: " << gz.size() << "\r\n\r\n";
+      res+= "Content-Length: "+ to_string(gz.size())+ "\r\n\r\n";
       res+= gz;
    } else {
       res+= "Content-Length: "+ res+ "\r\n\r\n";
       res+= args.body;
+   }
+   return -1;
+}
+int mkHttpRes (
+   FFJSON& ffHttp, ccp body, ccp ctype, int bsz, const int code,
+   ccp codeMsg, ccp addlHdrs
+) {
+   MkHttpArgs& mhArgs= ffHttp["resArgs"];
+   mhArgs.body=  body;
+   mhArgs.ctype= ctype;
+   mhArgs.bsz= bsz;
+   mhArgs.code= 200;
+   mhArgs.codeMsg= codeMsg;
+   if (!mhArgs.addlHdrs)
+      mhArgs.addlHdrs= addlHdrs;
+   else if (addlHdrs)
+      flErr(HL, "addlHdrs: %s not added");
+   string& res= ffHttp["res"];
+   int ocl= bsz== -1? strlen(body): bsz;
+   FFJSON& accEnc = ffHttp["accept-encoding"];
+   if (ocl>1024 && accEnc && accEnc["gzip"] &&
+       !strstr(mhArgs.ctype,"image")) {
+      mhArgs.ocl= ocl;
+   }
+   return mkHttpRes(mhArgs, res);
+}
+
+int mkHttpRes (FFJSON& ffHttp, FFJSON& body) {
+   mkHttpRes(ffHttp, nullptr, "text/json");
+   string& res= ffHttp["res"];
+   res+= "Content-Length: 00000000\r\n\r\n";
+   int pos= res.length()-4;
+   int size= res.length();
+   body.stringify(res, true);
+   size= res.length()- size;
+   string sizestr= to_string(size);
+   size= sizestr.length();
+   for (int i=1; i<= size; ++i) {
+      res[pos-i]= sizestr[size-i];
    }
    return -1;
 }
@@ -774,15 +795,6 @@ bool isNJsClient (FFJSON& ffHttp) {
    return false;
 }
 
-string stripJs (string& html) {
-   HTML_ doc(html.c_str());
-   auto jsElms = doc.getElementsByClassName("js");
-   for (auto* elem : jsElms) {
-      elem->remove();
-   }
-   flInf(HL, "stripped js");
-   return doc.stringify();
-}
 char* fileToStr (fs::path& fspath, char* buf) {
    ifstream in(fspath);
    streamsize size= in.tellg();
@@ -795,16 +807,15 @@ char* fileToStr (fs::path& fspath, char* buf) {
    delete buffer;
    return nullptr;
 }
-
 int handleHttp (FFJSON& ffHttp) {
-   MkHttpArgs resArgs;
-   ffHttp["resArgs"]= &resArgs;
+   MkHttpArgs mhArgs;
+   ffHttp["resArgs"]= &mhArgs;
    FFJSON& fpath= ffHttp["path"];
    if (!fpath)
       return mkHttpRes(ffHttp, "NaNa!");
    FFJSON& host= ffHttp["host"];
    if (!host)
-      return "";
+      return 0;
    ccp fqdn= host["fqdn"];
    string subdomain(fqdn,(int)host["subs"][0]);
    FFJSON& vhost= cfg["vhosts"][subdomain]?cfg["vhosts"][subdomain]:cfg;
@@ -817,8 +828,6 @@ int handleHttp (FFJSON& ffHttp) {
    string path((ccp)vhost["rootdir"]);
    int plen= fpath.size;
    int res= 0;
-   MkHttpArgs mhArgs;
-   mhArgs.ffHttp= &ffHttp;
    path+= "/";
    if (plen>1)
       path+= ((ccp)fpath)+1;
@@ -853,8 +862,8 @@ int handleHttp (FFJSON& ffHttp) {
          e.name= de.path().filename().string();
          e.type= de.is_directory()?ftype::DIR:de.is_symlink()?
             fs::exists(fs::status(de))?SLINK:BLINK:FSFILE;
-         e.size= e.type!=FSFILE ? 0 : (de.is_regular_file() ? de.file_size():0);
-         e.mtime= e.type!=BLINK?de.last_write_time():fs::file_time_type();
+         e.size= e.type!= FSFILE? 0: (de.is_regular_file()? de.file_size(): 0);
+         e.mtime= e.type!= BLINK? de.last_write_time(): fs::file_time_type();
          entries.push_back(std::move(e));
       }
       sort(entries.begin(), entries.end(), [](auto &a, auto &b){
@@ -887,10 +896,9 @@ int handleHttp (FFJSON& ffHttp) {
       if (!fs::exists(fspath))
          goto iptrack;
      serveFile:
-      mhArgs.ctype= ctype.c_str();
-      mhArgs.ffHttp= &ffHttp;
-      mkHttpRes(mhArgs);
       string ctype= getMimeType(fspath);
+      mhArgs.ctype= ctype.c_str();
+      mkHttpRes(ffHttp);
       uint fsize= fs::file_size(fspath);
       string& res= ffHttp["res"];
       res+= "Content-Length: "+ to_string(fsize)+ "\r\n\r\n";
@@ -921,7 +929,7 @@ int handleHttp (FFJSON& ffHttp) {
       }
    }
    mhArgs.body="NaNa!";
-   return mkHttpRes(mhArgs);
+   return mkHttpRes(ffHttp);
 }
 int waitForRead (int fd, int timeoutMs) {
     struct pollfd p = { fd, POLLIN, 0 };
@@ -941,14 +949,16 @@ void handleConnection (int tid, struct sockaddr_in cli, int clientFd,
    ffHttp["ip"] = (ccp)ip_str;
    flInf(HL, "tid: %d, %s, %d------", tid, ip_str, clientFd);
    //makeNonBlocking(clientFd);
-   crdwr nr = [clientFd] (char* buf, size_t bufSize)->size_t {
+   FFJSON& fres= ffHttp["res"];
+   string res;
+   crd nr = [clientFd] (char* buf, size_t bufSize)->size_t {
       return recv(clientFd, buf, bufSize, 0);
    };
-   crdwr sr = [ssl] (char* buf, size_t bufSize)->size_t {
+   crd sr = [ssl] (char* buf, size_t bufSize)->size_t {
       return SSL_read(ssl, buf, bufSize);
    };
-   crdwr rd = ssl ? sr : nr;
-   crdwr rr = [&rd, clientFd] (char* buf, size_t bufSize)->size_t {
+   crd rd = ssl ? sr : nr;
+   crd rr = [&rd, clientFd] (char* buf, size_t bufSize)->size_t {
       int retry = cfg["readRetry"];
       static int retryMS = cfg["retryMS"];
      readagain:
@@ -967,19 +977,17 @@ void handleConnection (int tid, struct sockaddr_in cli, int clientFd,
    if (!ffHttp["version"]) {
       goto handledone;
    }
-   FFSJON& fres= ffHttp["res"];
-   string res;
    fres= &res;
    handleHttp(ffHttp);
    if (res.length()) {
-      crdwr nw = [clientFd] (char* buf, size_t bufSize)->size_t {
+      cwr nw = [clientFd] (ccp buf, size_t bufSize)->size_t {
          return send(clientFd, buf, bufSize, 0);
       };
-      crdwr sw = [ssl] (char* buf, size_t bufSize)->size_t {
+      cwr sw = [ssl] (ccp buf, size_t bufSize)->size_t {
          return SSL_write(ssl, buf, bufSize);
       };
-      crdwr wd = ssl ? sw : nw;
-      crdwr rw = [&wd, clientFd] (char* buf, size_t bufSize)->size_t {
+      cwr wd = ssl ? sw : nw;
+      cwr rw = [&wd, clientFd] (ccp buf, size_t bufSize)->size_t {
          int retry = cfg["readRetry"];
          static int retryMS = cfg["retryMS"];
          size_t off = 0;
@@ -1265,11 +1273,14 @@ int run () {
    return 0;
 }
 int main (int argc, char **argv) {
+   fflAllowedType= (FF_LOG_TYPE) (FFL_ERR | FFL_NOTICE | FFL_DEBUG |
+                                  FFL_INFO | FFL_WARN);
+   fflAllowedBlks= (uint)(HL|FL);
    setupOsslLocking();
    cfg.init("file://http.ffjson|OBJECT");
    flDbg(HL, "%s\n", cfg.prettyString().c_str());
    flDbg(HL, "EAGAIN(%zd) EINTR(%zd) EINVAL(%zd)\n",
-             EAGAIN, EINTR, EINVAL);
+         EAGAIN, EINTR, EINVAL);
    signal(SIGINT, handleSigInt);
    signal(SIGPIPE, SIG_IGN);
    //signal(SIGPIPE, handleSigpipe);
