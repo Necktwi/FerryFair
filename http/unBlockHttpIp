@@ -1,4 +1,5 @@
 #!/bin/bash
 
 echo "Unblocking $1"
-iptables -D INPUT -s $1 -j DROP
+handle=$(nft -a list ruleset | sed -n "/$1/p" | sed 's/.*handle \([0-9]*\)$/\1/')
+nft delete rule ip ffWall ffin handle $handle

@@ -130,12 +130,12 @@ bool CompNameWt::operator () (const map<string, FFJSON*>::iterator it1,
 CompNameWt cmpNmWt;
 
 void QuadNode::seti (vector<uint>& ina) {
-   for (int i=0; i<ina.size();++i) {
-      if (ina[i]!=0) {
-         uint& lni = qpmapvec[i][this];
-         lni |= ina[i];
-         // if (i==0 && lni&0x80) {
-         //    printf("apple set\n");
+	for (int i=0; i<ina.size();++i) {
+		if (ina[i]!=0) {
+			uint& lni = qpmapvec[i][this];
+			lni |= ina[i];
+			// if (i==0 && lni&0x80) {
+			//    printf("apple set\n");
          // }
       }
    }
@@ -299,14 +299,40 @@ bool QuadNode::updateIntNames (QuadNode* tQN, uint8_t tind,
    }
    return copyi(r);
 }
-
+void QuadNode::destroy (QuadNode* pQN) {
+	QuadHldr* qh= (QuadHldr*)this;
+	for (int i=0; i<4; ++i) {
+		qh->destroy(pQN, this);
+		++qh;
+	}
+}
 QuadNode::~QuadNode () {
    map<QuadNode*,uint>::iterator qit = qpmapvec[0].find(this);
    if (qit!=qpmapvec[0].end()) {
       qpmapvec[0].erase(qit);
    }
 }
-
+void QuadHldr::destroy (QuadNode* pQN, QuadNode* tQN) {
+	if (!fp)
+		return;
+	QuadNode* resfp;
+   set<FFJSON*>* ressfp;
+	vector<map<QuadNode*,uint>::iterator> qit;
+   resfp = (QuadNode*)get<0>(bpxor(fp, pQN));
+   ressfp = (set<FFJSON*>*)resfp;
+	
+	qit = qpfind((QuadNode*)resfp);
+   if (qit.size()) {
+		resfp->destroy(tQN);
+		delete resfp;
+	} else if (mapffset.find(ressfp)!=mapffset.end()) {
+		delete ressfp;
+	}
+	fp= nullptr;
+}
+QuadHldr::~QuadHldr () {
+	destroy();
+}
 CntMut_& QuadHldr::lock (int l) {
    qhMapMut.lock();
    CntMut_& cntMut = qhModMutMap[this];
@@ -353,33 +379,34 @@ uint QuadHldr::insert (
 ) {
    FFJSON& rF=fq.rF;vector<uint>& ina=fq.ina;float& lx=fq.lx,ly=fq.ly;
    bool& deleteLeaf = fq.deleteLeaf;
-   uint ret = level;
+   uint ret= level;
    map<set<FFJSON*>*, vector<uint>>::iterator sit;
    vector<map<QuadNode*,uint>::iterator> qit;
    void* resfp;
    set<FFJSON*>* ressfp;
    ffl_debug(SL, "qh: %p, x,y: %lf,%lf\n", this, x, y);
 #ifdef _DEBUG
-   if (&fq.rF==(void*)0x5555556a4980) {
+   if (&rF==(void*)0x5555556a4980) {
       flDbg(SLL, "qh: %p", this);
    }
 #endif
-   CntMut_* pcm = nullptr;
-   if (!sn)
-      pcm = &lock(__LINE__);
+   CntMut_* pcm= nullptr;
+	pcm= &lock(__LINE__);
    if (fp==nullptr) {
-      fp = (FFJSON*)fpxor(&fq.rF, pQN, ind);
-      flDbg(SL, "rF:%p,%s inserted\n", &rF,rF["location"].stringify().c_str());
+      fp= (FFJSON*)fpxor(&rF, pQN, ind);
+		//rF could b a set, don't access it. we are cheating by not writing
+		//redundant function for set which we insert only in a new quadnode
+		flDbg(SL, "rF:%p, %f, %f inserted\n", &rF, lx, ly);
       goto retn;
    }
    resfp = get<0>(bpxor(fp, pQN));
    ressfp = (set<FFJSON*>*)resfp;
    if (!sn) {
-      sit = mapffset.find(ressfp);
       qit = qpfind((QuadNode*)resfp);
    }
+	sit = mapffset.find(ressfp);
    if (!qit.size() || sn) {
-      bool isS = sn ? false : sit != mapffset.end();
+      bool isS = sit != mapffset.end();
       if (deleteLeaf) {
          if (!isS && resfp == (void*)&rF) {
             fp=nullptr;
@@ -407,21 +434,21 @@ uint QuadHldr::insert (
          ffl_debug(SL, "rF: %p inserted in %p\n", &rF, pQN);
          goto retn;
       }
-      FFJSON& tmp = isS ? **ressfp->begin() : *(FFJSON*)resfp;
+      FFJSON& tmp= isS? **ressfp->begin() : *(FFJSON*)resfp;
       ffl_debug(SL, "tfp: %p,%p,%p\n", &tmp, fp, pQN);
-      float llx = (float)tmp["location"][1];
-      float lly = (float)tmp["location"][0];
+      float llx= (float)tmp["location"][1];
+      float lly= (float)tmp["location"][0];
       if (llx==lx && lly==ly) {
          if (!isS) {
             string tname((ccp)tmp["name"]);
-            tname += " ";
-            tname += (ccp)tmp["user"]["name"];
+            tname+= " ";
+            tname+= (ccp)tmp["user"]["name"];
             xorinaname(ina, tname.c_str());
-            sp = new set<FFJSON*>();
-            mapffset[sp]=ina;
+            sp= new set<FFJSON*>();
+            mapffset[sp]= ina;
             sp->insert(&tmp);
             sp->insert(&rF);
-            sp=(set<FFJSON*>*)fpxor(sp, pQN, ind);
+            sp= (set<FFJSON*>*)fpxor(sp, pQN, ind);
          } else {
             xorina(sit->second, ina);
             ressfp->insert(&rF);
@@ -442,8 +469,9 @@ uint QuadHldr::insert (
       }
       qp->seti(ina);
       FFQuad_ tfq(*(FFJSON*)resfp, ina, llx, lly, deleteLeaf);
-      qp->insert(tfq, x, y, level, tQN, tind, 1);
-      ret = qp->insert(fq, x, y, level, tQN, tind, 1);
+		//we are not implementing a redundant function for set; we r clever
+		qp->insert(tfq, x, y, level, tQN, tind, 1);	
+		ret = qp->insert(fq, x, y, level, tQN, tind, 1);
       qp = (QuadNode*)fpxor(qp,pQN,ind);
       ffl_debug(SL, "rF: %p inserted in %p\n", &rF, pQN);
       goto retn;
@@ -700,11 +728,11 @@ uint QuadHldr::addChildrenOnEdge (
 uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
                                QuadNode* pQN, uint8_t ind, float dx, float ds,
                                Direction d, bool notChild) {
-   if (tQN==nullptr) {
+   if (tQN==nullptr) {      
       return 0;
    }
-   short sign=1;
-   short minus=-1;
+   short sign= 1;
+   short minus= -1;
    QuadNode* resqp = (QuadNode*)get<0>(bpxor(fp, pQN));
    QuadHldr* tQH = (QuadHldr*)tQN;
    uint8_t ix=0;
@@ -802,7 +830,7 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
          }
       }
    } else {
-      pts.ni=pts.pts.size()-1;
+      pts.ni= pts.pts.size()-1;
       ix = ix==0?1:-1;
       iy = iy==0?1:-1;
       for (short i=-1; i <=1; ++i) {
@@ -823,19 +851,18 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
       //printf("---------\n");
       //printpts(pts.pts);
       //printf("---------\n");
-      pts.pni=pts.ni;
      cntnuFind:
       while (pts.ni<pts.pts.size() && pts.pni<pts.minPts) {
          NdNPrn nd = pts.pts[pts.ni];
          flDbg(SLL, "pts.ni: %d, nd.qh: %p", pts.ni, nd.qh);
-         tQN=nd.qh->qn();
-         tind=nd.qh-(QuadHldr*)tQN;
+         tQN= nd.qh->qn();
+         tind= nd.qh-(QuadHldr*)tQN;
          //pts.nni=pts.pts.size();
          ncnt+=nd.qh->findNeighbours(
             pts, tQN, tind, nd.prn, nd.ind, nd.dx, nd.ds, nd.d);
          if (nd.d.x!=0 && nd.d.y!=0) {
             Direction dd = nd.d;
-            dd.x = 0;
+            dd.x= 0;
             //pts.nni=pts.pts.size();
             ncnt+=nd.qh->findNeighbours(
                pts, tQN, tind, nd.prn, nd.ind, nd.dx, nd.ds, dd);
@@ -847,24 +874,25 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
          }
          quickSort(pts.pts, pts.ni+1, pts.pts.size()-1);
          if (nd.qh->fp && pts.ni>=pts.pni) {
-            QuadNode* resqp = (QuadNode*)get<0>(getNode(nd));
-            vector<map<QuadNode*,uint>::iterator> qit =
+            QuadNode* resqp= (QuadNode*)get<0>(getNode(nd));
+            vector<map<QuadNode*,uint>::iterator> qit=
                qpfind((QuadNode*)resqp);
             if (!qit.size()) {
-               set<FFJSON*>* ressfp = (set<FFJSON*>*)resqp;
-               map<set<FFJSON*>*, vector<uint>>::iterator sit =
+               set<FFJSON*>* ressfp= (set<FFJSON*>*)resqp;
+               map<set<FFJSON*>*, vector<uint>>::iterator sit=
                   mapffset.find(ressfp);
-               bool isS=sit != mapffset.end();
+               bool isS= sit!=mapffset.end();
                if (isS) {
-                  set<FFJSON*>& sf = *sit->first;
-                  set<FFJSON*>::iterator sfit = sf.begin();
-                  int moreElms=sf.size();
+                  set<FFJSON*>& sf= *sit->first;
+                  set<FFJSON*>::iterator sfit= sf.begin();
+                  int moreElms= sf.size();
                   while (sfit!=sf.end()) {
                      //break;
                      --moreElms;
-                     int8_t matchcount = ffHasName(**sfit, pts.ina,pts.op==AND);
+                     int8_t matchcount= ffHasName(**sfit, pts.ina,
+                                                  pts.op==AND);
                      if (matchcount) {
-                        pts.pts[pts.pni] = {(QuadHldr*)*sfit,(QuadNode*)-1,
+                        pts.pts[pts.pni]= {(QuadHldr*)*sfit,(QuadNode*)-1,
                            nd.dx,nd.ds,{matchcount,0},0};
                         if (pts.pni+moreElms>pts.ni) {
                            pts.pts.insert(
@@ -913,13 +941,13 @@ uint QuadHldr::getPointsFromQuad (
    int8_t tind, QuadNode* pQN, int8_t ind
 ) {
    flDbg(SLL, "qh: %p", this);
-   float dx = 180/(pow(2,level+1));
+   float dx= 180/(pow(2,level+1));
    if (fp==nullptr) {
-      pts.cnd = {this, pQN, dx, 0, 0, ind};
+      pts.cnd= {this, pQN, dx, 0, 0, ind};
       return findNeighbours(pts, tQN, tind, pQN, ind, dx);
    }
-   void* resfp = get<0>(bpxor(fp,pQN));
-   vector<map<QuadNode*,uint>::iterator> qit = qpfind((QuadNode*)resfp);
+   void* resfp= get<0>(bpxor(fp,pQN));
+   vector<map<QuadNode*,uint>::iterator> qit= qpfind((QuadNode*)resfp);
    if (!qit.size()) {
       set<FFJSON*>* ressfp = (set<FFJSON*>*)resfp;
       map<set<FFJSON*>*, vector<uint>>::iterator sit = mapffset.find(ressfp);
@@ -932,11 +960,13 @@ uint QuadHldr::getPointsFromQuad (
             if (matchcount) {
                pts.pts.push_back(
                   {(QuadHldr*)*sfit,(QuadNode*)-1,dx,dx,{matchcount,0},0});
+               ++pts.pni;
             }
             ++sfit;
          }
       } else if (ffHasName(*(FFJSON*)resfp, pts.ina,pts.op==AND)) {
          pts.pts.push_back({this,pQN});
+         ++pts.pni;
       }
       pts.cnd = {this, pQN, dx, 0, 0, ind};
       return findNeighbours(pts, tQN, tind, pQN, ind, dx);

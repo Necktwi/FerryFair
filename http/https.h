@@ -24,45 +24,53 @@ enum HTTPLOG {
    HLL = 1<<18,
    HLLL = 1<<19
 };
+
+static ccp jsonMime= "application/json";
+static ccp txtMime= "text/plain";
+static ccp htmlMime= "text/html";
+static ccp okStr= "OK";
 static atomic<bool> atmcRunning{true};
+
 struct MkHttpArgs {
-   ccp body= nullptr;
-   ccp ctype= "text/plain";
-   int bsz= -1;
-   int code= 200;
-   ccp codeMsg= "OK";
-   ccp addlHdrs= nullptr;
-   bool cchCtrl= false;
-   int ocl= 0;
-   ccp insCntnt= nullptr;
-   int insAt= 0;
+   ccp body;
+   ccp ctype;
+   int bsz;
+   int code;
+   ccp codeMsg;
+   ccp addlHdrs;
+   bool cchCtrl;
+   ccp insCntnt;
+   int insAt;
    MkHttpArgs (
-      ccp body, ccp ctype = "text/plain", int bsz=-1,
-      const int code = 200, ccp codeMsg = "OK", ccp addlHdrs = nullptr) :
+      ccp body, ccp ctype = txtMime, int bsz=-1,
+      const int code = 200, ccp codeMsg = okStr, ccp addlHdrs = nullptr) :
       body(body), ctype(ctype), bsz(bsz), code(code),
       codeMsg(codeMsg), addlHdrs(addlHdrs) {};
-   MkHttpArgs () {};
+   MkHttpArgs ():body(nullptr), ctype(txtMime), bsz(-1), code(200),
+                 codeMsg(okStr), addlHdrs(nullptr), cchCtrl(false),
+                 insCntnt(nullptr), insAt(0){};
    void init () {
       body= nullptr;
-      ctype= "text/plain";
+      ctype= htmlMime;
       bsz= -1;
       int code= 200;
-      codeMsg= "OK";
+      codeMsg= okStr;
       addlHdrs= nullptr;
       cchCtrl= false;
    }
 };
 
 char* fileToStr (fs::path& fspath, char* buf= nullptr);
-int mkHttpRes (MkHttpArgs& args, string& res);
+int mkHttpRes (string& res, MkHttpArgs& args);
 int mkHttpRes (
    FFJSON& ffHttp, ccp body= nullptr, ccp ctype= "text/plain", int bsz= -1,
-   const int code= 200, ccp codeMsg= "OK", ccp addlHdrs= "");
+   const int code= 200, ccp codeMsg= "OK", ccp addlHdrs= nullptr);
 int mkHttpRes (FFJSON& ffHttp, FFJSON& body);
 inline int mkHttpRes (
    FFJSON& ffHttp, string body, ccp ctype = "text/plain",
    const int code = 200, ccp codeMsg = "OK", ccp addlHdrs = "") {
-   return mkHttpRes(ffHttp, body.c_str(), ctype, body.length(), code, codeMsg, addlHdrs);
+   return mkHttpRes(ffHttp, body.c_str(), ctype, body.length(), code, codeMsg,
+                    addlHdrs);
 }
 class ThreadPool {
 public:

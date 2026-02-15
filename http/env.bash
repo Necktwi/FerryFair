@@ -1,9 +1,10 @@
 #!/bin/bash
-ARCH=${ARCH:-x86_64}
-OS=${OS:-Linux}
-export BTYPE=${BTYPE:-debug}
-BDIR="build/${OS}/${ARCH}/${BTYPE}"
-WS="../.."
-export LD_LIBRARY_PATH="$WS/ferrybase/$BDIR:$WS/FFJSON/$BDIR:$WS/logger/$BDIR"
-export TCPP=${TCPP:-clang++}
-export LIBEXT="so.1.0"
+export OS=Linux
+#export BTYPE=release
+export BTYPE=debug
+export BD="build/${OS}/$(uname -m)/${BTYPE}/"
+mkdir -p ${BD}
+WS="../../"
+export LD_LIBRARY_PATH="${WS}ferrybase/$BD:${WS}FFJSON/$BD:${WS}logger/$BD"
+export TCPP=g++
+export LIBEXT=so

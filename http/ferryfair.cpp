@@ -106,7 +106,7 @@ int addSmtgsToReply (FFJSON& users, FFJSON& user, FFJSON& r,
 
 void addSearchNoDups (Pts& pts, FFJSON& reply, set<FFJSON*>& mdts,
                       int prevni, bool dupLnks = true) {
-   int k=0;
+   int k= reply["things"].size;
    for (int i=prevni;i<pts.pni;++i) {
       NdNPrn& nd = pts.pts[i];
       FFJSON* f;
@@ -116,11 +116,13 @@ void addSearchNoDups (Pts& pts, FFJSON& reply, set<FFJSON*>& mdts,
          auto aa = getNode(nd);
          f = (FFJSON*)get<0>(aa);
       }
+		flDbg(HL, "finding in mdts");
       bool thingIsWithUser = mdts.find(f)!=mdts.end();
+		flDbg(HL, "thingIsWithUser: %d", thingIsWithUser);
       if (dupLnks && thingIsWithUser) {
          FFJSON& rt = reply["things"][k];
-         rt["id"]=(*f)["id"];
-         rt["user"]=&(*f)["user"]["name"];
+         rt["id"]= (*f)["id"];
+         rt["user"]= &(*f)["user"]["name"];
       } else {
          reply["things"][k]=f;
       }
@@ -198,9 +200,6 @@ FFJSON* pusers = nullptr;
 ccp mailServer = nullptr;
 int mailPort = 0;
 
-static ccp jsonMime= "application/json";
-static ccp txtMime= "text/plain";
-static ccp htmlMime= "text/html";
 static HTML_ thingsHtml;
 
 ccp yay = "{\"error\":\"yay\"}";
@@ -264,7 +263,7 @@ int ffDefault (string& bid, Txo& rbs, Txo& ffHttp, Txo& reply, Txo& tUsr,
                Txo& query, MkHttpArgs& mhArgs, auto& now,
                Txo& cookie, ccp path, ccp username, FFJSON& users,
                long& lepoch) {
-   bool bidset= false;
+	bool bidset= false;
    if (bid.length())
       if(rbs[bid])
          goto gotbid;
@@ -285,59 +284,44 @@ int ffDefault (string& bid, Txo& rbs, Txo& ffHttp, Txo& reply, Txo& tUsr,
    rbsid["ts"]= now;
    reply["bid"]= bid;
    if (bidset) {
-      sprintf(mesg, "Set-Cookie: bid=%", bid.c_str());
+      snprintf(mesg, sizeof(mesg), "Set-Cookie: bid=%s", bid.c_str());
       mhArgs.addlHdrs= mesg;
+      flDbg(FL, mhArgs.addlHdrs);
    }
    BidThings_& bts= bidThings[rbsid.val.fptr];
   cookieReply:
    setSavMtx.lock();
    pFSetToSave.insert(&rbs);
    setSavMtx.unlock();
-   if (tUsr) {
-      FFJSON& qthn= query["thing"];
-      FFJSON& thns= qthn? tUsr["things"][
-         getIdChildInd(tUsr["things"], atoi(qthn))]: tUsr["things"];
-      reply["things"]= &thns;
-   } else if (path) {
-      return 0;
-   }
-   FFJSON& user= users[username];
-   if (user &&
-       !strcmp((ccp)user["bid"],bid.c_str()) && cookie["js"]) {
-     sendUser:
-      rbsid["urts"]= lepoch;
-      set<FFJSON*>& mdts = bts.mdts;
-      addSmtgsToReply(users, user, reply, mdts);
-   }
-   mhArgs.ctype= htmlMime;
-   mkHttpRes(ffHttp);
-   fs::path& fspath= ffHttp["fspath"];
-   uint fsize= fs::file_size(fspath);
-   string& res= ffHttp["res"];
-   res+= "Content-Length: 00000000\r\n\r\n";
-   ifstream in(fspath);
-   res.append(istreambuf_iterator<char>(in), istreambuf_iterator<char>());
-   if (!cookie["js"]) {
-      
-   }
-   return -1;
+   return 0;
 }
 
 int ffSearch (
-   FFJSON& payload, FFJSON& rbsid, FFJSON& tUsr, FFJSON& reply,
-   FFJSON& ffHttp, FFJSON& cookie) {
-   FFJSON& fsrch = payload["search"];
-   if (!fsrch) {
-      return 2;
-   }
-   string srchStr= (ccp)fsrch;
+   FFJSON& payload, Txo& rbs, FFJSON& rbsid, FFJSON& tUsr, FFJSON& reply,
+   FFJSON& ffHttp, FFJSON& cookie, long& lepoch, Txo& users) {
+   ccp srch = payload["search"];
+   string srchStr(srch);
    BidThings_& bts= bidThings[rbsid.val.fptr];
    set<FFJSON*>& mdts= bts.mdts;
-   Pts& pts= bts.search;
+   Pts& pts= srchStr.length()?bts.search:bts.all;
    pts= Pts();
-   if (tUsr) {
-      srchStr+= " ";
-      srchStr+= (ccp)tUsr["name"];
+	if (payload["locked"]) { //just opened the page
+		ccp username= rbsid["user"];
+		if (username) {
+			rbsid["urts"]= lepoch;
+			FFJSON& user = users[username];
+			addSmtgsToReply(users, user, reply,
+								 bidThings[rbsid.val.fptr].mdts);
+				setSavMtx.lock();
+				pFSetToSave.insert(&rbs);
+				setSavMtx.unlock();
+		}
+	}
+   if (tUsr) { //url with username
+		if (srchStr.length()) {
+			srchStr+= " ";
+		}
+		srchStr+= (ccp)tUsr["name"];
    }
    vector<string> mstr= metaname(srchStr.c_str());
    pts.ina= nametouint(mstr);
@@ -357,16 +341,332 @@ int ffSearch (
    --searchCv;
    cvMod.notify_all();
    addSearchNoDups(pts, reply, mdts, pni);
-   reply["things"][0];
-   if (!cookie["js"])
+	if (!reply["things"].size) {
+		reply["things"].init("[]");
+	}
+   if (cookie["js"]) {
       mkHttpRes(ffHttp, reply);
-   else {
-      
+   } else {
    }
-      
    return -1;
 }
 
+int ffPts (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
+           FFJSON& cookie) {
+   flNtc(FL, "pts:");
+   BidThings_& bts = bidThings[rbsid.val.fptr];
+   bool isSearch = payload["search"];
+   Pts& pts = isSearch?bts.search:bts.all;
+   int dir = payload["dir"];
+   if (dir!=1 && dir!=-1) {
+      return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+   }
+   int ni = payload["ni"];
+   int pni = pts.pni;
+   ni = ni==-1?pni:ni;
+   reply["things"].init("[]");
+   if (pni<pts.minPts || pts.pts.size()<=pts.minPts) {
+      return mkHttpRes(ffHttp, reply);
+   }
+   int tpts = ni+dir*20;
+   tpts = tpts<0?0:tpts;
+   if (pni>=tpts || tpts>=512)
+      return mkHttpRes(ffHttp, reply);
+   pts.minPts= tpts;
+   NdNPrn& nd= pts.cnd;
+   QuadNode* tQN= nd.qh->qn();
+   uint8_t tind= nd.qh-(QuadHldr*)tQN;
+   pts.cnd.ds= 1;
+   cvSrch.wait(modLk, []{return modQhCv.load()==0;});
+   ++searchCv;
+   nd.qh->findNeighbours(
+      pts, tQN, tind, nd.prn, nd.ind, nd.dx);
+   --searchCv;
+   cvMod.notify_all();
+   set<FFJSON*>& mdts= bts.mdts;
+   addSearchNoDups(pts, reply, mdts,pni, false);
+   return mkHttpRes(ffHttp, reply);
+}
+int ffSignIn (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
+				  FFJSON& users, string& bid, long& lepoch, Txo& rbs) {
+	flNtc(FL, "SignIn");
+	ccp username=payload["username"], password=payload["password"];
+	flNtc(FL, "\nUser: %s\nPass: %s", username, password);
+	ccp gid= payload["gid"];
+	FFJSON fres;
+	if (!password) {
+		if (!gid)
+			return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+		CURL* curl = curl_easy_init();
+		if (!curl) return mkHttpRes(ffHttp, "{\"error\":3}", jsonMime);
+		string readBuffer;
+		string url("https://oauth2.googleapis.com/tokeninfo?id_token=");
+		url += gid;
+		flDbg(FL, "gurl: %s", url.c_str());
+		curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, onCurlResponse);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+		curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+
+		CURLcode res = curl_easy_perform(curl);
+		curl_easy_cleanup(curl);
+
+		if (res != CURLE_OK)
+			return mkHttpRes(ffHttp, "{\"error\":4}", jsonMime);
+		flDbg(FL,"gglBuf: %s", readBuffer.c_str());
+		fres.init(readBuffer);
+		if (!fres["aud"])
+			return mkHttpRes(ffHttp, "{\"signin\":\"false\"}", jsonMime);
+		username=fres["email"];
+	}
+	flNtcCntnu(FL, "username: %s\n", username);
+	if (!users[username]) {
+		return mkHttpRes(ffHttp, "{\"signin\":\"false\"}", jsonMime);
+	}
+	FFJSON& user = users[username];
+	if ((gid || (user["password"] && !strcmp(password,user["password"])))
+		 && !user["inactive"]) {
+		rbsid["user"]=user["name"];
+		rbsid["ip"]=(ccp)ffHttp["ip"];
+		user["bid"]=bid;
+		rbsid["urts"]=lepoch;
+		addSmtgsToReply(users, user, reply, bidThings[rbsid.val.fptr].mdts);
+		setSavMtx.lock();
+		pFSetToSave.insert(&rbs);
+		setSavMtx.unlock();
+		return mkHttpRes(ffHttp, reply);
+	} else {
+		return mkHttpRes(ffHttp, "\{\"signin\":\"false\"}", jsonMime);
+	}
+}
+int ffOwl (Txo& user, Txo& payload, ccp username, Txo& ffHttp, Txo& users,
+			  long& lepoch, Txo& rbsid) {
+	FFJSON& things = user["things"];
+	FFJSON& smsgs = user["smsgs"];
+	FFJSON& reps = user["reps"];
+	int smind=smsgs.size;
+	FFJSON& fQs = payload["Qs"];
+	FFJSON::Iterator it;
+	long urts;
+	long lmts;
+	int i,j;
+	if (!fQs) {
+		goto rqs;
+	}
+	it = fQs.begin();
+	while (it!=fQs.end()) {
+		ccp tuser = (ccp)it;
+		if (!strcmp(tuser,username)) {
+			return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+		}
+		FFJSON::Iterator tit;
+		if (tuser) {
+			tit  = users.find(tuser);
+		}
+		if (!tuser || tit==users.end()) {
+			return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+		}
+		FFJSON& tfuser = users[tuser];
+		FFJSON& tfthings = tfuser["things"];
+		tit = it->begin();
+		while (tit!=it->end()) {
+			ccp ctid = (ccp)tit;
+			if (!ctid) {
+				return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+			}
+			int tid = atoi(ctid);
+			int tind = getIdChildInd(tfthings, tid);
+			if (tind<0) {
+				return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+			}
+			FFJSON& rmsgs = tfthings[tind]["rmsgs"];
+			if (!rmsgs) {
+				rmsgs.init("[]");
+			}
+			int rmind=rmsgs.size;
+			smind=smsgs.size;
+			int rmid=1;
+			if (rmind) {
+				rmid = (int)rmsgs[rmind-1]["id"]+1;
+			}
+			rmsgs[rmind]["id"]=rmid;
+			rmsgs[rmind]["user"]=username;
+			rmsgs[rmind]["msg"]=*tit;
+			rmsgs[rmind]["ts"]=lepoch;
+			rmsgs[rmind]["new"]=true;
+			rmsgs[rmind]["smind"]=smind;
+			smsgs[smind].init("[]");
+			smsgs[smind][0]=tuser;
+			smsgs[smind][1]=tid;
+			smsgs[smind][2]=rmid;
+			*tit=rmid;
+			++tit;
+		}
+		tfuser["lmts"]=lepoch;
+		setSavMtx.lock();
+		pFSetToSave.insert(&tfuser);
+		setSavMtx.unlock();
+		++it;
+	}
+	payload["status"]=1;
+	setSavMtx.lock();
+	pFSetToSave.insert(&user);
+	setSavMtx.unlock();
+  rqs://mark query as read
+	FFJSON& fRs = payload["Rs"];
+	if (!fRs) {
+		goto rrs;
+	}
+	it = fRs.begin();
+	while (it!=fRs.end()) {
+		ccp ctid = (ccp)it;
+		if (!ctid) {
+			return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+		}
+		int tid = atoi(ctid);
+		int tind = getIdChildInd(things, tid);
+		if (tind<0) {
+			return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+		}
+		FFJSON& rmsgs = things[tind]["rmsgs"];
+		FFJSON::Iterator tit = it->begin();
+		while (tit!=it->end()) {
+			int mid = (int)*tit;
+			mid = getIdChildInd(rmsgs, mid);
+			if (mid<0) {
+				return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+			}
+			rmsgs[mid].erase("new");
+			++tit;
+		}
+		++it;
+	}
+	payload["status"]=1;
+	setSavMtx.lock();
+	pFSetToSave.insert(&user);
+	setSavMtx.unlock();
+  rrs://mark received replies as read
+	FFJSON& frrs = payload["rrs"];
+	if (!frrs) {
+		goto news;
+	}
+	for (int i=0; i<frrs.size; ++i) {
+		int smind = frrs[i];
+		for (int j=0; j<reps.size; j+=2) {
+			if ((int)reps[j]==smind) {
+				reps.erase(j,j+2);
+				break;
+			}
+		}
+	}
+	payload["status"]=1;
+	setSavMtx.lock();
+	pFSetToSave.insert(&user);
+	setSavMtx.unlock();
+  news://fetch if there are new queries
+	urts = (long)rbsid["urts"];
+	if (!user["lmts"]) {
+		goto rnews;
+	}
+	lmts = (long)user["lmts"];
+	if (urts>lmts) {
+		goto rnews;
+	}
+	for (int i=0; i<things.size; ++i) {
+		FFJSON& rmsgs = things[i]["rmsgs"];
+		for (int j=0;j<rmsgs.size;++j) {
+			FFJSON& msg = rmsgs[j];
+			long mts = (long)msg["ts"];
+			if (mts<urts) {
+				continue;
+			}
+			payload["news"][to_string((int)things[i]["id"])]
+				[to_string(j)]=msg;
+		}
+	}
+	payload["status"]=1;
+  rnews://fetch if there are new replies
+	if (!reps.size) {
+		goto reps;
+	}
+	i=reps.size-1;
+	lmts = (long)reps[i];
+	if (urts>lmts) {
+		goto reps;
+	}
+	j=0;
+	do {
+		--i;
+		int smind = reps[i];
+		FFJSON& smsg = smsgs[smind];
+		FFJSON& tusrts = users[(ccp)smsg[0]]["things"];
+		int tind = getIdChildInd(tusrts, (int)smsg[1]);
+		FFJSON& trmsgs = tusrts[tind]["rmsgs"];
+		int mind = getIdChildInd(trmsgs, (int)smsg[2]);
+		FFJSON& rep=payload["rnews"][j];
+		rep=smsg;
+		rep[3]=trmsgs[mind]["rep"];
+		rep[4]=smind;
+		--i;++j;
+		if (i<0) {
+			break;
+		}
+		lmts=(long)reps[i];
+	} while (urts<lmts);
+  reps://post reply to target user thing
+	FFJSON& fRps = payload["Reps"];
+	if (!fRps) {
+		goto owldone;
+	}
+	it = fRps.begin();
+	while (it!=fRps.end()) {
+		ccp ctid = (ccp)it;
+		if (!ctid) {
+			return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+		}
+		int tid = atoi(ctid);
+		int tind = getIdChildInd(things, tid);
+		if (tind<0) {
+			return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+		}
+		FFJSON& rmsgs = things[tind]["rmsgs"];
+		FFJSON::Iterator tit = it->begin();
+		while (tit!=it->end()) {
+			int mid = stoi((ccp)tit);
+			int mind = getIdChildInd(rmsgs, mid);
+			if (mind<0) {
+				return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
+			}
+			smind=smsgs.size;
+			rmsgs[mind]["rep"]=*tit;
+			smsgs[smind].init("[]");
+			smsgs[smind][0]="";
+			smsgs[smind][1]=tid;
+			smsgs[smind][2]=mid;
+			FFJSON& tusr = users[(ccp)rmsgs[mind]["user"]];
+			FFJSON& treps = tusr["reps"];
+			if (!treps) {
+				treps.init("[]");
+			}
+			treps[treps.size]=rmsgs[mind]["smind"];
+			treps[treps.size]=lepoch;
+			setSavMtx.lock();
+			pFSetToSave.insert(&tusr);
+			setSavMtx.unlock();
+			++tit;
+		}
+		++it;
+	}
+	setSavMtx.lock();
+	pFSetToSave.insert(&user);
+	setSavMtx.unlock();
+	payload["status"]=1;
+  owldone:
+	payload["status"]=1;
+	rbsid["urts"]=lepoch;
+	return mkHttpRes(ffHttp, payload);
+}
 int ferryfair (FFJSON& ffHttp) {
    MkHttpArgs& mhArgs= ffHttp["resArgs"];
    FFJSON reply;
@@ -387,8 +687,7 @@ int ferryfair (FFJSON& ffHttp) {
       bid = (ccp)cookie["bid"];
    }
    auto now= chrono::system_clock::now();
-   auto now_ms=
-      chrono::time_point_cast<chrono::milliseconds>(now);
+   auto now_ms= chrono::time_point_cast<chrono::milliseconds>(now);
    long lepoch= now_ms.time_since_epoch().count();
    if (!ffHttp["referer"]) goto nextproto;
    referer= ffHttp["referer"];
@@ -401,7 +700,7 @@ int ferryfair (FFJSON& ffHttp) {
    sprintf(proto,"%.*s",protolen,(ccp)ffHttp["referer"]);
   nextproto:
    username= nullptr;
-   flDbg(FL, "proto: %s, host: %s", proto, (ccp)ffHttp["host"]);
+   flDbg(FL, "proto: %s", proto);
    path= ffHttp["path"];
    if (path[0]=='/') {
       ++path;
@@ -422,6 +721,37 @@ int ferryfair (FFJSON& ffHttp) {
    if (cpld && ctype && strstr(ctype, "json")) {
       payload.init(cpld);
    }
+	bool bidset= false;
+   if (bid.length())
+      if(rbs[bid])
+         goto gotbid;
+  newbid:
+   bid= random_alphnuma_string();
+   bidset= 1;
+  bidcheck:
+   if (rbs[bid]) {
+      bid= random_alphnuma_string();
+      goto bidcheck;
+   }
+   rbs[bid]["ip"]= (ccp)ffHttp["ip"];
+  gotbid:
+   if (strcmp(rbs[bid]["ip"],ffHttp["ip"])) {
+      goto newbid;
+   }
+   FFJSON& rbsid= rbs[bid];
+   rbsid["ts"]= now;
+   reply["bid"]= bid;
+   if (bidset) {
+      snprintf(mesg, sizeof(mesg), "Set-Cookie: bid=%s", bid.c_str());
+      mhArgs.addlHdrs= mesg;
+      flDbg(FL, mhArgs.addlHdrs);
+   }
+   BidThings_& bts= bidThings[rbsid.val.fptr];
+  cookieReply:
+   setSavMtx.lock();
+   pFSetToSave.insert(&rbs);
+   setSavMtx.unlock();
+
    switch(req) {
    case "sleep"_hash: {
       int sd = atoi((ccp)query["time"]);
@@ -463,15 +793,10 @@ int ferryfair (FFJSON& ffHttp) {
             ffHttp, "{\"error\":\"wrongKey\"}", jsonMime, -1, 400);
       }
    }
-   default: {
-      int res= ffDefault(bid, rbs, ffHttp, reply, tUsr, query,
-                         mhArgs, now, cookie, path, username, users, lepoch);
-      if (res) {
-         return res;
-      }
-   }}
+   default:
+		break;
+	}
   bidcheck2:
-   FFJSON& rbsid = rbs[bid];
    if (!rbsid) {
       if (tUsr) {
          return 1;
@@ -482,7 +807,6 @@ int ferryfair (FFJSON& ffHttp) {
    switch (req) {
    case "signOut"_hash: {
      signOut:
-      FFJSON& rbsid = rbs[bid];
       rbsid["user"]= nullFFJSON;
       setSavMtx.lock();
       pFSetToSave.insert(&rbs);
@@ -503,100 +827,18 @@ int ferryfair (FFJSON& ffHttp) {
       return mkHttpRes(ffHttp, "{\"cap\":\"true\"}", jsonMime);
    }
    case "signIn"_hash: {
-      flNtc(FL, "SignIn");
-      username=payload["username"];password=payload["password"];
-      flNtc(FL, "\nUser: %s\nPass: %s", username, password);
-      ccp gid = payload["gid"];
-      FFJSON fres;
-      if (!password) {
-         if (!gid)
-            return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
-         CURL* curl = curl_easy_init();
-         if (!curl) return mkHttpRes(ffHttp, "{\"error\":3}", jsonMime);
-         string readBuffer;
-         string url("https://oauth2.googleapis.com/tokeninfo?id_token=");
-         url += gid;
-         flDbg(FL, "gurl: %s", url.c_str());
-         curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
-         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, onCurlResponse);
-         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
-         curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-
-         CURLcode res = curl_easy_perform(curl);
-         curl_easy_cleanup(curl);
-
-         if (res != CURLE_OK)
-            return mkHttpRes(ffHttp, "{\"error\":4}", jsonMime);
-         flDbg(FL,"gglBuf: %s", readBuffer.c_str());
-         fres.init(readBuffer);
-         if (!fres["aud"])
-            return mkHttpRes(ffHttp, "{\"signin\":\"false\"}", jsonMime);
-         username=fres["email"];
-      }
-      flNtcCntnu(FL, "username: %s\n", username);
-      if (!users[username]) {
-         return mkHttpRes(ffHttp, "{\"signin\":\"false\"}", jsonMime);
-      }
-      FFJSON& user = users[username];
-      if ((gid || (user["password"] && !strcmp(password,user["password"])))
-          && !user["inactive"]) {
-         rbsid["user"]=user["name"];
-         rbsid["ip"]=(ccp)ffHttp["ip"];
-         user["bid"]=bid;
-         rbsid["urts"]=lepoch;
-         addSmtgsToReply(users, user, reply, bidThings[rbsid.val.fptr].mdts);
-         setSavMtx.lock();
-         pFSetToSave.insert(&rbs);
-         setSavMtx.unlock();
-         return mkHttpRes(
-            ffHttp, reply.stringify(true), jsonMime);
-      } else {
-         return mkHttpRes(ffHttp, "\{\"signin\":\"false\"}", jsonMime);
-      }      
+		return ffSignIn(payload, rbsid, reply, ffHttp, users, bid, lepoch, rbs);
    }
    case "pts"_hash: {
-      flNtc(FL, "pts:");
-      BidThings_& bts = bidThings[&rbs[bid]];
-      bool isSearch = payload["search"];
-      Pts& pts = isSearch?bts.search:bts.all;
-      int dir = payload["dir"];
-      if (dir!=1 && dir!=-1) {
-         return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
-      }
-      int ni = payload["ni"];
-      int pni = pts.pni;
-      ni = ni==-1?pni:ni;
-      reply["things"].init("[]");
-      if (pni<pts.minPts || pts.pts.size()<=pts.minPts) {
-         return mkHttpRes(ffHttp, reply.stringify(1), jsonMime);
-      }
-      int tpts = ni+dir*20;
-      tpts = tpts<0?0:tpts;
-      if (pni>=tpts || tpts>=512)
-         return mkHttpRes(ffHttp, reply.stringify(1), jsonMime);
-      pts.minPts=tpts;
-      NdNPrn& nd = pts.cnd;
-      QuadNode* tQN=nd.qh->qn();
-      uint8_t tind=nd.qh-(QuadHldr*)tQN;
-      pts.cnd.ds=1;
-      cvSrch.wait(modLk, []{return modQhCv.load()==0;});
-      ++searchCv;
-      nd.qh->findNeighbours(
-         pts, tQN, tind, nd.prn, nd.ind, nd.dx);
-      --searchCv;
-      cvMod.notify_all();
-      set<FFJSON*>& mdts = bts.mdts;
-      addSearchNoDups(pts, reply, mdts,pni, false);
-      return mkHttpRes(ffHttp, reply.stringify(1), jsonMime);
+      return ffPts(payload, rbsid, reply, ffHttp, cookie);
    }
    case "signUp"_hash: {
       //signup
       bool recovery=false;
       flNtc(FL, "Signup");
       username = payload["username"];
-      ccp email = payload["email"];
-      ccp gid = payload["gid"];
+      ccp email= payload["email"];
+      ccp gid= payload["gid"];
       if (!gid && !isValidEmail(payload["email"])) {
          flWrn(FL, "invalid email.");
          return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
@@ -644,7 +886,9 @@ int ferryfair (FFJSON& ffHttp) {
          FFJSON fres(readBuffer);
          if (!fres["aud"])
             return mkHttpRes(ffHttp, "{\"signin\":\"false\"}", jsonMime);
-         email=fres["email"];
+         email= fres["email"];
+			strcpy(mesg, email);
+			email= mesg;
       }
       if (!recovery && user && user["name"]) {
          flWrn(FL, "User already exists.");
@@ -674,9 +918,9 @@ int ferryfair (FFJSON& ffHttp) {
             jsonMime);
       }
       if (!recovery) {
-         user["email"] = email;
+         user["email"]= email;
          if (!gid) {
-            user["password"] = password;
+            user["password"]= password;
             user["inactive"] = true;
          } else {
             user["inactive"] = false;
@@ -722,17 +966,17 @@ int ferryfair (FFJSON& ffHttp) {
                  username);
          flDbg(FL, "userFile: %s", fm.m_sFileName);
          if (gid) {
-            user["name"]=username;
-            user["inactive"]=false;
-            user["things"].init("[]");
+            user["name"]= username;
+            user["inactive"]= false;
+				user["things"].init("[]");
             user["smsgs"].init("[]");
             user["reps"].init("[]");
-            user["lmts"]=lepoch;
-            user["bid"]=bid;
-            rbsid["ts"]=now;
-            rbsid["user"]=username;
-            rbsid["ip"]=(ccp)ffHttp["ip"];
-            rbsid["urts"]=lepoch;
+            user["lmts"]= lepoch;
+            user["bid"]= bid;
+            rbsid["ts"]= now;
+            rbsid["user"]= username;
+            rbsid["ip"]= (ccp)ffHttp["ip"];
+            rbsid["urts"]= lepoch;
          }
          (*user).setEFlag(FFJSON::CASTFILE);
          (*user).setEFlag(FFJSON::FILE);
@@ -746,17 +990,18 @@ int ferryfair (FFJSON& ffHttp) {
       pFSetToSave.insert(&rbs);
       setSavMtx.unlock();
       if (gid) {
-         reply=*user;
-         reply["actEmailSent"]=2;
-         reply["msg"]="Welcome to FerryFair!";
-         return mkHttpRes(ffHttp, reply.stringify(true), jsonMime);
+         reply= *user;
+         reply["actEmailSent"]= 2;
+         reply["msg"]= "Welcome to FerryFair!";
+         return mkHttpRes(ffHttp, reply);
       }
       return mkHttpRes(ffHttp, 
          "{\"actEmailSent\":2,\"msg\":\"Activation mail sent to ur email"
          " :D\"}", jsonMime);
    }
    case "search"_hash: {
-      return ffSearch(payload, rbsid, tUsr, reply, ffHttp, cookie);
+      return ffSearch(payload, rbs, rbsid, tUsr, reply, ffHttp, cookie, lepoch,
+							 users);
    }
    }
    username = rbsid["user"];
@@ -910,7 +1155,7 @@ int ferryfair (FFJSON& ffHttp) {
       pFSetToSave.insert(&user);
       pFSetToSave.insert(fnameints);
       setSavMtx.unlock();
-      return mkHttpRes(ffHttp, reply.stringify(true).c_str(), jsonMime);
+      return mkHttpRes(ffHttp, reply);
    }
    case "upload"_hash: {
       int uMaxThings = user["maxThings"];
@@ -999,233 +1244,10 @@ int ferryfair (FFJSON& ffHttp) {
       upfile.close();
       reply["thingId"]= thingId;
       reply["picId"]= picId;
-      return mkHttpRes(ffHttp, reply.stringify(1).c_str(), jsonMime);
+      return mkHttpRes(ffHttp, reply);
    }
    case "owl"_hash: {
-      FFJSON& things = user["things"];
-      FFJSON& smsgs = user["smsgs"];
-      FFJSON& reps = user["reps"];
-      int smind=smsgs.size;
-      FFJSON& fQs = payload["Qs"];
-      FFJSON::Iterator it;
-      long urts;
-      long lmts;
-      int i,j;
-      if (!fQs) {
-         goto rqs;
-      }
-      it = fQs.begin();
-      while (it!=fQs.end()) {
-         ccp tuser = (ccp)it;
-         if (!strcmp(tuser,username)) {
-            return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
-         }
-         FFJSON::Iterator tit;
-         if (tuser) {
-            tit  = users.find(tuser);
-         }
-         if (!tuser || tit==users.end()) {
-            return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
-         }
-         FFJSON& tfuser = users[tuser];
-         FFJSON& tfthings = tfuser["things"];
-         tit = it->begin();
-         while (tit!=it->end()) {
-            ccp ctid = (ccp)tit;
-            if (!ctid) {
-               return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
-            }
-            int tid = atoi(ctid);
-            int tind = getIdChildInd(tfthings, tid);
-            if (tind<0) {
-               return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
-            }
-            FFJSON& rmsgs = tfthings[tind]["rmsgs"];
-            if (!rmsgs) {
-               rmsgs.init("[]");
-            }
-            int rmind=rmsgs.size;
-            smind=smsgs.size;
-            int rmid=1;
-            if (rmind) {
-               rmid = (int)rmsgs[rmind-1]["id"]+1;
-            }
-            rmsgs[rmind]["id"]=rmid;
-            rmsgs[rmind]["user"]=username;
-            rmsgs[rmind]["msg"]=*tit;
-            rmsgs[rmind]["ts"]=lepoch;
-            rmsgs[rmind]["new"]=true;
-            rmsgs[rmind]["smind"]=smind;
-            smsgs[smind].init("[]");
-            smsgs[smind][0]=tuser;
-            smsgs[smind][1]=tid;
-            smsgs[smind][2]=rmid;
-            *tit=rmid;
-            ++tit;
-         }
-         tfuser["lmts"]=lepoch;
-         setSavMtx.lock();
-         pFSetToSave.insert(&tfuser);
-         setSavMtx.unlock();
-         ++it;
-      }
-      payload["status"]=1;
-      setSavMtx.lock();
-      pFSetToSave.insert(&user);
-      setSavMtx.unlock();
-     rqs://mark query as read
-      FFJSON& fRs = payload["Rs"];
-      if (!fRs) {
-         goto rrs;
-      }
-      it = fRs.begin();
-      while (it!=fRs.end()) {
-         ccp ctid = (ccp)it;
-         if (!ctid) {
-            return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
-         }
-         int tid = atoi(ctid);
-         int tind = getIdChildInd(things, tid);
-         if (tind<0) {
-            return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
-         }
-         FFJSON& rmsgs = things[tind]["rmsgs"];
-         FFJSON::Iterator tit = it->begin();
-         while (tit!=it->end()) {
-            int mid = (int)*tit;
-            mid = getIdChildInd(rmsgs, mid);
-            if (mid<0) {
-               return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
-            }
-            rmsgs[mid].erase("new");
-            ++tit;
-         }
-         ++it;
-      }
-      payload["status"]=1;
-      setSavMtx.lock();
-      pFSetToSave.insert(&user);
-      setSavMtx.unlock();
-     rrs://mark received replies as read
-      FFJSON& frrs = payload["rrs"];
-      if (!frrs) {
-         goto news;
-      }
-      for (int i=0; i<frrs.size; ++i) {
-         int smind = frrs[i];
-         for (int j=0; j<reps.size; j+=2) {
-            if ((int)reps[j]==smind) {
-               reps.erase(j,j+2);
-               break;
-            }
-         }
-      }
-      payload["status"]=1;
-      setSavMtx.lock();
-      pFSetToSave.insert(&user);
-      setSavMtx.unlock();
-     news://fetch if there are new queries
-      urts = (long)rbsid["urts"];
-      if (!user["lmts"]) {
-         goto rnews;
-      }
-      lmts = (long)user["lmts"];
-      if (urts>lmts) {
-         goto rnews;
-      }
-      for (int i=0; i<things.size; ++i) {
-         FFJSON& rmsgs = things[i]["rmsgs"];
-         for (int j=0;j<rmsgs.size;++j) {
-            FFJSON& msg = rmsgs[j];
-            long mts = (long)msg["ts"];
-            if (mts<urts) {
-               continue;
-            }
-            payload["news"][to_string((int)things[i]["id"])]
-               [to_string(j)]=msg;
-         }
-      }
-      payload["status"]=1;
-     rnews://fetch if there are new replies
-      if (!reps.size) {
-         goto reps;
-      }
-      i=reps.size-1;
-      lmts = (long)reps[i];
-      if (urts>lmts) {
-         goto reps;
-      }
-      j=0;
-      do {
-         --i;
-         int smind = reps[i];
-         FFJSON& smsg = smsgs[smind];
-         FFJSON& tusrts = users[(ccp)smsg[0]]["things"];
-         int tind = getIdChildInd(tusrts, (int)smsg[1]);
-         FFJSON& trmsgs = tusrts[tind]["rmsgs"];
-         int mind = getIdChildInd(trmsgs, (int)smsg[2]);
-         FFJSON& rep=payload["rnews"][j];
-         rep=smsg;
-         rep[3]=trmsgs[mind]["rep"];
-         rep[4]=smind;
-         --i;++j;
-         if (i<0) {
-            break;
-         }
-         lmts=(long)reps[i];
-      } while (urts<lmts);
-     reps://post reply to target user thing
-      FFJSON& fRps = payload["Reps"];
-      if (!fRps) {
-         goto owldone;
-      }
-      it = fRps.begin();
-      while (it!=fRps.end()) {
-         ccp ctid = (ccp)it;
-         if (!ctid) {
-            return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
-         }
-         int tid = atoi(ctid);
-         int tind = getIdChildInd(things, tid);
-         if (tind<0) {
-            return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
-         }
-         FFJSON& rmsgs = things[tind]["rmsgs"];
-         FFJSON::Iterator tit = it->begin();
-         while (tit!=it->end()) {
-            int mid = stoi((ccp)tit);
-            int mind = getIdChildInd(rmsgs, mid);
-            if (mind<0) {
-               return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
-            }
-            smind=smsgs.size;
-            rmsgs[mind]["rep"]=*tit;
-            smsgs[smind].init("[]");
-            smsgs[smind][0]="";
-            smsgs[smind][1]=tid;
-            smsgs[smind][2]=mid;
-            FFJSON& tusr = users[(ccp)rmsgs[mind]["user"]];
-            FFJSON& treps = tusr["reps"];
-            if (!treps) {
-               treps.init("[]");
-            }
-            treps[treps.size]=rmsgs[mind]["smind"];
-            treps[treps.size]=lepoch;
-            setSavMtx.lock();
-            pFSetToSave.insert(&tusr);
-            setSavMtx.unlock();
-            ++tit;
-         }
-         ++it;
-      }
-      setSavMtx.lock();
-      pFSetToSave.insert(&user);
-      setSavMtx.unlock();
-      payload["status"]=1;
-     owldone:
-      payload["status"]=1;
-      rbsid["urts"]=lepoch;
-      return mkHttpRes(ffHttp, payload.stringify(true).c_str(), jsonMime);
+		return ffOwl(user, payload, username, ffHttp, users, lepoch, rbsid);
    }
    }
    if (tUsr)
@@ -1234,7 +1256,6 @@ int ferryfair (FFJSON& ffHttp) {
 }
 
 void makeThngsTree (Txo& cfg) {
-   QuadNode q;
    fnameints = &cfg["nameints"];
    nameints = fnameints->val.pairs;
    map<string, FFJSON*>::iterator nit = nameints->begin();
@@ -1364,6 +1385,8 @@ void initFerryFair (FFJSON& cfg) {
    thnsTree.print(pts.c);
    //ina.push_back(0x80);
    thnsTree.getPointsFromQuad(pts);
+   // cout << *pusers << endl;
+   // return;
    ftsEnd.update();
    ftsDiff = ftsEnd - ftsStart;
    cout << "timeToFind= " << ftsDiff << endl;
@@ -1390,4 +1413,8 @@ void initFerryFair (FFJSON& cfg) {
          delete e;
       }
    }
+}
+
+void uninitFerryFair () {
+	thnsTree.destroy();
 }

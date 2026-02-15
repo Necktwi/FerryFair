@@ -88,6 +88,7 @@ struct FFQuad_ {
    float lx = 0;
    float ly = 0;
    bool deleteLeaf = false;
+	bool isS= false;
    FFQuad_ (FFJSON& rF, vector<uint>& ina, float lx = 0, float ly = 0,
             bool deleteLeaf = false) : rF(rF), ina(ina), lx(lx), ly(ly),
                                        deleteLeaf(deleteLeaf) {}
@@ -96,7 +97,9 @@ union QuadHldr {
    QuadHldr () {
       qp=nullptr;
    };
-   struct InitInsArgs_ {
+	~QuadHldr ();
+	void destroy (QuadNode* pQN= nullptr, QuadNode* tQN= nullptr);
+	struct InitInsArgs_ {
       FFJSON& rF;
       const vector<uint>& ina;
       float lx;
@@ -180,6 +183,7 @@ struct QuadNode {
    bool updateIntNames (QuadNode* tQN = nullptr, uint8_t tind = 0,
                         QuadNode* pQN = nullptr, uint8_t ind = 0);
    ~QuadNode ();
+	void destroy (QuadNode* pQN= nullptr);
 };
 
 struct Qn2 {

@@ -105,6 +105,8 @@ typedef const char* ccp;
 set<FFJSON*> pFSetToSave;
 mutex setSavMtx;
 atomic<bool> saveTxoStop{0};
+mutex ipTracksMtx;
+mutex TmOtFuncSetMtx;
 
 void handleSigInt (int) {
    if (!atmcRunning) {
@@ -320,9 +322,9 @@ string htmlEscape (ccp s) {
 void urlEscape (char* s) {
    char* c= s;
    while (*s!= '\0') {
-      if (*s== '%') {
+      if (*s== '%' && *(s+1)!='\0' && *(s+2)!='\0') {
          s+=3;
-         *c=*s;
+			*c=*s;
          *s='\0';
          ++c;
          *c= (char)strtol(c, &s, 16);
@@ -339,8 +341,8 @@ void urlEscape (char* s) {
    *c= '\0';
 }
 
-using crd = function<size_t(char*, size_t)>;
-using cwr = function<size_t(ccp, size_t)>;
+using crd = function<ssize_t(char*, size_t)>;
+using cwr = function<ssize_t(ccp, size_t)>;
 void parseHost (crd read, FFJSON& host) {
    char c;
    string buf;
@@ -601,23 +603,31 @@ void parseHTTP (crd read, FFJSON& ffHttp) {
    }
 }
 
-int mkHttpRes (MkHttpArgs& args, string& res) {
+int mkHttpRes (string& res, MkHttpArgs& args) {
+	bool enc=false;
+	if (res=="1") {
+		res="";
+		enc=true;
+	}
    res+= "HTTP/1.0 "+ to_string(args.code)+ " "+ args.codeMsg+ "\r\n";
    res+= "Content-Type: "+ string(args.ctype)+ "\r\n";
-   res+= args.addlHdrs;
    res+= "Connection: close\r\n";
    if (!args.cchCtrl) {
       res+= "Cache-Control: public, max-age=3600\r\n";
    }
+   if (args.addlHdrs) {
+      res+= args.addlHdrs;
+		res+= "\r\n";
+	}
    if (!args.body)
       return -1;
-   if (args.ocl) {
-      string gz = gzipCompress(args.body, args.ocl);
+   if (enc) {
+      string gz = gzipCompress(args.body, args.bsz);
       res+= "Content-Encoding: gzip\r\n";
       res+= "Content-Length: "+ to_string(gz.size())+ "\r\n\r\n";
       res+= gz;
    } else {
-      res+= "Content-Length: "+ res+ "\r\n\r\n";
+      res+= "Content-Length: "+ to_string(args.bsz) + "\r\n\r\n";
       res+= args.body;
    }
    return -1;
@@ -635,15 +645,18 @@ int mkHttpRes (
    if (!mhArgs.addlHdrs)
       mhArgs.addlHdrs= addlHdrs;
    else if (addlHdrs)
-      flErr(HL, "addlHdrs: %s not added");
-   string& res= ffHttp["res"];
-   int ocl= bsz== -1? strlen(body): bsz;
-   FFJSON& accEnc = ffHttp["accept-encoding"];
-   if (ocl>1024 && accEnc && accEnc["gzip"] &&
-       !strstr(mhArgs.ctype,"image")) {
-      mhArgs.ocl= ocl;
-   }
-   return mkHttpRes(mhArgs, res);
+      flErr(HL, "addlHdrs: %s not added", addlHdrs);
+   mhArgs.bsz= (bsz==-1)? body? strlen(body) : 0 : bsz;
+	if (!ffHttp["res"]) {
+		flDbg(HL, "1");
+	}
+	string& res= ffHttp["res"];
+	FFJSON& accEnc= ffHttp["accept-encoding"];
+	if (mhArgs.bsz>1024 && accEnc && accEnc["gzip"] &&
+		 !strstr(mhArgs.ctype, "image")) {
+		res="1";
+	}
+   return mkHttpRes(res, mhArgs);
 }
 
 int mkHttpRes (FFJSON& ffHttp, FFJSON& body) {
@@ -665,6 +678,11 @@ int mkHttpRes (FFJSON& ffHttp, FFJSON& body) {
 enum ftype {
    FSFILE, SLINK, BLINK, DIR
 };
+static bool initIpBlocker () {
+	string command = string("sudo ./createNFChain");
+	int result = system(command.c_str());
+	return (result == 0);
+}
 static bool blockIp (ccp ip) {
    string command = string("sudo ./blockHttpIp ") + ip;
    int result = system(command.c_str());
@@ -761,8 +779,7 @@ typedef unordered_map<string, IpTrack_> IpTrksMp_;
 IpTrksMp_ ipTracks;
 struct TimeoutFunc_ {
    FTS_ timeout;
-   void (*func) () = nullptr;
-   void* data = nullptr;
+   virtual void func ()= 0;
 };
 
 struct CmpTout_ {
@@ -773,7 +790,7 @@ struct CmpTout_ {
 typedef set<TimeoutFunc_*, CmpTout_> TmOutSet_;
 TmOutSet_ TmOtFuncSet(cmpTout);
 struct TmOutIpUnblocker_:public TimeoutFunc_ {
-   void func () {
+   void func () override {
       unblockIp(ip);
    }
    ccp ip;
@@ -806,6 +823,7 @@ char* fileToStr (fs::path& fspath, char* buf) {
    delete buffer;
    return nullptr;
 }
+
 int handleHttp (FFJSON& ffHttp) {
    MkHttpArgs mhArgs;
    ffHttp["resArgs"]= &mhArgs;
@@ -827,11 +845,12 @@ int handleHttp (FFJSON& ffHttp) {
    string path((ccp)vhost["rootdir"]);
    int plen= fpath.size;
    int res= 0;
-   path+= "/";
    if (plen>1)
       path+= ((ccp)fpath)+1;
-   else
+   else {
+		mhArgs.cchCtrl= true;
       path+= "index.html";
+	}
    flInf(HL, "serving %s", path.c_str());
    fs::path fspath(path);
    ffHttp["fspath"]= (void*)&fspath;
@@ -897,9 +916,9 @@ int handleHttp (FFJSON& ffHttp) {
      serveFile:
       string ctype= getMimeType(fspath);
       mhArgs.ctype= ctype.c_str();
-      mkHttpRes(ffHttp);
-      uint fsize= fs::file_size(fspath);
       string& res= ffHttp["res"];
+      mkHttpRes(res, mhArgs);
+      uint fsize= fs::file_size(fspath);
       res+= "Content-Length: "+ to_string(fsize)+ "\r\n\r\n";
       ifstream in(fspath);
       res.append(istreambuf_iterator<char>(in), istreambuf_iterator<char>());
@@ -907,7 +926,9 @@ int handleHttp (FFJSON& ffHttp) {
    }
   iptrack:
    FTS_ now; now.update();
+	ipTracksMtx.lock();
    IpTrack_& ipt = ipTracks[(ccp)ffHttp["ip"]];
+	ipTracksMtx.unlock();
    flNtc(HL, "track: %s requested %s %d times",
          (ccp)ffHttp["ip"], (ccp)ffHttp["path"], ipt.count);
    if (!ipt.firstReqTime) {
@@ -919,10 +940,14 @@ int handleHttp (FFJSON& ffHttp) {
          flNtc(HL, "blocking %s", (ccp)ffHttp["ip"]);
          blockIp((ccp)ffHttp["ip"]);
          TmOutIpUnblocker_* tmOtIpUnBlkr = new TmOutIpUnblocker_();
+			ipTracksMtx.lock();
          IpTrksMp_::iterator it = ipTracks.find((ccp)ffHttp["ip"]);
+			ipTracksMtx.unlock();
          tmOtIpUnBlkr->ip=it->first.c_str();
          tmOtIpUnBlkr->timeout=now+7200;
+			TmOtFuncSetMtx.lock();
          TmOtFuncSet.insert(tmOtIpUnBlkr);
+			TmOtFuncSetMtx.unlock();
       } else if (ipt.count <2) {
          ipt.firstReqTime=now;
       }
@@ -940,6 +965,7 @@ int waitForWrite (int fd, int timeoutMs) {
     return poll(&p, 1, timeoutMs);
 }
 
+atomic<int> sslCount{0};
 void handleConnection (int tid, struct sockaddr_in cli, int clientFd,
                        SSL* ssl = nullptr) {
    FFJSON ffHttp;
@@ -948,16 +974,16 @@ void handleConnection (int tid, struct sockaddr_in cli, int clientFd,
    ffHttp["ip"] = (ccp)ip_str;
    flInf(HL, "tid: %d, %s, %d------", tid, ip_str, clientFd);
    //makeNonBlocking(clientFd);
-   FFJSON& fres= ffHttp["res"];
    string res;
-   crd nr = [clientFd] (char* buf, size_t bufSize)->size_t {
+   ffHttp["res"]= &res;
+   crd nr = [clientFd] (char* buf, size_t bufSize)->ssize_t {
       return recv(clientFd, buf, bufSize, 0);
    };
-   crd sr = [ssl] (char* buf, size_t bufSize)->size_t {
+   crd sr = [ssl] (char* buf, size_t bufSize)->ssize_t {
       return SSL_read(ssl, buf, bufSize);
    };
    crd rd = ssl ? sr : nr;
-   crd rr = [&rd, clientFd] (char* buf, size_t bufSize)->size_t {
+   crd rr = [&rd, clientFd] (char* buf, size_t bufSize)->ssize_t {
       int retry = cfg["readRetry"];
       static int retryMS = cfg["retryMS"];
      readagain:
@@ -976,17 +1002,16 @@ void handleConnection (int tid, struct sockaddr_in cli, int clientFd,
    if (!ffHttp["version"]) {
       goto handledone;
    }
-   fres= &res;
    handleHttp(ffHttp);
    if (res.length()) {
-      cwr nw = [clientFd] (ccp buf, size_t bufSize)->size_t {
+      cwr nw = [clientFd] (ccp buf, size_t bufSize)->ssize_t {
          return send(clientFd, buf, bufSize, 0);
       };
-      cwr sw = [ssl] (ccp buf, size_t bufSize)->size_t {
+      cwr sw = [ssl] (ccp buf, size_t bufSize)->ssize_t {
          return SSL_write(ssl, buf, bufSize);
       };
       cwr wd = ssl ? sw : nw;
-      cwr rw = [&wd, clientFd] (ccp buf, size_t bufSize)->size_t {
+      cwr rw = [&wd, clientFd] (ccp buf, size_t bufSize)->ssize_t {
          int retry = cfg["readRetry"];
          static int retryMS = cfg["retryMS"];
          size_t off = 0;
@@ -1017,6 +1042,8 @@ void handleConnection (int tid, struct sockaddr_in cli, int clientFd,
    if (ssl) {
       SSL_shutdown(ssl);
       SSL_free(ssl);
+		flDbg(HL, "ssl %p destroyed", ssl);
+		--sslCount;
    }
    ::close(clientFd);
    flDbg(HL, "tid:%d: %d fd closed", tid, clientFd);
@@ -1044,8 +1071,6 @@ int create_listen_socket (uint16_t port) {
 }
 
 SSL_CTX* create_ssl_ctx (const string &cert_file, const string &key_file) {
-   SSL_library_init();
-   SSL_load_error_strings();
    const SSL_METHOD *method = TLS_server_method();
    SSL_CTX *ctx = SSL_CTX_new(method);
    if (!ctx) return nullptr;
@@ -1073,7 +1098,6 @@ SSL_CTX* create_ssl_ctx (const string &cert_file, const string &key_file) {
       ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION);
    return ctx;
 }
-
 void acceptLoop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
    while (atmcRunning) {
       struct sockaddr_in cli{};
@@ -1107,15 +1131,19 @@ void acceptLoop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
             ::close(c);
             continue;
          }
-         ssl = SSL_new(ctx);
+         ssl= SSL_new(ctx);
+			flDbg(HL, "ssl %p created", ssl);
+			++sslCount;
          SSL_set_fd(ssl, c);
-         int r = SSL_accept(ssl);
+         int r= SSL_accept(ssl);
          if (r<0) {
             flErr(HL, "tid %d: SSL accept failed: %d: %s", tid, r,
                   ERR_error_string(SSL_get_error(ssl, r), nullptr));
             SSL_shutdown(ssl);
             SSL_free(ssl);
-            ::close(c);
+				--sslCount;
+            flDbg(HL, "ssl %p destroyed", ssl);
+				::close(c);
             flDbg(HL, "tid:%d: %d fd closed", tid, c);
             continue;
          }
@@ -1135,6 +1163,7 @@ void saveTxo () {
    FFJSON* p;
    while (!saveTxoStop) {
       this_thread::sleep_for(chrono::milliseconds(2000));
+		flDbg(HLL, "saving Txo");
       while (!pFSetToSave.empty()) {
          setSavMtx.lock();
          set<FFJSON*>::iterator it = pFSetToSave.begin();
@@ -1151,27 +1180,27 @@ void serveTimeouts () {
    FTS_ now;
    while (atmcRunning) {
       this_thread::sleep_for(chrono::milliseconds(2000));
+		flDbg(HLL, "running timeouts");
       while (1) {
+			TmOtFuncSetMtx.lock();
          TmOutSet_::iterator it = TmOtFuncSet.begin();
-         if (it==TmOtFuncSet.end())
-            break;
-         TimeoutFunc_* topTmOtFunc = *it;
+			if (it==TmOtFuncSet.end()) {
+				TmOtFuncSetMtx.unlock();
+			   break;
+			}
+         TmOtFuncSetMtx.unlock();
+			TimeoutFunc_* topTmOtFunc = *it;
          now.update();
-         if (topTmOtFunc->timeout < now) {
+         if (topTmOtFunc->timeout < now || !atmcRunning) {
             topTmOtFunc->func();
+				TmOtFuncSetMtx.lock();
             TmOtFuncSet.erase(it);
+				TmOtFuncSetMtx.unlock();
             delete topTmOtFunc;
          } else {
             break;
          }
       }
-   }
-   TmOutSet_::iterator it = TmOtFuncSet.begin();
-   while (it!=TmOtFuncSet.end()) {
-      TimeoutFunc_* topTmOtFunc = *it;
-      topTmOtFunc->func();
-      TmOtFuncSet.erase(it);
-      delete topTmOtFunc;
    }
 }
 // ---------------- CLI and main ----------------
@@ -1219,7 +1248,8 @@ int run () {
               (ccp)cfg["rootdir"], (int)fCfgThrdCnt);
 
    curl_global_init(CURL_GLOBAL_DEFAULT);
-   
+   initIpBlocker();
+	
    tpoolPtr = new ThreadPool((int)fCfgThrdCnt);
    initFerryFair(cfg["vhosts"]["www"]);
 
@@ -1252,7 +1282,7 @@ int run () {
    while (atmcRunning) {
       this_thread::sleep_for(chrono::milliseconds(2000));
    }
-
+	
    ::shutdown(httpFd, SHUT_RDWR);
    ::shutdown(httpsFd, SHUT_RDWR);
    ::close(httpFd);
@@ -1262,7 +1292,8 @@ int run () {
    if (t2.joinable()) t2.join();
    flDbg(HL,"freeing ssl_ctx");
    SSL_CTX_free(sslCtx);
-   flDbg(HL, "deleting thread pool");
+	uninitFerryFair();
+	flDbg(HL, "deleting thread pool");
    delete tpoolPtr;
    curl_global_cleanup();
    saveTxoStop=true;
@@ -1324,6 +1355,7 @@ int main (int argc, char **argv) {
    } else {
       run();
    }
+	flDbg(HL,"sslCount: %d", sslCount.load());
    flNtc(HL, "bye!----------");
    return 0;
 }

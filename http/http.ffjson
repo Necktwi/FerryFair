@@ -1,6 +1,6 @@
 name: "FairPlay configuration file",
 hostname: "ferryfair.com",
-rootdir: "../../WWW-development",
+rootdir: "../../WWW-development/",
 cert: "/etc/letsencrypt/live/ferryfair.com/cert.pem",
 key: "/etc/letsencrypt/live/ferryfair.com/privkey.pem",
 ca: "/etc/letsencrypt/live/ferryfair.com/fullchain.pem",
@@ -31,11 +31,11 @@ httpPort: 8080,
 httpsPort: 8443,
 vhosts: {
    www: {
-      rootdir: "../../WWW-development"
+      rootdir: "../../WWW-development/"
    },
    underconstruction: www
 },
 readRetry: 300,
 retryMS: 70,
-threadCount: 0,
-daemon: true
+threadCount: -1,
+daemon: false

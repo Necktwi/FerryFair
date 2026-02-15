@@ -1,0 +1,3 @@
+ALL ALL=(ALL) NOPASSWD: /home/Necktwi/workspace/ferryfair/http/blockHttpIp
+ALL ALL=(ALL) NOPASSWD: /home/Necktwi/workspace/ferryfair/http/unBlockHttpIp
+ALL ALL=(ALL) NOPASSWD: /home/Necktwi/workspace/ferryfair/http/createNFChain

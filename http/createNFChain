@@ -1,0 +1,4 @@
+#!/bin/bash
+
+nft add table ip ffWall
+nft add chain ip ffWall ffin { type filter hook input priority 0 \; }
