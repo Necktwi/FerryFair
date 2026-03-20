@@ -750,6 +750,7 @@ string getMimeType (const fs::path& path) {
       {".svg",  "image/svg+xml"},
       {".ico",  "image/x-icon"},
       {".txt",  "text/plain"},
+      {".log",  "text/plain"},
       {".md",  "text/plain"},
       {".ttf",  "font/ttf"},
       {".pdf",  "application/pdf"},
