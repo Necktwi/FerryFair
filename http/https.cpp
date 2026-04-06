@@ -752,12 +752,16 @@ string getMimeType (const fs::path& path) {
       {".txt",  "text/plain"},
       {".log",  "text/plain"},
       {".md",  "text/plain"},
+      {".dts",  "text/plain"},
       {".ttf",  "font/ttf"},
       {".pdf",  "application/pdf"},
       {".xml",  "application/xml"},
       {".zip",  "application/zip"},
       {".gz",   "application/gzip"},
-      {".tar",  "application/x-tar"}
+      {".tar",  "application/x-tar"},
+      {".ts",  "video/mp2t"},
+      {".m3u8",  "application/vnd.apple.mpegurl"}
+		
       // add more as needed
    };
 
@@ -771,6 +775,7 @@ string getMimeType (const fs::path& path) {
    }
    return "application/octet-stream"; // default
 }
+static const set<string> noCacheMime {".ts", ".m3u8"};
 
 struct IpTrack_ {
    FTS_ firstReqTime;
@@ -1013,29 +1018,29 @@ void handleConnection (int tid, struct sockaddr_in cli, int clientFd,
       };
       cwr wd = ssl ? sw : nw;
       cwr rw = [&wd, clientFd] (ccp buf, size_t bufSize)->ssize_t {
-         int retry = cfg["readRetry"];
-         static int retryMS = cfg["retryMS"];
-         size_t off = 0;
-         while (off < bufSize) {
-           writeagain:
-            ssize_t w = wd(buf+off, bufSize - off);
-            if (w<=0) {
-               if (retry>0 && (errno==EAGAIN || errno==EINTR)) {
-                  waitForRead(clientFd, retryMS);
-                  flDbgCntnu(HL, "fd: %d, w: %zd, e: %d %zd/%zd retry",
-                             clientFd, w, errno, off, bufSize);
-                  --retry;
-                  goto writeagain;
-               } else {
-                  flDbg(HL, "fd: %d, write error, closing at %d",
-                        clientFd, off);
-                  return off;
-               }
-            }
-            off += w;
-         }
-         return off;
-      };
+          int retry = cfg["readRetry"];
+          static int retryMS = cfg["retryMS"];
+          size_t off = 0;
+          while (off < bufSize) {
+            writeagain:
+             ssize_t w = wd(buf+off, bufSize - off);
+             if (w<=0) {
+                if (retry>0 && (errno==EAGAIN || errno==EINTR)) {
+                   waitForWrite(clientFd, retryMS);
+                   flDbgCntnu(HL, "fd: %d, w: %zd, e: %d %zd/%zd retry",
+                              clientFd, w, errno, off, bufSize);
+                   --retry;
+                   goto writeagain;
+                } else {
+                   flDbg(HL, "fd: %d, write error, closing at %d",
+                         clientFd, off);
+                   return off;
+                }
+             }
+             off += w;
+          }
+          return off;
+       };
       rw(res.c_str(), res.length());
    }
    
@@ -1149,15 +1154,15 @@ void acceptLoop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
             continue;
          }
       }
-      // make socket non-blocking
-      int flags = fcntl(c, F_GETFL, 0);
-      if (flags == -1) continue;
-      fcntl(c, F_SETFL, flags | O_NONBLOCK);
+       // make socket non-blocking
+       int flags = fcntl(c, F_GETFL, 0);
+       if (flags == -1) continue;
+       fcntl(c, F_SETFL, flags | O_NONBLOCK);
 
-      pool.enqueue([cli, ssl, c] (int tid) {
-         handleConnection(tid, cli, c, ssl);
-      });
-   }
+       pool.enqueue([cli, ssl, c] (int tid) {
+          handleConnection(tid, cli, c, ssl);
+       });
+    }
 }
 
 void saveTxo () {
