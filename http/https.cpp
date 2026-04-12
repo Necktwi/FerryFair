@@ -603,6 +603,10 @@ void parseHTTP (crd read, FFJSON& ffHttp) {
    }
 }
 
+static const set<string> noCacheMime {
+	"video/mp2t", "application/vnd.apple.mpegurl"
+};
+
 int mkHttpRes (string& res, MkHttpArgs& args) {
 	bool enc=false;
 	if (res=="1") {
@@ -610,9 +614,10 @@ int mkHttpRes (string& res, MkHttpArgs& args) {
 		enc=true;
 	}
    res+= "HTTP/1.0 "+ to_string(args.code)+ " "+ args.codeMsg+ "\r\n";
-   res+= "Content-Type: "+ string(args.ctype)+ "\r\n";
+	string ctype(args.ctype);
+   res+= "Content-Type: "+ ctype + "\r\n";
    res+= "Connection: close\r\n";
-   if (!args.cchCtrl) {
+   if (!args.cchCtrl && !noCacheMime.contains(ctype)) {
       res+= "Cache-Control: public, max-age=3600\r\n";
    }
    if (args.addlHdrs) {
@@ -775,7 +780,6 @@ string getMimeType (const fs::path& path) {
    }
    return "application/octet-stream"; // default
 }
-static const set<string> noCacheMime {".ts", ".m3u8"};
 
 struct IpTrack_ {
    FTS_ firstReqTime;
