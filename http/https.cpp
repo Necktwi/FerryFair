@@ -822,15 +822,22 @@ bool isNJsClient (FFJSON& ffHttp) {
 }
 
 char* fileToStr (fs::path& fspath, char* buf) {
-   ifstream in(fspath);
+   ifstream in(fspath, ios::binary);
+	if (!in) {
+		return nullptr;
+	}
+	in.seekg(0, std::ios::end);
    streamsize size= in.tellg();
+	if (size < 0) {
+		return nullptr;
+	}
    in.seekg(0, std::ios::beg);
    char* buffer= new char[size+ 1];
    if (in.read(buffer, size)) {
       buffer[size]= '\0';
       return buffer;
    }
-   delete buffer;
+   delete[] buffer;
    return nullptr;
 }
 

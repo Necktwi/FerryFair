@@ -200,7 +200,10 @@ FFJSON* pusers = nullptr;
 ccp mailServer = nullptr;
 int mailPort = 0;
 
-static HTML_ thingsHtml;
+static HTML_ thingsNoJsHtml;
+static HTML_* thingHPtr;
+static HTML_* thingImgHPtr;
+static HTML_ indexHtml;
 
 ccp yay = "{\"error\":\"yay\"}";
 static size_t onCurlResponse (void* contents, size_t size, size_t nmemb,
@@ -211,25 +214,19 @@ static size_t onCurlResponse (void* contents, size_t size, size_t nmemb,
 	return totalSize;
 }
 vector<FFJSON*> usersId;
-void thingToHtml (FFJSON& thn, string& res) {
+HTML_* thingToHtml (FFJSON& thn) {
 	int numPics= thn["pics"].size;
 	ccp username= thn["user"]["name"];
+	HTML_* pThn= thingHPtr->cloneNode();
 	int id= thn[id];
-	if (numPics>0) {
-		HTML_* img= &thingsHtml.getElementById("ThingImg");
-		int i= 0;
-		while(1) {
-			img->setAttribute("src", string("/upload/")+ username+ "/"+
-									to_string(id)+ "."+	to_string(i)+ ".jpg");
-			++i;
-			if (i< numPics) {
-				HTML_* p= img->parent;
-				img= img->cloneNode(true);
-				p->insertAdjacentElement("beforeEnd", *img);
-			}
-		}
+	HTML_& p= pThn->getElementById("Imgs");
+	for (int i= 0; i < numPics; ++i) {
+		HTML_* img= thingImgHPtr->cloneNode(true);
+		img->setAttribute("src", string("/upload/")+ username+ "/"+
+								to_string(id)+ "."+	to_string(i)+ ".jpg");
+		p.insertAdjacentElement("beforeEnd", *img);
 	}
-	HTML_& thnLoc= thingsHtml.getElementById("ThingLocation");
+	HTML_& thnLoc= pThn->getElementById("ThingLocation");
 	thnLoc.tag= "a";
 	string locStr;
 	locStr+= to_string((float)thn["location"][0]);
@@ -238,27 +235,31 @@ void thingToHtml (FFJSON& thn, string& res) {
 	HTML_* loc= new HTML_(locStr.c_str());
 	thnLoc.insertAdjacentElement("afterBegin", *loc);
 	thnLoc.setAttribute("href", "https://maps.google.com?q="+locStr);
-	HTML_& thnName= thingsHtml.getElementById("ThingName");
+	HTML_& thnName= pThn->getElementById("ThingName");
 	HTML_* thnAName= new HTML_((ccp)thn["name"]);
 	thnName.insertAdjacentElement("afterBegin", *thnAName);
-	HTML_& thnUsr= thingsHtml.getElementById("ThingUsr");
+	HTML_& thnUsr= pThn->getElementById("ThingUsr");
 	HTML_* thnAUsr= new HTML_(username);
 	thnUsr.insertAdjacentElement("afterBegin", *thnAUsr);
-	HTML_& thnId= thingsHtml.getElementById("ThingId");
+	HTML_& thnId= pThn->getElementById("ThingId");
 	HTML_* thnAId= new HTML_(to_string((int)thn["id"]).c_str());
 	thnId.insertAdjacentElement("afterBegin", *thnAId);
-	HTML_& thnLstModd= thingsHtml.getElementById("lastModed");
+	HTML_& thnLstModd= pThn->getElementById("lastModed");
 	time_t ts= thn["lastModed"];
-	struct tm *tm_info = gmtime(&ts);
+	struct tm* tm_info = gmtime(&ts);
 	char buf[128];
 	strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", tm_info);
 	HTML_* thnALstModd= new HTML_(buf);
 	thnLstModd.insertAdjacentElement("afterBegin", *thnALstModd);
-	HTML_& thnDtls= thingsHtml.getElementById("ThingDetails");
-	HTML_* thnADtls= new HTML_((ccp)thn["details"]);
-	thnUsr.insertAdjacentElement("afterBegin", *thnADtls);
-	thingsHtml.stringify(res);
+	HTML_& thnDtls= pThn->getElementById("ThingDetails");
+	ccp thnDtlsCcp= thn["details"];
+	if (thnDtlsCcp && strlen(thnDtlsCcp)) {
+		HTML_* thnADtls= new HTML_(thnDtlsCcp);
+		thnDtls.insertAdjacentElement("afterBegin", *thnADtls);
+	}
+	return pThn;
 }
+
 int ffDefault (string& bid, Txo& rbs, Txo& ffHttp, Txo& reply, Txo& tUsr,
 					Txo& query, MkHttpArgs& mhArgs, auto& now, Txo& cookie,
 					ccp path, ccp username, FFJSON& users, long& lepoch) {
@@ -294,15 +295,51 @@ int ffDefault (string& bid, Txo& rbs, Txo& ffHttp, Txo& reply, Txo& tUsr,
 	setSavMtx.unlock();
 	return 0;
 }
-
+void mkHtmlThings (Txo& ffHttp, Txo& reply, Pts& pts, int numThings, int dir,
+						 bool init=false) {
+	HTML_* pageHtml = indexHtml.cloneNode();
+	HTML_& header = pageHtml->getElementById("header");
+	HTML_* thingsDiv = new HTML_("<div id=\"things\"></div>");
+	for (int i = 0; i < numThings; ++i) {
+		FFJSON* thn= &reply["things"][i];
+		HTML_* thingHtml= thingToHtml(*thn);
+		thingsDiv->insertAdjacentElement("beforeEnd", *thingHtml);
+	}
+	if ((dir>0 && numThings >= 20) || (dir<0)) {
+		HTML_* ldMr= thingsNoJsHtml.getElementById("loadBottom").cloneNode();
+		string href= "?req=pts&dir=1&ni=";
+		href+= to_string(pts.minPts);
+		ldMr->setAttribute("href", href);
+		header.insertAdjacentElement("afterEnd", *ldMr);
+	}
+	if (!init && !(dir<0 && pts.minPts<=20)) {
+		HTML_* ldPr= thingsNoJsHtml.getElementById("loadBottom").cloneNode();
+		string href= "?req=pts&dir=-1&ni=";
+		href+= to_string(pts.minPts);
+		ldPr->setAttribute("href", href);
+		ldPr->setAttribute("id", "ldPr");
+		ldPr->content.children[0]->tag="<-";
+		HTML_* nbsp= new HTML_("&nbsp;&nbsp;");
+		header.insertAdjacentElement("afterEnd", *nbsp);
+		header.insertAdjacentElement("afterEnd", *ldPr);
+	}
+	header.insertAdjacentElement("afterEnd", *thingsDiv);
+	string htmlResponse;
+	pageHtml->stringify(htmlResponse);
+	mkHttpRes(ffHttp, htmlResponse.c_str(), "text/html", -1, 200, "OK",
+				 nullptr);
+	delete pageHtml;
+}
 int ffSearch (
 	FFJSON& payload, Txo& rbs, FFJSON& rbsid, FFJSON& tUsr, FFJSON& reply,
 	FFJSON& ffHttp, FFJSON& cookie, long& lepoch, Txo& users) {
+	bool noJs= cookie["js"]? false : true;
 	ccp srch = payload["search"];
+	if (!srch) srch= NullCcp;
 	string srchStr(srch);
 	BidThings_& bts= bidThings[rbsid.val.fptr];
 	set<FFJSON*>& mdts= bts.mdts;
-	Pts& pts= srchStr.length()?bts.search:bts.all;
+	Pts& pts= (noJs||srchStr.length())?bts.search:bts.all;
 	pts= Pts();
 	if (payload["locked"]) { //just opened the page
 		ccp username= rbsid["user"];
@@ -311,9 +348,9 @@ int ffSearch (
 			FFJSON& user = users[username];
 			addSmtgsToReply(users, user, reply,
 								 bidThings[rbsid.val.fptr].mdts);
-				setSavMtx.lock();
-				pFSetToSave.insert(&rbs);
-				setSavMtx.unlock();
+			setSavMtx.lock();
+			pFSetToSave.insert(&rbs);
+			setSavMtx.unlock();
 		}
 	}
 	if (tUsr) { //url with username
@@ -332,59 +369,80 @@ int ffSearch (
 		rbsid["geoposition"]= payload["geoposition"];
 	}
 	int pni= pts.pni;
-	flInf(FL, "searching %s at %s\n",srchStr.c_str(),
-			payload["geoposition"].stringify().c_str());
+	flInf(FL, "searching %s at %f,%f\n",srchStr.c_str(),
+			pts.c.x, pts.c.y);
 	cvSrch.wait(modLk, []{return modQhCv.load()==0;});
 	++searchCv;
 	thnsTree.getPointsFromQuad(pts);
 	--searchCv;
 	cvMod.notify_all();
 	addSearchNoDups(pts, reply, mdts, pni);
-	if (!reply["things"].size) {
+	int numThings= reply["things"].size;
+	if (!numThings) {
 		reply["things"].init("[]");
 	}
-	if (cookie["js"]) {
+	if (!noJs) {
 		mkHttpRes(ffHttp, reply);
 	} else {
+		mkHtmlThings(ffHttp, reply, pts, numThings, 1, true);
 	}
 	return -1;
 }
 
 int ffPts (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
-			  FFJSON& cookie) {
+			  FFJSON& cookie, Txo& query) {
 	flNtc(FL, "pts:");
+	bool noJs= cookie["js"]? false : true;
 	BidThings_& bts = bidThings[rbsid.val.fptr];
-	bool isSearch = payload["search"];
-	Pts& pts = isSearch?bts.search:bts.all;
-	int dir = payload["dir"];
+	set<FFJSON*>& mdts= bts.mdts;
+	bool isSearch = noJs? true : payload["search"];
+	Pts& pts= isSearch? bts.search : bts.all;
+	int dir = noJs? atoi(query["dir"]) : payload["dir"];
 	if (dir!=1 && dir!=-1) {
 		return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
 	}
-	int ni = payload["ni"];
+	int ni = noJs? atoi(query["ni"]) : payload["ni"];
 	int pni = pts.pni;
 	ni = ni==-1?pni:ni;
 	reply["things"].init("[]");
-	if (pni<pts.minPts || pts.pts.size()<=pts.minPts) {
-		return mkHttpRes(ffHttp, reply);
-	}
 	int tpts = ni+dir*20;
 	tpts = tpts<0?0:tpts;
-	if (pni>=tpts || tpts>=512)
-		return mkHttpRes(ffHttp, reply);
 	pts.minPts= tpts;
-	NdNPrn& nd= pts.cnd;
-	QuadNode* tQN= nd.qh->qn();
-	uint8_t tind= nd.qh-(QuadHldr*)tQN;
-	pts.cnd.ds= 1;
-	cvSrch.wait(modLk, []{return modQhCv.load()==0;});
-	++searchCv;
-	nd.qh->findNeighbours(
-		pts, tQN, tind, nd.prn, nd.ind, nd.dx);
-	--searchCv;
-	cvMod.notify_all();
-	set<FFJSON*>& mdts= bts.mdts;
-	addSearchNoDups(pts, reply, mdts,pni, false);
-	return mkHttpRes(ffHttp, reply);
+	if ((pni<pts.minPts && pni%20==0) || pts.pts.size()<=pts.minPts) {
+		NdNPrn& nd= pts.cnd;
+		QuadNode* tQN= nd.qh->qn();
+		uint8_t tind= nd.qh-(QuadHldr*)tQN;
+		nd.ds= 1;
+		cvSrch.wait(modLk, []{return modQhCv.load()==0;});
+		++searchCv;
+		nd.qh->findNeighbours(
+			pts, tQN, tind, nd.prn, nd.ind, nd.dx);
+		--searchCv;
+		cvMod.notify_all();
+		addSearchNoDups(pts, reply, mdts, pni, false);
+	} else {
+		for (int i= tpts-20; i < tpts; ++i) {
+			NdNPrn& nd= pts.pts[i];
+			FFJSON* f;
+			if (nd.prn==(QuadNode*)-1) {
+				f= (FFJSON*)nd.qh;
+			} else {
+				auto aa= getNode(nd);
+				f= (FFJSON*)get<0>(aa);
+			}
+			reply["things"][i-(tpts-20)]= f;
+		}
+   }
+	int numThings= reply["things"].size;
+	if (!numThings) {
+		reply["things"].init("[]");
+	}
+	if (!noJs) {
+		mkHttpRes(ffHttp, reply);
+	} else {
+		mkHtmlThings(ffHttp, reply, pts, numThings, dir);
+	}
+	return -1;
 }
 int ffSignIn (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 				  FFJSON& users, string& bid, long& lepoch, Txo& rbs) {
@@ -801,7 +859,7 @@ int ferryfair (FFJSON& ffHttp) {
 		return ffSignIn(payload, rbsid, reply, ffHttp, users, bid, lepoch, rbs);
 	}
 	case "pts"_hash: {
-		return ffPts(payload, rbsid, reply, ffHttp, cookie);
+		return ffPts(payload, rbsid, reply, ffHttp, cookie, query);
 	}
 	case "signUp"_hash: {
 		//signup
@@ -1375,15 +1433,17 @@ void initFerryFair (FFJSON& cfg) {
 		++it;
 	}
 	fs::path fswdir(wdir);
-	fs::path fsThingsHtml= fswdir/"html/things.html";
-	thingsHtml.parse(fsThingsHtml.c_str());
-	auto elms= thingsHtml.getElementsByAnyClassName("removable hidden js");
-	for (auto e : elms) {
-		if (!e->hasAnyClass("noJs")) {
-			e->remove();
-			delete e;
-		}
-	}
+	fs::path fsThingsNoJsHtml= fswdir/"html/thingsNoJs.html";
+	fs::path fsIndexHtml= fswdir/"index.html";
+	ccp ccptnjh=  fileToStr(fsThingsNoJsHtml);
+	thingsNoJsHtml.parse(ccptnjh);
+	delete[] ccptnjh;
+	thingImgHPtr= &thingsNoJsHtml.getElementById("ThingImg");
+	thingImgHPtr->remove();
+	thingHPtr= &thingsNoJsHtml.getElementById("Thing");
+	ccp ccpih= fileToStr(fsIndexHtml);
+	indexHtml.parse(ccpih);
+	delete[] ccpih;
 }
 
 void uninitFerryFair () {

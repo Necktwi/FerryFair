@@ -51,15 +51,17 @@ HTML_::~HTML_() {
    }
 }
 
-size_t HTML_::stringify(string& out, const string& skipClass, const string& mustClass) const {
-   size_t totalLen = calculateLength(skipClass, mustClass);
-   size_t initialLen = out.length();
+size_t HTML_::stringify (
+	string& out, const string& skipClass, const string& mustClass) const {
+   size_t totalLen= calculateLength(skipClass, mustClass);
+   size_t initialLen= out.length();
    out.reserve(initialLen + totalLen);
    stringifyHelper(out, skipClass, mustClass);
    return out.length() - initialLen;
 }
 
-size_t HTML_::calculateLength(const string& skipClass, const string& mustClass) const {
+size_t HTML_::calculateLength (const string& skipClass,
+										 const string& mustClass) const {
    if (type == POINTER) return 0;
    if (hasAnyClass(skipClass) && !hasAnyClass(mustClass)) return 0;
    if (type == TEXT) return tag.length();
@@ -81,7 +83,8 @@ size_t HTML_::calculateLength(const string& skipClass, const string& mustClass) 
    return len;
 }
 
-void HTML_::stringifyHelper(string& out, const string& skipClass, const string& mustClass) const {
+void HTML_::stringifyHelper (
+	string& out, const string& skipClass, const string& mustClass) const {
    if (type == POINTER) return;
    if (hasAnyClass(skipClass) && !hasAnyClass(mustClass)) return;
    if (type == TEXT) {
@@ -251,7 +254,7 @@ bool HTML_::hasAnyClass(const string& classes) const {
    return false;
 }
 
-void HTML_::parse(const string& html) {
+void HTML_::parse (const string& html) {
    if (html.empty()) return;
    vector<string> voidTags = {
       "area", "base", "br", "col", "embed", "hr", "img", 
