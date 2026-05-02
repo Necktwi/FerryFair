@@ -453,7 +453,7 @@ void parseHTTP (crd read, FFJSON& ffHttp) {
             ffHttp["content-length"]=inL;
             if (!inL)
                return;
-            uint8_t* pbuf = new uint8_t[inL+1];
+            uint8_t* pbuf= (uint8_t*)malloc(inL+1);
             ssize_t r = read((char*)pbuf, inL);
             if (r<=0) {
                flDbg(HL,"end r: %zd", r);

@@ -69,5 +69,8 @@ testSpatialSearch: ${BD}spatialSearch.o testSpatialSearch.cpp
 	-lssl -lcrypto -ljpeg -lz -licui18n -licuuc -licudata \
 	-lcurl -Wl,--no-as-needed -Wl,-unresolved-symbols=ignore-in-shared-libs
 
+testHtmlParser: ${BD}htmlParser.o testHtmlParser.cpp
+	${TCPP} -std=c++23 -fPIE ${DBGF} -D${DBG} $^ -o ${BD}$@
+
 clean:
 	/bin/bash -c "rm -rf ${BD}{*.o,https,test*}"

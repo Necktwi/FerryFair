@@ -116,9 +116,9 @@ void addSearchNoDups (Pts& pts, FFJSON& reply, set<FFJSON*>& mdts,
 			auto aa = getNode(nd);
 			f = (FFJSON*)get<0>(aa);
 		}
-		flDbg(HL, "finding in mdts");
-		bool thingIsWithUser = mdts.find(f)!=mdts.end();
-		flDbg(HL, "thingIsWithUser: %d", thingIsWithUser);
+		flDbg(FLL, "finding in mdts");
+		bool thingIsWithUser = dupLnks && mdts.find(f)!=mdts.end();
+		flDbg(FLL, "thingIsWithUser: %d", thingIsWithUser);
 		if (dupLnks && thingIsWithUser) {
 			FFJSON& rt = reply["things"][k];
 			rt["id"]= (*f)["id"];
@@ -376,7 +376,7 @@ int ffSearch (
 	thnsTree.getPointsFromQuad(pts);
 	--searchCv;
 	cvMod.notify_all();
-	addSearchNoDups(pts, reply, mdts, pni);
+	addSearchNoDups(pts, reply, mdts, pni, !noJs);
 	int numThings= reply["things"].size;
 	if (!numThings) {
 		reply["things"].init("[]");
@@ -401,12 +401,12 @@ int ffPts (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 	if (dir!=1 && dir!=-1) {
 		return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
 	}
-	int ni = noJs? atoi(query["ni"]) : payload["ni"];
-	int pni = pts.pni;
-	ni = ni==-1?pni:ni;
+	int ni= noJs? atoi(query["ni"]) : payload["ni"];
+	int pni= pts.pni;
+	if (ni==-1) ni= pni;
 	reply["things"].init("[]");
-	int tpts = ni+dir*20;
-	tpts = tpts<0?0:tpts;
+	int tpts= ni+dir*20;
+	if (tpts<0) tpts= 0;
 	pts.minPts= tpts;
 	if ((pni<pts.minPts && pni%20==0) || pts.pts.size()<=pts.minPts) {
 		NdNPrn& nd= pts.cnd;
@@ -421,7 +421,9 @@ int ffPts (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 		cvMod.notify_all();
 		addSearchNoDups(pts, reply, mdts, pni, false);
 	} else {
-		for (int i= tpts-20; i < tpts; ++i) {
+		int i= tpts-20, j=0;
+		if (tpts>pni) tpts= pni;
+		for (; i < tpts; ++i,++j) {
 			NdNPrn& nd= pts.pts[i];
 			FFJSON* f;
 			if (nd.prn==(QuadNode*)-1) {
@@ -430,13 +432,10 @@ int ffPts (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 				auto aa= getNode(nd);
 				f= (FFJSON*)get<0>(aa);
 			}
-			reply["things"][i-(tpts-20)]= f;
+			reply["things"][j]= f;
 		}
    }
 	int numThings= reply["things"].size;
-	if (!numThings) {
-		reply["things"].init("[]");
-	}
 	if (!noJs) {
 		mkHttpRes(ffHttp, reply);
 	} else {
@@ -1443,9 +1442,13 @@ void initFerryFair (FFJSON& cfg) {
 	thingHPtr= &thingsNoJsHtml.getElementById("Thing");
 	ccp ccpih= fileToStr(fsIndexHtml);
 	indexHtml.parse(ccpih);
+	HTML_* htbl= &indexHtml.getElementById("htable");
+	htbl->remove();
+	delete htbl;
 	delete[] ccpih;
 }
 
 void uninitFerryFair () {
+	delete thingImgHPtr;
 	thnsTree.destroy();
 }
