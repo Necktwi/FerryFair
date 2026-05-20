@@ -130,7 +130,7 @@ static void enableCoreDumps () {
 }
 
 static void moveCoreFile (pid_t pid) {
-   const char *core_names[] = {
+   const char* core_names[] = {
       "core", "core.dump", "core.%d", "core.%d.dump"
    };
    for (const char *pattern : core_names) {
@@ -419,18 +419,18 @@ void parseAcceptEncoding (crd read, FFJSON& ffAEnc) {
    while (read(&c, 1)>0) {
       switch (c) {
          case ',':
-            ffAEnc[]=enc;
+            ffAEnc[]= enc;
             flInfCntnu(HL, "%s,", enc.c_str());
             enc.clear();
          case ' ':
          case '\r':
             continue;
          case '\n':
-            ffAEnc[]=enc;
+            ffAEnc[]= enc;
             flInfCntnu(HL, "%s\n", enc.c_str());
             return;
          default:
-            enc+=c;
+            enc+= c;
             break;
       }
    }
@@ -523,7 +523,7 @@ void parseHTTP (crd read, FFJSON& ffHttp) {
                   buf[ci]='\0';
                   if (!query) {
                      flInfCntnu(HL, "path: %s\n", buf);
-                     ffHttp["path"]=(ccp)buf;
+                     ffHttp["path"]= (ccp)buf;
                   } else {
                      urlEscape(buf+query);
                      ffHttp["query"][(ccp)buf]= (ccp)buf+query;
