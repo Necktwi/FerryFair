@@ -31,11 +31,12 @@ httpPort: 8080,
 httpsPort: 8443,
 vhosts: {
    www: {
-      rootdir: "../../WWW-development/"
+      rootdir: "../../WWW-development/",
+		redirect: "ferryfair.com"
    },
    underconstruction: www
 },
 readRetry: 300,
 retryMS: 70,
-threadCount: 1,
-daemon: false
+threadCount: -1,
+daemon: true
