@@ -441,15 +441,15 @@ void parseHTTP (crd read, FFJSON& ffHttp) {
 	unsigned int i= 0;
 	unsigned int pairStartPin= i;
 	char c;
-	static const int bufSize = 1024;
+	static const int bufSize= 1024;
 	char buf[bufSize];
-	int li=0;
-	int spCnt=0;
-	int ci=0,hend = 0,bodyBegin=0,query=0;
+	int li= 0;
+	int spCnt= 0;
+	int ci= 0, hend= 0, bodyBegin= 0, query= 0;
 	while (true) {
 		if (bodyBegin) {
 			if (ffHttp["content-length"]) {
-				int inL = atoi((ccp)ffHttp["content-length"]);
+				int inL= atoi((ccp)ffHttp["content-length"]);
 				ffHttp["content-length"]=inL;
 				if (!inL)
 					return;
@@ -469,6 +469,7 @@ void parseHTTP (crd read, FFJSON& ffHttp) {
 				FFJSON::Blob_ b;
 				b.p = pbuf;
 				b.s = inL+1;
+				flDbg(HL, "body: %.*s", b.s, b.p);
 				ffHttp["payload"] = b;
 			}
 			return;

@@ -1,9 +1,9 @@
 BTYPE?=debug
 OS?=Linux
-FFJINC=../../FFJSON
-FFLINC=../../logger
-FBINC=../../ferrybase
-FFINC=../..
+FFJINC=../../FFJSON/
+FFLINC=../../logger/
+FBINC=../../ferrybase/
+FFINC=../../
 BD?=build/${OS}/$(shell uname -m)/${BTYPE}/
 FFJLIB=../../FFJSON/${BD}libFFJSON.${LIBEXT}
 FFLLIB=../../logger/${BD}liblogger.${LIBEXT}
@@ -23,14 +23,14 @@ https: ${BD}https htmlParser.cpp
 ${BD}https: ${BD}https.o ${BD}ferryfair.o ${BD}cap.o ${BD}smtpClient.o \
 ${BD}spatialSearch.o ${BD}htmlParser.o
 	${TCPP} -std=c++23 -fPIE ${CXXFLAGS} ${DBGF} -D${DBG} -pthread \
-   -Wno-unqualified-std-cast-call -I${FFJINC} -I${FFLINC} -I${FBINC} \
-	-I${FFINC} -I.. $^ -o $@ ${FFJLIB} ${FFLLIB} ${FBLIB} \
+	-Wno-unqualified-std-cast-call -I${FFJINC}${BD} -I${FFJINC} -I${FFLINC} \
+	-I${FBINC} -I${FFINC} -I.. $^ -o $@ ${FFJLIB} ${FFLLIB} ${FBLIB} \
 	-lssl -lcrypto -ljpeg -lz -licui18n -licuuc -licudata \
 	-lcurl -Wl,-unresolved-symbols=ignore-in-shared-libs
 
 ${BD}smtpClient.o: smtpClient.cpp smtpClient.h
 	${TCPP} -c -std=c++23 ${CXXFLAGS} ${DBGF} -D${DBG} -I${FFINC} -I${FBINC} \
-	-I${FFLINC} -I${FFJINC} ${CXXFLAGS} $< -o $@
+	-I${FFLINC} -I${FFJINC} -I${FFJINC}${BD} ${CXXFLAGS} $< -o $@
 
 ${BD}htmlParser.o: htmlParser.cpp htmlParser.h
 	${TCPP} -c -std=c++23 ${CXXFLAGS} ${DBGF} -D${DBG} \
@@ -41,21 +41,19 @@ ${BD}cap.o: ../cap.cpp ../cap.h
 
 ${BD}spatialSearch.o: spatialSearch.cpp spatialSearch.h
 	${TCPP} -c -std=c++23 ${CXXFLAGS} ${DBGF} -D${DBG} \
-   -Wno-unqualified-std-cast-call -I${FFINC} -I${FBINC} -I${FFLINC} \
-	-I${FFJINC} -I.. $< -o $@
+	-Wno-unqualified-std-cast-call -I${FFINC} -I${FBINC} -I${FFLINC} \
+	-I${FFJINC}${BD} -I${FFJINC} -I.. $< -o $@
 
 ${BD}ferryfair.o: ferryfair.cpp ferryfair.h
 	${TCPP} -c -std=c++23 ${CXXFLAGS} ${DBGF} -D${DBG} -pthread \
-   -Wno-unqualified-std-cast-call -I${FFJINC} -I${FFLINC} -I${FBINC} \
-	-I${FFINC} -I.. $< -o $@
+	-Wno-unqualified-std-cast-call -I${FFJINC} -I${FFJINC}${BD} -I${FFLINC} \
+	-I${FBINC} -I${FFINC} -I.. $< -o $@
 
 ${BD}https.o: https.cpp https.h
 	mkdir -p ${BD}; \
 	${TCPP} -c -std=c++23 ${CXXFLAGS} ${DBGF} -D${DBG} -pthread \
-   -Wno-unqualified-std-cast-call -I${FFJINC} -I${FFLINC} -I${FBINC} \
-	-I${FFINC} -I.. $< -o $@
-
-
+	-Wno-unqualified-std-cast-call -I${FFJINC}${BD} -I${FFJINC} -I${FFLINC} \
+	-I${FBINC} -I${FFINC} -I.. $< -o $@
 
 ${BD}critcalSection.o:
 	${TCPP} -c -masm=intel criticalSection.s -o $@
@@ -64,7 +62,7 @@ ${BD}test: ${BD}criticalSection.o
 
 testSpatialSearch: ${BD}spatialSearch.o testSpatialSearch.cpp
 	${TCPP} -pthread -std=c++23 -fPIE ${DBGF} -D${DBG} \
-   -Wno-unqualified-std-cast-call -I${FFINC} -I${FFJINC} -I${FFLINC} \
+	-Wno-unqualified-std-cast-call -I${FFINC} -I${FFJINC} -I${FFLINC} \
 	-I${FBINC} -I.. $^ -o ${BD}$@ ${FBLIB} ${FFLLIB} ${FFJLIB} \
 	-lssl -lcrypto -ljpeg -lz -licui18n -licuuc -licudata \
 	-lcurl -Wl,--no-as-needed -Wl,-unresolved-symbols=ignore-in-shared-libs

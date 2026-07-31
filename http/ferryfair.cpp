@@ -1358,7 +1358,7 @@ void makeThngsTree (Txo& cfg) {
 	FFJSON& users = cfg["users"];
 	FFJSON::Iterator it = users.begin();
 	FFJSON::Iterator tit;
-	int ic=0;
+	int ic= 0;
 	vector<string> bmstr = metaname("flat gowtham");
 	vector<uint> bina = nametouint(bmstr);
 					
@@ -1372,30 +1372,30 @@ void makeThngsTree (Txo& cfg) {
 		while (usersId.size()<=id) {
 			usersId.push_back(nullptr);
 		}
-		usersId[id]=&(*it);
+		usersId[id]= &(*it);
 		//adds users to nameints
 		//vector<string> musr = metaname(user);
-		FFJSON& uthings = (*it)["things"];
+		FFJSON& uthings= (*it)["things"];
 		//(*fnameints)[musr[0]]=uthings.size+(int)(*fnameints)[musr[0]];
-		tit = uthings.begin();
+		tit= uthings.begin();
 		while (tit!=uthings.end()) {
 			if (!((*tit)["name"].isType(FFJSON::UNDEFINED) ||
 					(*tit)["location"].isType(FFJSON::UNDEFINED))) {
-				FFJSON* pF = &*tit;
+				FFJSON* pF= &*tit;
 				//flDbg(FL, "inserting %d", ic);
 				tpoolPtr->enqueue([pF, ic] (int tid) {
-					FFJSON& rF = *pF;
+					FFJSON& rF= *pF;
 					string tname((ccp)rF["name"]);
-					tname += " ";
-					tname += (ccp)rF["user"]["name"];
-					flDbg(FL,"inserting %p: %s", pF, tname.c_str());
+					tname+= " ";
+					tname+= (ccp)rF["user"]["name"];
 					vector<string> mstr = metaname(tname);
 					vector<uint> ina = nametouint(mstr);
 					for (int i=0; i<ina.size(); ++i)
 						flDbgCntnu(FLL,"%x ", ina[i]);
 					flDbgCntnu(FLL, "\n");
-					float lx = rF["location"][1];
-					float ly = rF["location"][0];
+					float lx= rF["location"][1];
+					float ly= rF["location"][0];
+					flDbg(FL,"inserting %p: %s@%f,%f", pF, tname.c_str(), lx, ly);
 					FFQuad_ fq(rF, ina, lx, ly);
 					thnsTree.insert(fq);
 					//flDbg(FL, "%d inserted %d", tid, ic);
