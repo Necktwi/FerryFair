@@ -11,10 +11,12 @@ FBLIB=../../ferrybase/${BD}libferrybase.${LIBEXT}
 TCPP?=/opt/rocm/llvm/bin/clang++
 DBGF=-O3
 DBG=_DEBUG0
+DBGL=
 ifeq ($(BTYPE),debug)
 	DBG=_DEBUG
-#	DBGF=-fsanitize=address -fno-sanitize-recover=all -fsanitize-address-use-after-scope -g -O0 -fno-omit-frame-pointer
-	DBGF=-g -O0
+	DBGF=-fsanitize=address -fno-sanitize-recover=all -fsanitize-address-use-after-scope -g -O0 -fno-omit-frame-pointer
+	DBGL=-lasan
+#	DBGF=-g -O0
 endif
 
 https: ${BD}https htmlParser.cpp
@@ -24,7 +26,7 @@ ${BD}https: ${BD}https.o ${BD}ferryfair.o ${BD}cap.o ${BD}smtpClient.o \
 ${BD}spatialSearch.o ${BD}htmlParser.o
 	${TCPP} -std=c++23 -fPIE ${CXXFLAGS} ${DBGF} -D${DBG} -pthread \
 	-Wno-unqualified-std-cast-call -I${FFJINC}${BD} -I${FFJINC} -I${FFLINC} \
-	-I${FBINC} -I${FFINC} -I.. $^ -o $@ ${FFJLIB} ${FFLLIB} ${FBLIB} \
+	-I${FBINC} -I${FFINC} -I.. $^ -o $@ ${DBGL} ${FFJLIB} ${FFLLIB} ${FBLIB} \
 	-lssl -lcrypto -ljpeg -lz -licui18n -licuuc -licudata \
 	-lcurl -Wl,-unresolved-symbols=ignore-in-shared-libs
 
@@ -63,7 +65,7 @@ ${BD}test: ${BD}criticalSection.o
 testSpatialSearch: ${BD}spatialSearch.o testSpatialSearch.cpp
 	${TCPP} -pthread -std=c++23 -fPIE ${DBGF} -D${DBG} \
 	-Wno-unqualified-std-cast-call -I${FFINC} -I${FFJINC} -I${FFLINC} \
-	-I${FBINC} -I.. $^ -o ${BD}$@ ${FBLIB} ${FFLLIB} ${FFJLIB} \
+	-I${FBINC} -I.. $^ -o ${BD}$@ ${DBGL} ${FBLIB} ${FFLLIB} ${FFJLIB} \
 	-lssl -lcrypto -ljpeg -lz -licui18n -licuuc -licudata \
 	-lcurl -Wl,--no-as-needed -Wl,-unresolved-symbols=ignore-in-shared-libs
 

@@ -52,11 +52,15 @@ void quickSort (vector<NdNPrn>& pts, int start, int end) {
 }
 
 vector<string> metaname (string name) {
-   vector<string> r = explode(name);
+   vector<string> r= explode(name);
+	vector<string> res;
    for (int k=0;k<r.size();++k) {
-      r[k]= m3e.encode(r[k]).first;   
+		vector<string> s= explodeByNum(r[k]);
+		for (int l=0; l<s.size(); ++l) {
+			res.push_back(m3e.encode(s[l]).first);
+		}
    }
-   return r;
+   return res;
 }
 // returns vector of size >= size of qpmapvec
 vector<uint> nametouint (vector<string>& mstr) {
@@ -257,27 +261,27 @@ vector<uint> QuadHldr::getIntNames (QuadNode* tQN, uint8_t tind,
    if (!fp) {
       return r;
    }
-   QuadNode* resfp = (QuadNode*)get<0>(bpxor(fp, pQN));
-   uint a=0;
-   for (uint i=0; i<qpmapvec.size(); ++i) {
-      map<QuadNode*, uint>::iterator it = qpmapvec[i].find(resfp);
+   QuadNode* resfp= (QuadNode*)get<0>(bpxor(fp, pQN));
+   uint a= 0;
+   for (uint i= 0; i<qpmapvec.size(); ++i) {
+      map<QuadNode*, uint>::iterator it= qpmapvec[i].find(resfp);
       if (it!=qpmapvec[i].end()) {
          r.push_back(it->second);
-         a|=it->second;
+         a|= it->second;
       } else {
          r.push_back(0);
       }
    }
    if (!a) {
-      set<FFJSON*>* ressfp = (set<FFJSON*>*)resfp;
-      map<set<FFJSON*>*, vector<uint>>::iterator sit = mapffset.find(ressfp);
-      bool isS=sit != mapffset.end();
+      set<FFJSON*>* ressfp= (set<FFJSON*>*)resfp;
+      map<set<FFJSON*>*, vector<uint>>::iterator sit= mapffset.find(ressfp);
+      bool isS= sit!=mapffset.end();
       if (isS) {
-         r = sit->second;
+         r= sit->second;
       } else {
-         FFJSON& tfp = *(FFJSON*)resfp;
-         vector<string> mstr = metaname((ccp)tfp["name"]);
-         r=nametouint(mstr);
+         FFJSON& tfp= *(FFJSON*)resfp;
+         vector<string> mstr= metaname((ccp)tfp["name"]);
+         r= nametouint(mstr);
       }
    }
    return r;

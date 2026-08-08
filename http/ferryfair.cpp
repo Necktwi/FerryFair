@@ -521,7 +521,7 @@ int ffSignIn (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 	if ((gid || (user["password"] && !strcmp(password,user["password"])))
 		 && !user["inactive"]) {
 		strcpy(lusrnm, (ccp)user["name"]);tolower(lusrnm);
-		rbsid["user"]= lusrnm;
+		rbsid["user"]= (ccp)lusrnm;
 		rbsid["ip"]= (ccp)ffHttp["ip"];
 		user["bid"]= bid;
 		rbsid["urts"]= lepoch;
@@ -585,7 +585,7 @@ int ffOwl (Txo& user, Txo& payload, ccp username, Txo& ffHttp,
 				rmid = (int)rmsgs[rmind-1]["id"]+1;
 			}
 			rmsgs[rmind]["id"]= rmid;
-			rmsgs[rmind]["user"]= lusrnm;
+			rmsgs[rmind]["user"]= (ccp)lusrnm;
 			rmsgs[rmind]["msg"]= *tit;
 			rmsgs[rmind]["ts"]= lepoch;
 			rmsgs[rmind]["new"]= true;
@@ -1196,7 +1196,7 @@ int ffSignUp (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 			user["lmts"]= lepoch;
 			user["bid"]= bid;
 			rbsid["ts"]= now;
-			rbsid["user"]= lusrnm;
+			rbsid["user"]= (ccp)lusrnm;
 			rbsid["ip"]= (ccp)ffHttp["ip"];
 			rbsid["urts"]= lepoch;
 		}
