@@ -457,12 +457,12 @@ void parseHTTP (crd read, FFJSON& ffHttp) {
 				ssize_t r = read((char*)pbuf, inL);
 				if (r<=0) {
 					flDbg(HL,"end r: %zd", r);
-					delete[] pbuf;
+					free(pbuf);
 					return;
 				}
 				if (inL!=r) {
 					ffl_err(HL, "payload != content-length");
-					delete[] pbuf;
+					free(pbuf);
 					return;
 				}
 				pbuf[r] = '\0';
@@ -791,6 +791,7 @@ IpTrksMp_ ipTracks;
 struct TimeoutFunc_ {
 	FTS_ timeout;
 	virtual void func ()= 0;
+	virtual ~TimeoutFunc_ () {}
 };
 
 struct CmpTout_ {
@@ -1190,7 +1191,10 @@ void saveTxo () {
 			p=*it;
 			pFSetToSave.erase(it);
 			setSavMtx.unlock();
+			shared_mutex& mtx= ffFileMtx[p];
+			mtx.lock_shared();
 			p->save();
+			mtx.unlock_shared();
 		}
 	}
 }
@@ -1359,7 +1363,7 @@ int main (int argc, char **argv) {
 				flNtc(HL, "server [%d] terminated by signal %d (%s)",
 						pid, sig, strsignal(sig));
 
-				if (sig == SIGSEGV) {
+				if (sig == SIGSEGV || sig == SIGABRT) {
 					moveCoreFile(pid);
 					flErr(HL, "reforking after crash...");
 					goto createChild;	 // restart loop

@@ -5,8 +5,9 @@
 #include <filesystem>
 #include <queue>
 #include <thread>
-#include <FFJSON.h>
+#include <shared_mutex>
 #include <condition_variable>
+#include <FFJSON.h>
 #include <FerryTimeStamp.h>
 
 #define Txo FFJSON
@@ -107,4 +108,5 @@ constexpr uint32_t fnv1a (const char *s, uint32_t hash = 2166136261u) {
 constexpr uint32_t operator ""_hash (const char *s, size_t) {
    return fnv1a(s);
 }
+static map<FFJSON*, shared_mutex> ffFileMtx;
 #endif

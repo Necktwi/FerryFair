@@ -22,8 +22,8 @@
 
 using namespace std;
 
-bool valgrind_test = false;
-int valgrind_count = 1;
+bool valgrind_test= false;
+int valgrind_count= 1;
 mutex qhModMtx;
 unique_lock<mutex> modLk(qhModMtx);
 condition_variable cvMod, cvSrch;
@@ -53,9 +53,10 @@ struct BidThings_ {
 	Pts search;
 };
 map<FFJSON*, BidThings_> bidThings;
-thread_local ccp to = nullptr;
+thread_local ccp to= nullptr;
 thread_local char subj[64];
 thread_local char mesg[128];
+
 /**
  * inserts thing in to reply r if not in mdts and adds other user's things
  * on which user has commented
@@ -107,26 +108,26 @@ int addSmtgsToReply (FFJSON& users, FFJSON& user, FFJSON& r,
 }
 
 void addSearchNoDups (Pts& pts, FFJSON& reply, set<FFJSON*>& mdts,
-							 int prevni, bool dupLnks = true) {
+							 int prevni, bool dupLnks= true) {
 	int k= reply["things"].size;
-	for (int i=prevni;i<pts.pni;++i) {
-		NdNPrn& nd = pts.pts[i];
+	for (int i= prevni; i<pts.pni; ++i) {
+		NdNPrn& nd= pts.pts[i];
 		FFJSON* f;
 		if (nd.prn==(QuadNode*)-1) {
-			f = (FFJSON*)nd.qh;
+			f= (FFJSON*)nd.qh;
 		} else {
-			auto aa = getNode(nd);
-			f = (FFJSON*)get<0>(aa);
+			auto aa= getNode(nd);
+			f= (FFJSON*)get<0>(aa);
 		}
 		flDbg(FLL, "finding in mdts");
-		bool thingIsWithUser = dupLnks && mdts.find(f)!=mdts.end();
+		bool thingIsWithUser= dupLnks && mdts.find(f)!=mdts.end();
 		flDbg(FLL, "thingIsWithUser: %d", thingIsWithUser);
 		if (dupLnks && thingIsWithUser) {
-			FFJSON& rt = reply["things"][k];
+			FFJSON& rt= reply["things"][k];
 			rt["id"]= (*f)["id"];
 			rt["user"]= &(*f)["user"]["name"];
 		} else {
-			reply["things"][k]=f;
+			reply["things"][k]= f;
 		}
 		++k;
 	}
@@ -194,13 +195,13 @@ bool isValidLocation (FFJSON& cloc) {
 	return false;
 }
 ccp admin, adminPass;
-static ccp from = "FerryFair";
+static ccp from= "FerryFair";
 string wdir;
-FFJSON* pffcfg = nullptr;
-FFJSON* prbs = nullptr;
-FFJSON* pusers = nullptr;
-ccp mailServer = nullptr;
-int mailPort = 0;
+FFJSON* prbs= nullptr;
+FFJSON* pffcfg= nullptr;
+FFJSON* pusers= nullptr;
+ccp mailServer= nullptr;
+int mailPort= 0;
 
 static HTML_ thingsNoJsHtml;
 static HTML_* thingHPtr;
@@ -243,14 +244,14 @@ HTML_* thingToHtml (FFJSON& thn) {
 	HTML_& thnName= pThn->getElementById("ThingName");
 	HTML_* thnAName= new HTML_((ccp)thn["name"]);
 	thnName.insertAdjacentElement("afterBegin", *thnAName);
-	ccp tid= to_string((int)thn["id"]).c_str();
+	string tid= to_string((int)thn["id"]);
 	thnName.setAttribute("href",
 								string("/")+(ccp)thn["user"]["name"]+"?thing="+tid);
 	HTML_& thnUsr= pThn->getElementById("ThingUsr");
 	HTML_* thnAUsr= new HTML_(username);
 	thnUsr.insertAdjacentElement("afterBegin", *thnAUsr);
 	HTML_& thnId= pThn->getElementById("ThingId");
-	HTML_* thnAId= new HTML_(tid);
+	HTML_* thnAId= new HTML_(tid.c_str());
 	thnId.insertAdjacentElement("afterBegin", *thnAId);
 	HTML_& thnLstModd= pThn->getElementById("lastModed");
 	time_t ts= thn["lastModed"];
@@ -268,25 +269,34 @@ HTML_* thingToHtml (FFJSON& thn) {
 	return pThn;
 }
 
-int ffDefault (string& bid, Txo& rbs, Txo& ffHttp, Txo& reply,
-					MkHttpArgs& mhArgs, auto& now) {
+int ffDefault (string& bid, Txo& rbs, shared_mutex& rbsmtx, Txo& ffHttp,
+					Txo& reply, MkHttpArgs& mhArgs, auto& now) {
 	bool bidset= false;
-	if (bid.length())
-		if(rbs[bid])
+	rbsmtx.lock_shared();
+	if (bid.length()) {
+		if(rbs.find(bid)!=rbs.end())
 			goto gotbid;
+	}
   newbid:
 	bid= random_alphnuma_string();
 	bidset= 1;
   bidcheck:
-	if (rbs[bid]) {
+	if (rbs.find(bid)!=rbs.end()) {
 		bid= random_alphnuma_string();
 		goto bidcheck;
 	}
+	rbsmtx.unlock_shared();
+	rbsmtx.lock();
+	rbs[bid];
+	rbsmtx.unlock();
+	rbsmtx.lock_shared();
 	rbs[bid]["ip"]= (ccp)ffHttp["ip"];
   gotbid:
-	if (!rbs[bid]["ip"] || strcmp(rbs[bid]["ip"], ffHttp["ip"])) {
+	Txo& rbip= rbs[bid]["ip"];
+	if (!rbip || strcmp(rbip, ffHttp["ip"])) {
 		goto newbid;
 	}
+	rbsmtx.unlock_shared();
 	FFJSON& rbsid= rbs[bid];
 	rbsid["ts"]= now;
 	reply["bid"]= bid;
@@ -376,7 +386,8 @@ int ffSearch (
 	}
 	if (tUsr) { //url with username
 		Txo* txTName= &tUsr["name"];
-		reply["name"]= txTName;
+		reply["tname"]= txTName;
+		reply["tdesc"]= &tUsr["desc"];
 		if (query["thing"]) {
 			Txo& uts= tUsr["things"];
 			if (uts.size) {
@@ -1230,6 +1241,7 @@ int ferryfair (FFJSON& ffHttp) {
 	static FFJSON& users= *pusers;
 	static int cfgMaxThings= ffcfg["maxThings"];
 	static int cfgMaxThingPics= ffcfg["maxThingPics"];
+	static shared_mutex& rbsmtx= ffFileMtx[prbs];
 	ccp referer= nullptr;char proto[8]= "https"; int protolen;
 	ccp username= nullptr, password= nullptr, cpld= nullptr;
 	ccp path;
@@ -1277,7 +1289,7 @@ int ferryfair (FFJSON& ffHttp) {
 	if (cpld && ctype && strstr(ctype, "json")) {
 		payload.init(cpld);
 	}
-	int defRet= ffDefault(bid, rbs, ffHttp, reply, mhArgs, now);
+	int defRet= ffDefault(bid, rbs, rbsmtx, ffHttp, reply, mhArgs, now);
 	if (defRet>1) {
 		return defRet;
 	}
