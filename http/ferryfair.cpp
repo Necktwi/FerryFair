@@ -24,11 +24,12 @@ using namespace std;
 
 bool valgrind_test= false;
 int valgrind_count= 1;
-mutex qhModMtx;
-unique_lock<mutex> modLk(qhModMtx);
-condition_variable cvMod, cvSrch;
-atomic<int> searchCv{0};
-atomic<int> modQhCv{0};
+//mutex qhModMtx;
+//unique_lock<mutex> modLk(qhModMtx);
+//condition_variable cvMod, cvSrch;
+//atomic<int> searchCv{0};
+//atomic<int> modQhCv{0};
+shared_mutex qtMtx;
 
 struct CompThingNameMatch {
 	bool operator () (const tuple<FFJSON*,int8_t>& t1,
@@ -415,11 +416,13 @@ int ffSearch (
 	}
 	int pni= pts.pni;
 	flInf(FL, "searching %s at %f,%f\n", srchStr.c_str(), pts.c.x, pts.c.y);
-	cvSrch.wait(modLk, []{return modQhCv.load()==0;});
-	++searchCv;
+	//cvSrch.wait(modLk, []{return modQhCv.load()==0;});
+	//++searchCv;
+	qtMtx.lock_shared();
 	thnsTree.getPointsFromQuad(pts);
-	--searchCv;
-	cvMod.notify_all();
+	qtMtx.unlock_shared();
+	//--searchCv;
+	//cvMod.notify_all();
 	addSearchNoDups(pts, reply, mdts, pni, !noJs);
 	int numThings= reply["things"].size;
 	if (!numThings) {
@@ -458,12 +461,14 @@ int ffPts (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 		QuadNode* tQN= nd.qh->qn();
 		uint8_t tind= nd.qh-(QuadHldr*)tQN;
 		nd.ds= 1;
-		cvSrch.wait(modLk, []{return modQhCv.load()==0;});
-		++searchCv;
+		//cvSrch.wait(modLk, []{return modQhCv.load()==0;});
+		//++searchCv;
+		qtMtx.lock_shared();
 		nd.qh->findNeighbours(
 			pts, tQN, tind, nd.prn, nd.ind, nd.dx);
-		--searchCv;
-		cvMod.notify_all();
+		qtMtx.unlock_shared();
+		//--searchCv;
+		//cvMod.notify_all();
 		addSearchNoDups(pts, reply, mdts, pni, false);
 	} else {
 		int i= tpts-20, j=0;
@@ -903,8 +908,8 @@ int ffUpdThn (Txo& ffHttp, Txo& reply, Txo& user, Txo& payload,
 							mitposMtx.unlock();
 						}
 					}
-					nameChanged=true;
-					funame=fcname;
+					nameChanged= true;
+					funame= fcname;
 				}
 			  updateLoc:
 				FFJSON& fuloc = futhing["location"];
@@ -914,55 +919,60 @@ int ffUpdThn (Txo& ffHttp, Txo& reply, Txo& user, Txo& payload,
 				}
 				if (((double)fcloc[0]!=(double)fuloc[0] ||
 					  (double)fcloc[1]!=(double)fuloc[1])) {
-					fuloc=fcloc;
-					locChanged=true;
+					locChanged= true;
 				}
 				if (nameChanged||locChanged) {
-					moded=true;
-					ina = nametouint(mstr);
-					cvMod.wait(modLk, [] {return searchCv.load()==0;});
-					++modQhCv;
-					FFQuad_ fq(uthings[j], ina, 0, 0, true);
+					moded= true;
+					ina= nametouint(mstr);
+					//cvMod.wait(modLk, [] {return searchCv.load()==0;});
+					//++modQhCv;
+					FFQuad_ fq(uthings[j], ina, fuloc[1], fuloc[0], true);
+					qtMtx.lock();
 					thnsTree.insert(fq);
-					--modQhCv;
-					cvSrch.notify_all();
+					qtMtx.unlock();
+					if (locChanged)
+						fuloc= fcloc;
+					//--modQhCv;
+					//cvSrch.notify_all();
 				}
 			}
-			FFJSON& fcthnDtls = fcthing["details"];
+			FFJSON& fcthnDtls= fcthing["details"];
 			if (fcthnDtls) {
 				if (isValidThingDetails(fcthnDtls)) {
-					futhing["details"]=fcthnDtls;
-					moded=true;
+					futhing["details"]= fcthnDtls;
+					moded= true;
 				} else {
 					return mkHttpRes(ffHttp, 
 										  "{\"error\":\"invalidThingDetails\"}", jsonMime, -1, 400);
 				}
 			}
 			if (nameChanged) {
-				mstr=metaname(cname+" "+lusrnm);
+				mstr= metaname(cname+" "+lusrnm);
 				for (int k=0; k<mstr.size(); ++k) {
 					mitposMtx.lock();
-					map<string, FFJSON*>::iterator it =
+					map<string, FFJSON*>::iterator it=
 						nameints->find(mstr[k]);
 					if (it==nameints->end()) {
-						(*fnameints)[mstr[k]]=1;
-						it=nameints->find(mstr[k]);
-						mitpos[&it->first]=nameints->size()-1;
+						(*fnameints)[mstr[k]]= 1;
+						it= nameints->find(mstr[k]);
+						mitpos[&it->first]= nameints->size()-1;
 					} else {
 						++(*nameints)[mstr[k]]->val.number;
 					}
 					mitposMtx.unlock();
 				}
-				ina=nametouint(mstr);
+				ina= nametouint(mstr);
 			}
 			if (locChanged||nameChanged) {
-				FFQuad_ fq(futhing, ina);
+				FFQuad_ fq(futhing, ina, fcloc[1], fcloc[0]);
+				qtMtx.lock();
 				thnsTree.insert(fq);
+				qtMtx.unlock();
 			}
 			if (moded) {
-				futhing["lastModed"]=lepoch;
+				futhing["lastModed"]= lepoch;
 			}
-			reply["things"][reply["things"].size]=&futhing;
+			reply["things"][reply["things"].size]= &futhing;
 		}
 	}
 	setSavMtx.lock();
@@ -1385,9 +1395,9 @@ int ferryfair (FFJSON& ffHttp) {
 }
 
 void makeThngsTree (Txo& cfg) {
-	fnameints = &cfg["nameints"];
-	nameints = fnameints->val.pairs;
-	map<string, FFJSON*>::iterator nit = nameints->begin();
+	fnameints= &cfg["nameints"];
+	nameints= fnameints->val.pairs;
+	map<string, FFJSON*>::iterator nit= nameints->begin();
 	multiset<map<string, FFJSON*>::iterator, CompNameWt> namewtset(cmpNmWt);
 	while (nit!=nameints->end()) {
 		namewtset.insert(nit);
@@ -1397,24 +1407,24 @@ void makeThngsTree (Txo& cfg) {
 	multiset<map<string, FFJSON*>::iterator, CompNameWt>::iterator mit
 		= namewtset.begin();
 	while (mit!=namewtset.end()) {
-		mitpos[&((*mit)->first)]=i;
+		mitpos[&((*mit)->first)]= i;
 		++i;
 		++mit;
 	}
-	FFJSON& users = cfg["users"];
-	FFJSON::Iterator it = users.begin();
+	FFJSON& users= cfg["users"];
+	FFJSON::Iterator it= users.begin();
 	FFJSON::Iterator tit;
 	int ic= 0;
-	vector<string> bmstr = metaname("flat gowtham");
-	vector<uint> bina = nametouint(bmstr);
+	vector<string> bmstr= metaname("flat gowtham");
+	vector<uint> bina= nametouint(bmstr);
 					
 	while (it!= users.end()) {
 		if (it->isType(FFJSON::LINK)) {
 			++it;
 			continue;
 		}
-		string user = it.getIndex();
-		int id = (*it)["id"];
+		string user= it.getIndex();
+		int id= (*it)["id"];
 		while (usersId.size()<=id) {
 			usersId.push_back(nullptr);
 		}
@@ -1429,7 +1439,7 @@ void makeThngsTree (Txo& cfg) {
 					(*tit)["location"].isType(FFJSON::UNDEFINED))) {
 				FFJSON* pF= &*tit;
 				//flDbg(FL, "inserting %d", ic);
-				tpoolPtr->enqueue([pF, ic] (int tid) {
+				//tpoolPtr->enqueue([pF, ic] (int tid) {
 					FFJSON& rF= *pF;
 					string tname((ccp)rF["name"]);
 					tname+= " ";
@@ -1445,7 +1455,7 @@ void makeThngsTree (Txo& cfg) {
 					FFQuad_ fq(rF, ina, lx, ly);
 					thnsTree.insert(fq);
 					//flDbg(FL, "%d inserted %d", tid, ic);
-				});
+				//});
 				// FFJSON& rF = *pF;
 				// string tname((ccp)rF["name"]);
 				// tname += (ccp)rF["user"]["name"];
@@ -1483,7 +1493,7 @@ void makeThngsTree (Txo& cfg) {
 }
 
 void initFerryFair (FFJSON& cfg) {
-	wdir=(ccp)cfg["rootdir"];
+	wdir= (ccp)cfg["rootdir"];
 	FFJSON& ffcfg= cfg["cfg"];
 	ffcfg.init(string("file://")+wdir+"/config.txo|OBJECT");
 	flDbg(FL, "wdir: %s", wdir.c_str());

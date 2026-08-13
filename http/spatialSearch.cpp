@@ -337,32 +337,32 @@ void QuadHldr::destroy (QuadNode* pQN, QuadNode* tQN) {
 QuadHldr::~QuadHldr () {
 	destroy();
 }
-CntMut_& QuadHldr::lock (int l) {
-   qhMapMut.lock();
-   CntMut_& cntMut = qhModMutMap[this];
-   ++cntMut.count;
-   qhMapMut.unlock();
-   cntMut.m.lock();
-   return cntMut;
-}
+// CntMut_& QuadHldr::lock (int l) {
+//    qhMapMut.lock();
+//    CntMut_& cntMut = qhModMutMap[this];
+//    ++cntMut.count;
+//    qhMapMut.unlock();
+//    cntMut.m.lock();
+//    return cntMut;
+// }
 
-void QuadHldr::unlock (CntMut_* p = nullptr) {
-   qhMapMut.lock();
-   if (!p)
-      p = &qhModMutMap[this];
-   --p->count;
-   qhMapMut.unlock();
-   p->m.unlock();
-}
+// void QuadHldr::unlock (CntMut_* p = nullptr) {
+//    qhMapMut.lock();
+//    if (!p)
+//       p = &qhModMutMap[this];
+//    --p->count;
+//    qhMapMut.unlock();
+//    p->m.unlock();
+// }
 
 uint QuadNode::insert (FFQuad_& fq, float x, float y, uint level,
                        QuadNode* pQN, int8_t ind, int8_t sn) {
    QuadHldr* qh = (QuadHldr*)this;
-   CntMut_* pcm = nullptr;
+   //CntMut_* pcm = nullptr;
    if (!sn) {
-      pcm = &qh->lock(__LINE__);
+      //pcm = &qh->lock(__LINE__);
       this->seti(fq.ina);
-      qh->unlock(pcm);
+      //qh->unlock(pcm);
    }
    uint returnv= 0;
    int8_t qind= fq.lx>= x ? 0: 1;
@@ -381,8 +381,8 @@ uint QuadHldr::insert (
    FFQuad_& fq, float x, float y, uint level, QuadNode* tQN, int8_t tind,
    QuadNode* pQN, int8_t ind, int8_t sn
 ) {
-   FFJSON& rF=fq.rF;vector<uint>& ina=fq.ina;float& lx=fq.lx,ly=fq.ly;
-   bool& deleteLeaf = fq.deleteLeaf;
+   FFJSON& rF= fq.rF; vector<uint>& ina= fq.ina; float& lx= fq.lx, ly= fq.ly;
+   bool& deleteLeaf= fq.deleteLeaf;
    uint ret= level;
    map<set<FFJSON*>*, vector<uint>>::iterator sit;
    vector<map<QuadNode*,uint>::iterator> qit;
@@ -394,8 +394,8 @@ uint QuadHldr::insert (
       flDbg(SLL, "qh: %p", this);
    }
 #endif
-   CntMut_* pcm= nullptr;
-	pcm= &lock(__LINE__);
+   //CntMut_* pcm= nullptr;
+	//pcm= &lock(__LINE__);
    if (fp==nullptr) {
       fp= (FFJSON*)fpxor(&rF, pQN, ind);
 		//rF could b a set, don't access it. we are cheating by not writing
@@ -480,17 +480,17 @@ uint QuadHldr::insert (
       ffl_debug(SL, "rF: %p inserted in %p\n", &rF, pQN);
       goto retn;
    } else {
-      QuadNode* qpres = (QuadNode*)resfp;
-      if (!deleteLeaf)
-         if (pcm) {
-            unlock(pcm);
-            pcm=nullptr;
-         }
+      QuadNode* qpres= (QuadNode*)resfp;
+      // if (!deleteLeaf)
+      //    if (pcm) {
+      //       unlock(pcm);
+      //       pcm=nullptr;
+      //    }
       ret = qpres->insert(fq, x, y, level, tQN, tind, sn);
       if (deleteLeaf) {
          if (ret) {
-            QuadHldr* qh = (QuadHldr*)qpres;
-            FFJSON* pxorrf = nullptr;
+            QuadHldr* qh= (QuadHldr*)qpres;
+            FFJSON* pxorrf= nullptr;
             if (ret>1) {
                int8_t qind = 0;
                int8_t xs=0;
@@ -527,8 +527,8 @@ uint QuadHldr::insert (
       return ret;
    }
   retn:
-   if (pcm)
-      unlock(pcm);
+   // if (pcm)
+   //    unlock(pcm);
    return ret;
 }
 bool Circle::grabIfNearest (FFJSON& f) {
