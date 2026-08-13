@@ -294,7 +294,7 @@ int ffDefault (string& bid, Txo& rbs, shared_mutex& rbsmtx, Txo& ffHttp,
 	rbs[bid]["ip"]= (ccp)ffHttp["ip"];
   gotbid:
 	Txo& rbip= rbs[bid]["ip"];
-	if (!rbip || strcmp(rbip, ffHttp["ip"])) {
+	if (!rbip || (strcmp(rbip, ffHttp["ip"]) && false)) {
 		goto newbid;
 	}
 	rbsmtx.unlock_shared();
