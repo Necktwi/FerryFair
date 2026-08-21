@@ -7,13 +7,14 @@
 #include <thread>
 #include <shared_mutex>
 #include <condition_variable>
+#include <map>
 #include <FFJSON.h>
 #include <FerryTimeStamp.h>
 
 #define Txo FFJSON
 #define let auto;
 
-namespace fs = std::filesystem;
+namespace fs= std::filesystem;
 
 extern FFJSON cfg;
 enum HTTPLOG {
@@ -26,11 +27,11 @@ enum HTTPLOG {
    HLLL = 1<<19
 };
 
-static ccp jsonMime= "application/json";
-static ccp txtMime= "text/plain";
-static ccp htmlMime= "text/html";
-static ccp okStr= "OK";
-static atomic<bool> atmcRunning{true};
+extern ccp jsonMime;
+extern ccp txtMime;
+extern ccp htmlMime;
+extern ccp okStr;
+extern atomic<bool> atmcRunning;
 
 struct MkHttpArgs {
    ccp body;
@@ -101,6 +102,8 @@ extern thread_local int tid;
 extern ThreadPool* tpoolPtr;
 extern set<FFJSON*> pFSetToSave;
 extern mutex setSavMtx;
+extern map<Txo*, shared_mutex> TxoMtxMap;
+extern mutex TxoMtxMapMtx;
 extern atomic<bool> saveTxoStop;
 constexpr uint32_t fnv1a (const char *s, uint32_t hash = 2166136261u) {
    return (*s == 0) ? hash : fnv1a(s + 1, (hash ^ uint32_t(*s)) * 16777619u);
@@ -108,5 +111,5 @@ constexpr uint32_t fnv1a (const char *s, uint32_t hash = 2166136261u) {
 constexpr uint32_t operator ""_hash (const char *s, size_t) {
    return fnv1a(s);
 }
-static map<FFJSON*, shared_mutex> ffFileMtx;
+extern map<FFJSON*, shared_mutex> ffFileMtx;
 #endif

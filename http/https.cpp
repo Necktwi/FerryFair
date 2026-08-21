@@ -53,23 +53,22 @@
 #include <logger.h>
 #include <myconverters.h>
 #include <FerryTimeStamp.h>
+#include <map>
 #include <mystdlib.h>
 #include "https.h"
 #include "ferryfair.h"
 
-// In-memory store for push subscriptions (for demonstration purposes)
-// In a real application, you would use a database.						 
-static std::vector<std::string> s_subscriptions;							 
-// Your VAPID public and private keys.											 
-// Generate them once and keep them safe.										 
-// You can use an online generator like										 
-// https://www.stevesouders.com/bin/vapid.php										
-static const char *s_vapid_public_key = "YOUR_VAPID_PUBLIC_KEY";		 
-static const char *s_vapid_private_key = "YOUR_VAPID_PRIVATE_KEY";	 
-
 // For OpenSSL thread-safety in multi-threaded applications
 static std::mutex *ssl_mutexes = nullptr;
 
+ccp jsonMime= "application/json";
+ccp txtMime= "text/plain";
+ccp htmlMime= "text/html";
+ccp okStr= "OK";
+atomic<bool> atmcRunning{true};
+map<FFJSON*, shared_mutex> ffFileMtx;
+map<Txo*, shared_mutex> TxoMtxMap;
+mutex TxoMtxMapMtx;
 static void lockingFunc (int mode, int n, const char *file, int line) {
 	if (mode & CRYPTO_LOCK) {
 		ssl_mutexes[n].lock();
@@ -81,7 +80,7 @@ static void lockingFunc (int mode, int n, const char *file, int line) {
 static unsigned long threadIdFunc (void) {									 
 	// This is not guaranteed to be unique on all platforms, but is
 	// efficient for OpenSSL's locking needs.											  
-	 return (unsigned long)std::hash<std::thread::id>()(
+	return (unsigned long)std::hash<std::thread::id>()(
 		 std::this_thread::get_id());
 }
 
@@ -1320,7 +1319,7 @@ int run () {
 	flDbg(HL, "deleting thread pool");
 	delete tpoolPtr;
 	curl_global_cleanup();
-	saveTxoStop=true;
+	saveTxoStop= true;
 	flDbg(HL, "saving pending files");
 	saveTxoT.join();
 	serveTmOtT.join();

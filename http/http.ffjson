@@ -34,9 +34,11 @@ vhosts: {
       rootdir: "../../WWW-development/",
 		redirect: "ferryfair.com"
    },
-   underconstruction: www
+   underconstruction: {
+		rootdir: "../../WWW-development/"
+	}
 },
 readRetry: 300,
 retryMS: 70,
 threadCount: -1,
-daemon: true
+daemon: false
