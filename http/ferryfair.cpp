@@ -135,6 +135,11 @@ void initFerryFair (FFJSON& cfg) {
 	admin= ffcfg["secret"]["admin"];
 	adminPass= ffcfg["secret"]["adminPass"];
 	wpPrivKe= ffcfg["secret"]["webPush"]["privateKey"];
+	if (!wpPrivKe) {
+		flErr(FL, "No webpush private key in"
+				" red/secret.txo/webPush/privateKey");
+		exit -1;
+	}
 	wpPubKe= ffcfg["secret"]["webPush"]["publicKey"];
 	prbs= &ffcfg["rbs"];
 	pusers= &ffcfg["users"];
@@ -587,6 +592,7 @@ void addSearchNoDups (Pts& pts, FFJSON& reply, set<FFJSON*>& mdts,
 			rt["user"]= &(*f)["user"]["name"];
 		} else {
 			reply["things"][k]= f;
+			mdts.insert(f);
 		}
 		++k;
 	}
@@ -1015,6 +1021,7 @@ int ffSignIn (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 		}
 		setSavMtx.lock();
 		pFSetToSave.insert(&rbs);
+		pFSetToSave.insert(&user);
 		setSavMtx.unlock();
 		return mkHttpRes(ffHttp, reply);
 	} else {
