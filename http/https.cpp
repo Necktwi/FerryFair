@@ -66,9 +66,7 @@ ccp txtMime= "text/plain";
 ccp htmlMime= "text/html";
 ccp okStr= "OK";
 atomic<bool> atmcRunning{true};
-map<FFJSON*, shared_mutex> ffFileMtx;
-map<Txo*, shared_mutex> TxoMtxMap;
-mutex TxoMtxMapMtx;
+map<Txj*, shared_mutex> ffFileMtx;
 static void lockingFunc (int mode, int n, const char *file, int line) {
 	if (mode & CRYPTO_LOCK) {
 		ssl_mutexes[n].lock();
@@ -90,7 +88,7 @@ static void setupOsslLocking (void) {
 	CRYPTO_set_locking_callback(lockingFunc);
 }
 
-FFJSON cfg;
+Txj cfg;
 
 int child_exit_status = 0;
 thread_local int tid = 0;
@@ -101,9 +99,9 @@ using namespace std;
 
 typedef const char* ccp;
 
-set<FFJSON*> pFSetToSave;
+set<Txj*> pFSetToSave;
 mutex setSavMtx;
-atomic<bool> saveTxoStop{0};
+atomic<bool> saveTxjStop{0};
 mutex ipTracksMtx;
 mutex TmOtFuncSetMtx;
 
@@ -342,11 +340,11 @@ void urlEscape (char* s) {
 
 using crd = function<ssize_t(char*, size_t)>;
 using cwr = function<ssize_t(ccp, size_t)>;
-void parseHost (crd read, FFJSON& host) {
+void parseHost (crd read, Txj& host) {
 	char c;
 	string buf;
-	FFJSON& fqdn = host["fqdn"];
-	FFJSON& subs = host["subs"];
+	Txj& fqdn = host["fqdn"];
+	Txj& subs = host["subs"];
 	subs.init("[]");
 	bool port = false;
 	int ci=0;
@@ -372,7 +370,7 @@ void parseHost (crd read, FFJSON& host) {
 		}
 	}
 }
-void parseCookie (crd read, FFJSON& ffCookie) {
+void parseCookie (crd read, Txj& ffCookie) {
 	char c;
 	string key,value;
 	string* buf = &key;
@@ -412,7 +410,7 @@ void parseCookie (crd read, FFJSON& ffCookie) {
 	}
 }
 
-void parseAcceptEncoding (crd read, FFJSON& ffAEnc) {
+void parseAcceptEncoding (crd read, Txj& ffAEnc) {
 	char c;
 	string enc;
 	while (read(&c, 1)>0) {
@@ -436,7 +434,7 @@ void parseAcceptEncoding (crd read, FFJSON& ffAEnc) {
 	return;
 }
 
-void parseHTTP (crd read, FFJSON& ffHttp) {
+void parseHTTP (crd read, Txj& ffHttp) {
 	unsigned int i= 0;
 	unsigned int pairStartPin= i;
 	char c;
@@ -465,7 +463,7 @@ void parseHTTP (crd read, FFJSON& ffHttp) {
 					return;
 				}
 				pbuf[r] = '\0';
-				FFJSON::Blob_ b;
+				Txj::Blob_ b;
 				b.p = pbuf;
 				b.s = inL+1;
 				flDbg(HL, "body: %.*s", b.s, b.p);
@@ -576,7 +574,7 @@ void parseHTTP (crd read, FFJSON& ffHttp) {
 					flInfCntnu(HL,"%s: ",buf);
 					tolower((ccp)buf);
 					size_t key = fnv1a(buf);
-					FFJSON& fvalue = ffHttp[(ccp)buf];
+					Txj& fvalue = ffHttp[(ccp)buf];
 					switch (key) {
 					case "cookie"_hash:
 						parseCookie(read, fvalue);
@@ -638,7 +636,7 @@ int mkHttpRes (string& res, MkHttpArgs& args) {
 	return -1;
 }
 int mkHttpRes (
-	FFJSON& ffHttp, ccp body, ccp ctype, int bsz, const int code,
+	Txj& ffHttp, ccp body, ccp ctype, int bsz, const int code,
 	ccp codeMsg, ccp addlHdrs
 ) {
 	MkHttpArgs& mhArgs= ffHttp["resArgs"];
@@ -656,7 +654,7 @@ int mkHttpRes (
 		flDbg(HL, "1");
 	}
 	string& res= ffHttp["res"];
-	FFJSON& accEnc= ffHttp["accept-encoding"];
+	Txj& accEnc= ffHttp["accept-encoding"];
 	if (mhArgs.bsz>1024 && accEnc && accEnc["gzip"] &&
 		 !strstr(mhArgs.ctype, "image")) {
 		res="1";
@@ -664,7 +662,7 @@ int mkHttpRes (
 	return mkHttpRes(res, mhArgs);
 }
 
-int mkHttpRes (FFJSON& ffHttp, FFJSON& body) {
+int mkHttpRes (Txj& ffHttp, Txj& body) {
 	mkHttpRes(ffHttp, nullptr, "text/json");
 	string& res= ffHttp["res"];
 	res+= "Content-Length: 00000000\r\n\r\n";
@@ -810,7 +808,7 @@ struct TmOutIpUnblocker_:public TimeoutFunc_ {
 FTS_ oneMin = {60,0};
 FTS_ halfMin = {30,0};
 
-bool isNJsClient (FFJSON& ffHttp) {
+bool isNJsClient (Txj& ffHttp) {
 	ccp ua = ffHttp["user-agent"];
 	flInf(HL, ua);
 	if (strstr(ua, "w3m") || strstr(ua, "nojs") || strstr(ua, "Dillo") ||
@@ -842,18 +840,18 @@ char* fileToStr (fs::path& fspath, char* buf) {
 	return nullptr;
 }
 
-int handleHttp (FFJSON& ffHttp) {
+int handleHttp (Txj& ffHttp) {
 	MkHttpArgs mhArgs;
 	ffHttp["resArgs"]= &mhArgs;
-	FFJSON& fpath= ffHttp["path"];
+	Txj& fpath= ffHttp["path"];
 	if (!fpath)
 		return mkHttpRes(ffHttp, "NaNa!");
-	FFJSON& host= ffHttp["host"];
+	Txj& host= ffHttp["host"];
 	if (!host)
 		return 0;
 	ccp fqdn= host["fqdn"];
 	string subdomain(fqdn,(int)host["subs"][0]);
-	FFJSON& vhost= cfg["vhosts"][subdomain]?cfg["vhosts"][subdomain]:cfg;
+	Txj& vhost= cfg["vhosts"][subdomain]?cfg["vhosts"][subdomain]:cfg;
 	if (vhost["redirect"]) {
 		char rhed[64];
 		sprintf(rhed, "Location: http%s://%s", ffHttp["ssl"]? "s":"",
@@ -987,7 +985,7 @@ int waitForWrite (int fd, int timeoutMs) {
 atomic<int> sslCount{0};
 void handleConnection (int tid, struct sockaddr_in cli, int clientFd,
 							  SSL* ssl = nullptr) {
-	FFJSON ffHttp;
+	Txj ffHttp;
 	char ip_str[INET_ADDRSTRLEN];
 	inet_ntop(AF_INET, &cli.sin_addr, ip_str, sizeof(ip_str));
 	ffHttp["ip"] = (ccp)ip_str;
@@ -1179,25 +1177,24 @@ void acceptLoop (int listen_fd, ThreadPool& pool, SSL_CTX* ctx = nullptr) {
 	 }
 }
 
-void saveTxo () {
-	FFJSON* p;
-	while (!saveTxoStop) {
+void saveTxj () {
+	Txj* p;
+	while (!saveTxjStop) {
 		this_thread::sleep_for(chrono::milliseconds(2000));
-		flDbg(HLL, "saving Txo");
+		flDbg(HLL, "saving Txj");
 		while (!pFSetToSave.empty()) {
 			setSavMtx.lock();
-			set<FFJSON*>::iterator it = pFSetToSave.begin();
-			p=*it;
+			set<Txj*>::iterator it= pFSetToSave.begin();
+			p= *it;
 			pFSetToSave.erase(it);
 			setSavMtx.unlock();
-			shared_mutex& mtx= ffFileMtx[p];
-			mtx.lock_shared();
+			p->lockShared();
 			p->save();
-			mtx.unlock_shared();
+			p->unlockShared();
 		}
+		Txj::prune();
 	}
 }
-
 
 void serveTimeouts () {
 	FTS_ now;
@@ -1259,7 +1256,7 @@ int run () {
 		dup2(ferr, 2);
 		close(ferr);
 	}
-	FFJSON& fCfgThrdCnt = cfg["threadCount"];
+	Txj& fCfgThrdCnt = cfg["threadCount"];
 	if ((int)fCfgThrdCnt<=0)
 		fCfgThrdCnt=2*thread::hardware_concurrency();
 	if (!(cfg["cert"] && cfg["key"] && cfg["ca"])) {
@@ -1299,7 +1296,7 @@ int run () {
 	thread t2([httpsFd, &sslCtx] () {
 		acceptLoop(httpsFd, *tpoolPtr, sslCtx);
 	});
-	thread saveTxoT(saveTxo);
+	thread saveTxjT(saveTxj);
 	thread serveTmOtT(serveTimeouts);
 	flDbg(HL, "main sleeping..");
 	while (atmcRunning) {
@@ -1319,9 +1316,9 @@ int run () {
 	flDbg(HL, "deleting thread pool");
 	delete tpoolPtr;
 	curl_global_cleanup();
-	saveTxoStop= true;
+	saveTxjStop= true;
 	flDbg(HL, "saving pending files");
-	saveTxoT.join();
+	saveTxjT.join();
 	serveTmOtT.join();
 	return 0;
 }

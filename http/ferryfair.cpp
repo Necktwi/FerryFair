@@ -43,11 +43,11 @@ int valgrind_count= 1;
 shared_mutex qtMtx;
 
 struct BidThings_ {
-	set<FFJSON*> mdts;
+	set<Txj*> mdts;
 	Pts all;
 	Pts search;
 };
-map<FFJSON*, BidThings_> bidThings;
+map<Txj*, BidThings_> bidThings;
 thread_local ccp to= nullptr;
 thread_local char subj[64];
 thread_local char mesg[128];
@@ -56,9 +56,9 @@ ccp wpPrivKe, wpPubKe;
 ccp admin, adminPass;
 static ccp from= "FerryFair";
 string wdir;
-FFJSON* prbs= nullptr;
-FFJSON* pffcfg= nullptr;
-FFJSON* pusers= nullptr;
+Txj* prbs= nullptr;
+Txj* pffcfg= nullptr;
+Txj* pusers= nullptr;
 ccp mailServer= nullptr;
 int mailPort= 0;
 
@@ -125,10 +125,10 @@ static vector<uint8_t> urlBase64Decode(const string& in) {
 	}
 	return out;
 }
-void makeThngsTree (Txo& cfg);
-void initFerryFair (FFJSON& cfg) {
+void makeThngsTree (Txj& cfg);
+void initFerryFair (Txj& cfg) {
 	wdir= (ccp)cfg["rootdir"];
-	FFJSON& ffcfg= cfg["cfg"];
+	Txj& ffcfg= cfg["cfg"];
 	ffcfg.init(string("file://")+wdir+"/config.txo|OBJECT");
 	flDbg(FL, "wdir: %s", wdir.c_str());
 	pffcfg= &ffcfg;
@@ -178,11 +178,11 @@ void initFerryFair (FFJSON& cfg) {
 	it= pts.pts.begin();
 	auto itend= it+pts.pni;
 	while (it!=itend) {
-		FFJSON* fp;
+		Txj* fp;
 		if (it->prn==(QuadNode*)-1) {
-			fp= (FFJSON*)it->qh;
+			fp= (Txj*)it->qh;
 		} else {
-			fp= (FFJSON*)get<0>(getNode(*it));
+			fp= (Txj*)get<0>(getNode(*it));
 		}
 		printf("%s\n", (*fp)["location"].stringify().c_str());
 		++it;
@@ -218,7 +218,7 @@ void uninitFerryFair () {
 	delete[] isJsHtml;
 }
 
-int ffVapidKey (Txo& ffHttp, Txo& reply) {
+int ffVapidKey (Txj& ffHttp, Txj& reply) {
 	return mkHttpRes(ffHttp, wpPubKe, "text/plain", strlen(wpPubKe));
 }
 
@@ -424,8 +424,8 @@ static vector<uint8_t> encryptWebPushMsg (const string& msg,
 	return wpEncrypt(msg, uaPub, uaAuth, salt, asPub);
 }
 
-int ffStoreSubscription (Txo& ffHttp, Txo& rbs, Txo& rbsid, Txo& payload,
-								 Txo& reply) {
+int ffStoreSubscription (Txj& ffHttp, Txj& rbs, Txj& rbsid, Txj& payload,
+								 Txj& reply) {
 	if (payload.size <= 0) {
 		return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
 	}
@@ -446,16 +446,16 @@ static string endpointAud (const string& endpoint) {
 	return endpoint.substr(0, e);
 }
 
-int ffSendPush (Txo& ffHttp, Txo& rbsid, Txo& payload) {
-	Txo& wpSub= rbsid["wpSub"];
-	Txo keys= wpSub["keys"];
+int ffSendPush (Txj& ffHttp, Txj& rbsid, Txj& payload) {
+	Txj& wpSub= rbsid["wpSub"];
+	Txj keys= wpSub["keys"];
 	ccp endpoint= wpSub["endpoint"];
 	ccp p256dh= keys["p256dh"], authKe= keys["auth"];
 	if (!endpoint || !p256dh || !authKe)
 		return -1;
 	vector<uint8_t> uaPub= urlBase64Decode(p256dh);
 	vector<uint8_t> uaAuth= urlBase64Decode(authKe);
-	Txo msg;
+	Txj msg;
 	string data= payload.stringify(1);
 	vector<uint8_t> asPub;
 	vector<uint8_t> enc= encryptWebPushMsg(data, uaPub, uaAuth, asPub);
@@ -504,12 +504,12 @@ int ffSendPush (Txo& ffHttp, Txo& rbsid, Txo& payload) {
 }
 
 struct CompThingNameMatch {
-	bool operator () (const tuple<FFJSON*,int8_t>& t1,
-							const tuple<FFJSON*,int8_t>& t2) const {
+	bool operator () (const tuple<Txj*,int8_t>& t1,
+							const tuple<Txj*,int8_t>& t2) const {
 		return (get<1>(t1) < get<1>(t2));
 	}
 };
-int getIdChildInd (FFJSON& arr, int id) {
+int getIdChildInd (Txj& arr, int id) {
 	int last = arr.size;
 	last = id<last?id:last;
 	for (int i=last-1;i>=0;++i) {
@@ -524,25 +524,25 @@ int getIdChildInd (FFJSON& arr, int id) {
  * inserts thing in to reply r if not in mdts and adds other user's things
  * on which user has commented
  */
-int addSmtgsToReply (FFJSON& users, FFJSON& user, FFJSON& r,
-							set<FFJSON*>& mdts, bool usr= true, bool bNUts= false) {
+int addSmtgsToReply (Txj& users, Txj& user, Txj& r,
+							set<Txj*>& mdts, bool usr= true, bool bNUts= false) {
 	if (usr) {
-		FFJSON q("{things:!}");//add all keys of user except things to r;
+		Txj q("{things:!}");//add all keys of user except things to r;
 		user.answerObject(&q, nullptr, FerryTimeStamp(), &r);
 	}
-	FFJSON& ruts= r["uthings"];
-	FFJSON& rmts= r["mthings"];
-	FFJSON& uts= user["things"];
+	Txj& ruts= r["uthings"];
+	Txj& rmts= r["mthings"];
+	Txj& uts= user["things"];
 	int k= ruts->size;
 	int l= rmts->size;
 	if (bNUts) goto utsend;
 	for (uint i= 0; i< uts.size; ++i) {
-		FFJSON* f= &uts[i];
+		Txj* f= &uts[i];
 		if (to) {
 			if (strcmp((*f)["user"], to))
 				continue;
 		}
-		set<FFJSON*>::iterator it= mdts.find(f);
+		set<Txj*>::iterator it= mdts.find(f);
 		if (it==mdts.end()) {
 			ruts[k]= f;
 			++k;
@@ -550,18 +550,18 @@ int addSmtgsToReply (FFJSON& users, FFJSON& user, FFJSON& r,
 		}
 	}
   utsend:
-	FFJSON::Iterator stit= user.find("smsgs");
+	Txj::Iterator stit= user.find("smsgs");
 	if (stit!=user.end()) {
-		FFJSON& smsgs= *stit;
-		FFJSON& rsmsgs= r["smsgs"];
+		Txj& smsgs= *stit;
+		Txj& rsmsgs= r["smsgs"];
 		for (int i= 0; i< smsgs.size; ++i) {
-			FFJSON& s= smsgs[i];
+			Txj& s= smsgs[i];
 			if (!s[0].size)
 				continue;
-			FFJSON& uts= users[(ccp)s[0]]["things"];
+			Txj& uts= users[(ccp)s[0]]["things"];
 			int tind= getIdChildInd(uts, (int)s[1]);
-			FFJSON* f= &uts[tind];
-			set<FFJSON*>::iterator it= mdts.find(f);
+			Txj* f= &uts[tind];
+			set<Txj*>::iterator it= mdts.find(f);
 			if (it== mdts.end()) {
 				rmts[l]= f;
 				++l;
@@ -571,23 +571,23 @@ int addSmtgsToReply (FFJSON& users, FFJSON& user, FFJSON& r,
 	return k+l;
 }
 
-void addSearchNoDups (Pts& pts, FFJSON& reply, set<FFJSON*>& mdts,
+void addSearchNoDups (Pts& pts, Txj& reply, set<Txj*>& mdts,
 							 int prevni, bool dupLnks= true) {
 	int k= reply["things"].size;
 	for (int i= prevni; i<pts.pni; ++i) {
 		NdNPrn& nd= pts.pts[i];
-		FFJSON* f;
+		Txj* f;
 		if (nd.prn==(QuadNode*)-1) {
-			f= (FFJSON*)nd.qh;
+			f= (Txj*)nd.qh;
 		} else {
 			auto aa= getNode(nd);
-			f= (FFJSON*)get<0>(aa);
+			f= (Txj*)get<0>(aa);
 		}
 		flDbg(FLL, "finding in mdts");
 		bool thingIsWithUser= dupLnks && mdts.find(f)!=mdts.end();
 		flDbg(FLL, "thingIsWithUser: %d", thingIsWithUser);
 		if (dupLnks && thingIsWithUser) {
-			FFJSON& rt= reply["things"][k];
+			Txj& rt= reply["things"][k];
 			rt["id"]= (*f)["id"];
 			rt["user"]= &(*f)["user"]["name"];
 		} else {
@@ -598,8 +598,8 @@ void addSearchNoDups (Pts& pts, FFJSON& reply, set<FFJSON*>& mdts,
 	}
 }
 
-bool isValidEmail (FFJSON& tname) {
-	if (tname.isType(FFJSON::STRING) && tname.size<48) {
+bool isValidEmail (Txj& tname) {
+	if (tname.isType(Txj::STRING) && tname.size<48) {
 		ccp ctname = tname;
 		for (uint i=0; i<tname.size; ++i) {
 			char c = ctname[i];
@@ -614,8 +614,8 @@ bool isValidEmail (FFJSON& tname) {
 	}
 	return true;
 }
-bool isValidThingName (FFJSON& tname) {
-	if (tname.isType(FFJSON::STRING) && tname.size>0 && tname.size<=64) {
+bool isValidThingName (Txj& tname) {
+	if (tname.isType(Txj::STRING) && tname.size>0 && tname.size<=64) {
 		ccp ctname = tname;
 		for (uint i=0; i<tname.size; ++i) {
 			char c = ctname[i];
@@ -635,8 +635,8 @@ bool isValidThingName (FFJSON& tname) {
 	return true;
 }
 
-bool isValidThingDetails (FFJSON& tname) {
-	if (tname.isType(FFJSON::STRING) && tname.size<=256) {
+bool isValidThingDetails (Txj& tname) {
+	if (tname.isType(Txj::STRING) && tname.size<=256) {
 		ccp ctname = tname;
 		for (uint i=0; i<tname.size; ++i) {
 			char c = ctname[i];
@@ -651,9 +651,9 @@ bool isValidThingDetails (FFJSON& tname) {
 	return true;
 }
 
-bool isValidLocation (FFJSON& cloc) {
-	if (cloc.isType(FFJSON::ARRAY) && cloc.size==2) {
-		if (cloc[0].isType(FFJSON::NUMBER) && cloc[1].isType(FFJSON::NUMBER)) {
+bool isValidLocation (Txj& cloc) {
+	if (cloc.isType(Txj::ARRAY) && cloc.size==2) {
+		if (cloc[0].isType(Txj::NUMBER) && cloc[1].isType(Txj::NUMBER)) {
 			return true;
 		}
 	}
@@ -666,8 +666,8 @@ static size_t onCurlResponse (void* contents, size_t size, size_t nmemb,
 	output->append((char*)contents, totalSize);
 	return totalSize;
 }
-vector<FFJSON*> usersId;
-HTML_* thingToHtml (FFJSON& thn) {
+vector<Txj*> usersId;
+HTML_* thingToHtml (Txj& thn) {
 	int numPics= thn["pics"].size;
 	ccp username= thn["user"]["name"];
 	strcpy(lusrnm, username); tolower(lusrnm);
@@ -717,10 +717,9 @@ HTML_* thingToHtml (FFJSON& thn) {
 	return pThn;
 }
 
-int ffDefault (string& bid, Txo& rbs, shared_mutex& rbsmtx, Txo& ffHttp,
-					Txo& reply, MkHttpArgs& mhArgs, auto& now) {
+int ffDefault (string& bid, Txj& rbs, Txj& ffHttp,
+					Txj& reply, MkHttpArgs& mhArgs, auto& now) {
 	bool bidset= false;
-	rbsmtx.lock_shared();
 	if (bid.length()) {
 		if(rbs.find(bid)!=rbs.end())
 			goto gotbid;
@@ -733,19 +732,13 @@ int ffDefault (string& bid, Txo& rbs, shared_mutex& rbsmtx, Txo& ffHttp,
 		bid= random_alphnuma_string();
 		goto bidcheck;
 	}
-	rbsmtx.unlock_shared();
-	rbsmtx.lock();
-	rbs[bid];
-	rbsmtx.unlock();
-	rbsmtx.lock_shared();
 	rbs[bid]["ip"]= (ccp)ffHttp["ip"];
   gotbid:
-	Txo& rbip= rbs[bid]["ip"];
+	Txj& rbip= rbs[bid]["ip"];
 	if (!rbip || (strcmp(rbip, ffHttp["ip"]) && false)) {
 		goto newbid;
 	}
-	rbsmtx.unlock_shared();
-	FFJSON& rbsid= rbs[bid];
+	Txj& rbsid= rbs[bid];
 	rbsid["ts"]= now;
 	reply["bid"]= bid;
 	if (bidset) {
@@ -765,7 +758,7 @@ int ffDefault (string& bid, Txo& rbs, shared_mutex& rbsmtx, Txo& ffHttp,
 	// }
 	return 0;
 }
-int mkHtmlThings (Txo& ffHttp, Txo& reply, Pts& pts, int numThings, int dir,
+int mkHtmlThings (Txj& ffHttp, Txj& reply, Pts& pts, int numThings, int dir,
 						string srch, string loc, bool init= false) {
 	HTML_* pageHtml= indexHtml.cloneNode();
 	HTML_& header= pageHtml->getElementById("header");
@@ -775,7 +768,7 @@ int mkHtmlThings (Txo& ffHttp, Txo& reply, Pts& pts, int numThings, int dir,
 	srchH.setAttribute("value", srch);
 	HTML_* thingsDiv= new HTML_("<div id=\"things\"></div>");
 	for (int i= 0; i < numThings; ++i) {
-		FFJSON* thn= &reply["things"][i];
+		Txj* thn= &reply["things"][i];
 		HTML_* thingHtml= thingToHtml(*thn);
 		thingsDiv->insertAdjacentElement("beforeEnd", *thingHtml);
 	}
@@ -807,13 +800,13 @@ int mkHtmlThings (Txo& ffHttp, Txo& reply, Pts& pts, int numThings, int dir,
 	return mkHttpRes(ffHttp, htmlResponse.c_str(), "text/html", -1, 200, "OK",
 						  nullptr);
 }
-int ffUsers (Txo& ffHttp, Txo& users) {
-	Txo::Iterator it= users.begin();
+int ffUsers (Txj& ffHttp, Txj& users) {
+	Txj::Iterator it= users.begin();
 	HTML_ usersDiv("<div id=\"users\"></div>");
 	while (it!=users.end()) {
 		ccp un= it;
 		if (strstr(un, "@")) {++it;continue;}
-		Txo& user= *it;
+		Txj& user= *it;
 		if (!user) {++it; users.erase(un); continue;}
 		if (user["inactive"]) {++it;continue;}
 		ccp cun= user["name"];
@@ -832,8 +825,8 @@ int ffUsers (Txo& ffHttp, Txo& users) {
 						  "OK", nullptr);	
 }
 int ffSearch (
-	FFJSON& payload, Txo& rbs, FFJSON& rbsid, FFJSON& tUsr, FFJSON& reply,
-	FFJSON& ffHttp, bool noJs, long& lepoch, Txo& users, Txo& query,
+	Txj& payload, Txj& rbs, Txj& rbsid, Txj& tUsr, Txj& reply,
+	Txj& ffHttp, bool noJs, long& lepoch, Txj& users, Txj& query,
 	ccp username
 ) {
 	ccp qSrch= query["search"];
@@ -843,7 +836,7 @@ int ffSearch (
 	string srchStr(qSrch);
 	decodeURIComponent(srchStr);
 	BidThings_& bts= bidThings[rbsid.val.fptr];
-	set<FFJSON*>& mdts= bts.mdts;
+	set<Txj*>& mdts= bts.mdts;
 	Pts& pts= (noJs||srchStr.length())?bts.search:bts.all;
 	pts= Pts();
 	if (payload["locked"]) { //just opened the page
@@ -871,11 +864,11 @@ int ffSearch (
 		//cvMod.notify_all();
 		addSearchNoDups(pts, reply, mdts, pni, !noJs);
 	} else { //url with username
-		Txo* txTName= &tUsr["name"];
+		Txj* txTName= &tUsr["name"];
 		reply["tname"]= txTName;
 		reply["tdesc"]= &tUsr["desc"];
-		Txo& uts= tUsr["things"];
-		Txo& ruts= reply["things"];
+		Txj& uts= tUsr["things"];
+		Txj& ruts= reply["things"];
 		if (query["thing"]) {
 			if (uts.size) {
 				int tind= getIdChildInd(uts, atoi(query["thing"]));
@@ -888,9 +881,9 @@ int ffSearch (
 	}
 	if (payload["locked"] && username) { //just opened the page
 		rbsid["urts"]= lepoch;
-		FFJSON& user= users[lusrnm];
+		Txj& user= users[lusrnm];
 		addSmtgsToReply(users, user, reply, mdts, true, tUsr?&tUsr==&user:0);
-		Txo& wpSub= rbsid["wpSub"];
+		Txj& wpSub= rbsid["wpSub"];
 		if (wpSub)
 			reply["wpSub"]= &wpSub;
 		setSavMtx.lock();
@@ -910,12 +903,12 @@ int ffSearch (
 	return -1;
 }
 
-int ffPts (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
-			  FFJSON& cookie, Txo& query) {
+int ffPts (Txj& payload, Txj& rbsid, Txj& reply, Txj& ffHttp,
+			  Txj& cookie, Txj& query) {
 	flNtc(FL, "pts:");
 	bool noJs= cookie["js"]? false : true;
 	BidThings_& bts= bidThings[rbsid.val.fptr];
-	set<FFJSON*>& mdts= bts.mdts;
+	set<Txj*>& mdts= bts.mdts;
 	bool isSearch= noJs? true : payload["search"];
 	Pts& pts= isSearch? bts.search : bts.all;
 	int dir = noJs? atoi(query["dir"]) : payload["dir"];
@@ -942,18 +935,18 @@ int ffPts (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 		qtMtx.unlock_shared();
 		//--searchCv;
 		//cvMod.notify_all();
-		addSearchNoDups(pts, reply, mdts, pni, false);
+		addSearchNoDups(pts, reply, mdts, pni);
 	} else {
 		int i= tpts-20, j=0;
 		if (tpts>pni) tpts= pni;
 		for (; i < tpts; ++i,++j) {
 			NdNPrn& nd= pts.pts[i];
-			FFJSON* f;
+			Txj* f;
 			if (nd.prn==(QuadNode*)-1) {
-				f= (FFJSON*)nd.qh;
+				f= (Txj*)nd.qh;
 			} else {
 				auto aa= getNode(nd);
-				f= (FFJSON*)get<0>(aa);
+				f= (Txj*)get<0>(aa);
 			}
 			reply["things"][j]= f;
 		}
@@ -968,14 +961,14 @@ int ffPts (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 	}
 	return -1;
 }
-int ffSignIn (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
-				  FFJSON& users, string& bid, long& lepoch, Txo& rbs) {
+int ffSignIn (Txj& payload, Txj& rbsid, Txj& reply, Txj& ffHttp,
+				  Txj& users, string& bid, long& lepoch, Txj& rbs) {
 	flNtc(FL, "SignIn");
 	ccp username= payload["username"], password= payload["password"];
 	if(username) {strcpy(lusrnm, username); tolower(lusrnm);}
 	flNtc(FL, "\nUser: %s\nPass: %s", username, password);
 	ccp gid= payload["gid"];
-	FFJSON fres;
+	Txj fres;
 	if (!password) {
 		if (!gid)
 			return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
@@ -1003,7 +996,7 @@ int ffSignIn (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 		strcpy(lusrnm, (ccp)fres["email"]);
 	}
 	flNtcCntnu(FL, "lusrnm: %s\n", lusrnm);
-	FFJSON& user= users[(ccp)lusrnm];
+	Txj& user= users[(ccp)lusrnm];
 	if (!user) {
 		return mkHttpRes(ffHttp, "{\"signin\":\"false\"}", jsonMime);
 	}
@@ -1015,7 +1008,7 @@ int ffSignIn (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 		user["bid"]= bid;
 		rbsid["urts"]= lepoch;
 		addSmtgsToReply(users, user, reply, bidThings[rbsid.val.fptr].mdts);
-		Txo& wpSub= rbsid["wpSub"];
+		Txj& wpSub= rbsid["wpSub"];
 		if (wpSub) {
 			reply["wpSub"]=&wpSub;
 		}
@@ -1028,12 +1021,12 @@ int ffSignIn (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 		return mkHttpRes(ffHttp, "\{\"signin\":\"false\"}", jsonMime);
 	}
 }
-int ffSignOut (Txo& user, Txo& rbsid) {
-	user["bid"]= nullFFJSON;
-	rbsid["user"]= nullFFJSON;
+int ffSignOut (Txj& user, Txj& rbsid) {
+	user["bid"]= nullTxj;
+	rbsid["user"]= nullTxj;
 	return 0;
 }
-int ffSignOutRes (Txo& ffHttp, Txo& user, Txo& rbs, Txo& rbsid) {
+int ffSignOutRes (Txj& ffHttp, Txj& user, Txj& rbs, Txj& rbsid) {
 	ffSignOut(user,rbsid);
 	setSavMtx.lock();
 	pFSetToSave.insert(&rbs);
@@ -1041,14 +1034,14 @@ int ffSignOutRes (Txo& ffHttp, Txo& user, Txo& rbs, Txo& rbsid) {
 	return mkHttpRes(ffHttp, "{\"signOut\":true}", jsonMime);
 }
 
-int ffOwl (Txo& user, Txo& payload, ccp username, Txo& ffHttp,
-			  Txo& users, long& lepoch, Txo& rbs, Txo& rbsid) {
-	FFJSON& things= user["things"];
-	FFJSON& smsgs= user["smsgs"];
-	FFJSON& reps= user["reps"];
+int ffOwl (Txj& user, Txj& payload, ccp username, Txj& ffHttp,
+			  Txj& users, long& lepoch, Txj& rbs, Txj& rbsid) {
+	Txj& things= user["things"];
+	Txj& smsgs= user["smsgs"];
+	Txj& reps= user["reps"];
 	int smind= smsgs.size;
-	FFJSON& fQs= payload["Qs"];
-	FFJSON::Iterator it;
+	Txj& fQs= payload["Qs"];
+	Txj::Iterator it;
 	long urts;
 	long lmts;
 	int i,j;
@@ -1061,15 +1054,15 @@ int ffOwl (Txo& user, Txo& payload, ccp username, Txo& ffHttp,
 		if (!strcmp(tuser, lusrnm)) {
 			return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
 		}
-		FFJSON::Iterator tit;
+		Txj::Iterator tit;
 		if (tuser) {
 			tit= users.find(tuser);
 		}
 		if (!tuser || tit==users.end()) {
 			return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
 		}
-		FFJSON& tfuser= users[tuser];
-		FFJSON& tfthings= tfuser["things"];
+		Txj& tfuser= users[tuser];
+		Txj& tfthings= tfuser["things"];
 		tit= it->begin();
 		while (tit!=it->end()) {
 			ccp ctid= (ccp)tit;
@@ -1081,12 +1074,8 @@ int ffOwl (Txo& user, Txo& payload, ccp username, Txo& ffHttp,
 			if (tind<0) {
 				return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
 			}
-			TxoMtxMapMtx.lock();
-			Txo& tfthing= tfthings[tind];
-			FFJSON& rmsgs= tfthing["rmsgs"];
-			shared_mutex& rmtx= TxoMtxMap[&rmsgs];
-			TxoMtxMapMtx.unlock();
-			rmtx.lock();
+			Txj& tfthing= tfthings[tind];
+			Txj& rmsgs= tfthing["rmsgs"];
 			if (!rmsgs) {
 				rmsgs.init("[]");
 			}
@@ -1097,9 +1086,8 @@ int ffOwl (Txo& user, Txo& payload, ccp username, Txo& ffHttp,
 				rmid= (int)rmsgs[rmind-1]["id"]+1;
 			}
 			rmsgs[rmind]["id"]= rmid;
-			rmtx.unlock();
 			rmsgs[rmind]["user"]= (ccp)lusrnm;
-			Txo& frmsg= rmsgs[rmind]["msg"];
+			Txj& frmsg= rmsgs[rmind]["msg"];
 			frmsg= *tit;
 			rmsgs[rmind]["ts"]= lepoch;
 			rmsgs[rmind]["new"]= true;
@@ -1110,8 +1098,8 @@ int ffOwl (Txo& user, Txo& payload, ccp username, Txo& ffHttp,
 			smsgs[smind][2]= rmid;
 			ccp tbid= tfuser["bid"];
 			if (tbid) {
-				Txo& trbsid= rbs[tbid];
-				Txo pld; pld["user"]= &user["name"];
+				Txj& trbsid= rbs[tbid];
+				Txj pld; pld["user"]= &user["name"];
 				pld["tid"]= tid;
 				pld["thingName"]= &tfthing["name"];
 				pld["msg"]= &frmsg;
@@ -1131,7 +1119,7 @@ int ffOwl (Txo& user, Txo& payload, ccp username, Txo& ffHttp,
 	pFSetToSave.insert(&user);
 	setSavMtx.unlock();
   rqs://mark query as read
-	FFJSON& fRs= payload["Rs"];
+	Txj& fRs= payload["Rs"];
 	if (!fRs) {
 		goto rrs;
 	}
@@ -1146,8 +1134,8 @@ int ffOwl (Txo& user, Txo& payload, ccp username, Txo& ffHttp,
 		if (tind<0) {
 			return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
 		}
-		FFJSON& rmsgs= things[tind]["rmsgs"];
-		FFJSON::Iterator tit= it->begin();
+		Txj& rmsgs= things[tind]["rmsgs"];
+		Txj::Iterator tit= it->begin();
 		while (tit!=it->end()) {
 			int mid= (int)*tit;
 			mid= getIdChildInd(rmsgs, mid);
@@ -1164,7 +1152,7 @@ int ffOwl (Txo& user, Txo& payload, ccp username, Txo& ffHttp,
 	pFSetToSave.insert(&user);
 	setSavMtx.unlock();
   rrs://mark received replies as read
-	FFJSON& frrs= payload["rrs"];
+	Txj& frrs= payload["rrs"];
 	if (!frrs) {
 		goto news;
 	}
@@ -1191,9 +1179,9 @@ int ffOwl (Txo& user, Txo& payload, ccp username, Txo& ffHttp,
 		goto rnews;
 	}
 	for (int i= 0; i<things.size; ++i) {
-		FFJSON& rmsgs= things[i]["rmsgs"];
+		Txj& rmsgs= things[i]["rmsgs"];
 		for (int j= 0;j<rmsgs.size;++j) {
-			FFJSON& msg= rmsgs[j];
+			Txj& msg= rmsgs[j];
 			long mts= (long)msg["ts"];
 			if (mts<urts) {
 				continue;
@@ -1216,12 +1204,12 @@ int ffOwl (Txo& user, Txo& payload, ccp username, Txo& ffHttp,
 	do {
 		--i;
 		int smind= reps[i];
-		FFJSON& smsg= smsgs[smind];
-		FFJSON& tusrts= users[(ccp)smsg[0]]["things"];
+		Txj& smsg= smsgs[smind];
+		Txj& tusrts= users[(ccp)smsg[0]]["things"];
 		int tind= getIdChildInd(tusrts, (int)smsg[1]);
-		FFJSON& trmsgs= tusrts[tind]["rmsgs"];
+		Txj& trmsgs= tusrts[tind]["rmsgs"];
 		int mind= getIdChildInd(trmsgs, (int)smsg[2]);
-		FFJSON& rep= payload["rnews"][j];
+		Txj& rep= payload["rnews"][j];
 		rep= smsg;
 		rep[3]= trmsgs[mind]["rep"];
 		rep[4]= smind;
@@ -1232,7 +1220,7 @@ int ffOwl (Txo& user, Txo& payload, ccp username, Txo& ffHttp,
 		lmts= (long)reps[i];
 	} while (urts<lmts);
   reps://post reply to target user thing
-	FFJSON& fRps= payload["Reps"];
+	Txj& fRps= payload["Reps"];
 	if (!fRps) {
 		goto owldone;
 	}
@@ -1247,9 +1235,9 @@ int ffOwl (Txo& user, Txo& payload, ccp username, Txo& ffHttp,
 		if (tind<0) {
 			return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
 		}
-		Txo& tfthing= things[tind];
-		FFJSON& rmsgs= tfthing["rmsgs"];
-		FFJSON::Iterator tit= it->begin();
+		Txj& tfthing= things[tind];
+		Txj& rmsgs= tfthing["rmsgs"];
+		Txj::Iterator tit= it->begin();
 		while (tit!=it->end()) {
 			int mid= stoi((ccp)tit);
 			int mind= getIdChildInd(rmsgs, mid);
@@ -1257,14 +1245,14 @@ int ffOwl (Txo& user, Txo& payload, ccp username, Txo& ffHttp,
 				return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
 			}
 			smind= smsgs.size;
-			Txo& frmsg= rmsgs[mind]["rep"];
+			Txj& frmsg= rmsgs[mind]["rep"];
 			frmsg= *tit;
 			smsgs[smind].init("[]");
 			smsgs[smind][0]= "";
 			smsgs[smind][1]= tid;
 			smsgs[smind][2]= mid;
-			FFJSON& tusr= users[(ccp)rmsgs[mind]["user"]];
-			FFJSON& treps= tusr["reps"];
+			Txj& tusr= users[(ccp)rmsgs[mind]["user"]];
+			Txj& treps= tusr["reps"];
 			if (!treps) {
 				treps.init("[]");
 			}
@@ -1272,8 +1260,8 @@ int ffOwl (Txo& user, Txo& payload, ccp username, Txo& ffHttp,
 			treps[treps.size]= lepoch;
 			ccp tbid= tusr["bid"];
 			if (tbid) {
-				Txo& trbsid= rbs[tbid];
-				Txo pld; pld["user"]= &user["name"];
+				Txj& trbsid= rbs[tbid];
+				Txj pld; pld["user"]= &user["name"];
 				pld["tid"]= tid;
 				pld["thingName"]= &tfthing["name"];
 				pld["msg"]= &frmsg;
@@ -1295,20 +1283,20 @@ int ffOwl (Txo& user, Txo& payload, ccp username, Txo& ffHttp,
 	rbsid["urts"]= lepoch;
 	return mkHttpRes(ffHttp, payload);
 }
-int ffSleep (Txo& ffHttp, Txo& query) {
+int ffSleep (Txj& ffHttp, Txj& query) {
 	int sd= atoi((ccp)query["time"]);
 	sleep(sd);
 	sprintf(mesg, "slept for %d", sd);
 	return mkHttpRes(ffHttp, mesg);
 }
-int ffActivate (Txo& ffHttp, Txo& query, Txo& users, long& lepoch,
+int ffActivate (Txj& ffHttp, Txj& query, Txj& users, long& lepoch,
 					 ccp username) {
 	username= query["user"];
 	if (!username) {
 		return mkHttpRes(ffHttp, yay, jsonMime, -1, 400);
 	}
 	strcpy(lusrnm, username); tolower(lusrnm);
-	FFJSON& user= users[(ccp)lusrnm];
+	Txj& user= users[(ccp)lusrnm];
 	if ((!user["password"] || !user["inactive"]) && !user["newpassword"]) {
 		return mkHttpRes(ffHttp, "{\"error\":\"wrongKey\"}", jsonMime, -1, 400);
 	} else if (!strcmp(user["activationKey"],query["key"])) {
@@ -1334,9 +1322,9 @@ int ffActivate (Txo& ffHttp, Txo& query, Txo& users, long& lepoch,
 	} 
 	return mkHttpRes(ffHttp, "{\"error\":\"wrongKey\"}", jsonMime, -1, 400);
 }
-int ffSendUsrThings (Txo& ffHttp, Txo& reply, Txo& query, Txo& tUsr) {
-	Txo& rthns= reply["things"];
-	Txo& uthns= tUsr["things"];
+int ffSendUsrThings (Txj& ffHttp, Txj& reply, Txj& query, Txj& tUsr) {
+	Txj& rthns= reply["things"];
+	Txj& uthns= tUsr["things"];
 	if (query["thing"]) {
 		rthns.init("[]");
 		rthns[0]= &uthns[getIdChildInd(uthns, atoi(query["thing"]))];
@@ -1347,11 +1335,11 @@ int ffSendUsrThings (Txo& ffHttp, Txo& reply, Txo& query, Txo& tUsr) {
 	Pts pts; return mkHtmlThings(
 		ffHttp, reply, pts, rthns->size, 0, "", "0,0", true);
 }
-int ffUpdThn (Txo& ffHttp, Txo& reply, Txo& user, Txo& payload,
-				  long& lepoch, Txo& users) {
+int ffUpdThn (Txj& ffHttp, Txj& reply, Txj& user, Txj& payload,
+				  long& lepoch, Txj& users) {
 	if (payload["things"]) {
-		FFJSON& cthings= payload["things"];
-		FFJSON& uthings= user["things"];
+		Txj& cthings= payload["things"];
+		Txj& uthings= user["things"];
 		bool newthing= false;
 		int id= 0;
 		if (!(bool)uthings) {
@@ -1365,8 +1353,8 @@ int ffUpdThn (Txo& ffHttp, Txo& reply, Txo& user, Txo& payload,
 				return mkHttpRes(ffHttp, "{\"error\":\"sizeExceeded\"}", jsonMime,
 									  -1, 400);
 			}
-			FFJSON& fcthing= cthings[i];
-			FFJSON& fcname= fcthing["name"];
+			Txj& fcthing= cthings[i];
+			Txj& fcname= fcthing["name"];
 			string cname((ccp)fcname);
 			if (!isValidThingName(fcname)) {
 				return mkHttpRes(ffHttp, "{\"error\":\"invalidThingName\"}",
@@ -1378,14 +1366,14 @@ int ffUpdThn (Txo& ffHttp, Txo& reply, Txo& user, Txo& payload,
 			cthings[i].erase("user");
 			vector<string> mstr;
 			vector<uint> ina;
-			FFJSON& fcloc= fcthing["location"];
-			FFJSON& futhing= j<0?uthings[uthings.size]:uthings[j];
-			FFJSON& funame= futhing["name"];
+			Txj& fcloc= fcthing["location"];
+			Txj& futhing= j<0?uthings[uthings.size]:uthings[j];
+			Txj& funame= futhing["name"];
 			bool moded= false;
 			if (j<0) {
 				j= uthings.size;
 				futhing["id"]= j>1?(int)uthings[j-2]["id"]+1:1;
-				FFJSON& ln= futhing["user"].addLink(users, lusrnm);
+				Txj& ln= futhing["user"].addLink(users, lusrnm);
 				if (!ln)
 					delete &ln;
 				funame= fcname;
@@ -1400,8 +1388,8 @@ int ffUpdThn (Txo& ffHttp, Txo& reply, Txo& user, Txo& payload,
 				moded= true;
 			} else {
 				string uname(funame?(ccp)funame:"");
-				FFJSON::trimWhites(cname);
-				FFJSON::trimWhites(uname);
+				Txj::trimWhites(cname);
+				Txj::trimWhites(uname);
 				tolower(cname);
 				tolower(uname);
 				if (!uname.length()) {
@@ -1412,7 +1400,7 @@ int ffUpdThn (Txo& ffHttp, Txo& reply, Txo& user, Txo& payload,
 				mstr= metaname(uname+" "+lusrnm);
 				if (cname!=uname) {
 					for (int k=0; k<mstr.size(); ++k) {
-						map<string, FFJSON*>::iterator it =
+						map<string, Txj*>::iterator it =
 							nameints->find(mstr[k]);
 						if (it->second->val.number==1) {
 							mitposMtx.lock();
@@ -1429,7 +1417,7 @@ int ffUpdThn (Txo& ffHttp, Txo& reply, Txo& user, Txo& payload,
 					funame= fcname;
 				}
 			  updateLoc:
-				FFJSON& fuloc = futhing["location"];
+				Txj& fuloc = futhing["location"];
 				if (!isValidLocation(fcloc)) {
 					return mkHttpRes(ffHttp, 
 										  "{\"error\":\"invalidLocation\"}", jsonMime, -1, 400);
@@ -1453,7 +1441,7 @@ int ffUpdThn (Txo& ffHttp, Txo& reply, Txo& user, Txo& payload,
 					//cvSrch.notify_all();
 				}
 			}
-			FFJSON& fcthnDtls= fcthing["details"];
+			Txj& fcthnDtls= fcthing["details"];
 			if (fcthnDtls) {
 				if (isValidThingDetails(fcthnDtls)) {
 					futhing["details"]= fcthnDtls;
@@ -1467,7 +1455,7 @@ int ffUpdThn (Txo& ffHttp, Txo& reply, Txo& user, Txo& payload,
 				mstr= metaname(cname+" "+lusrnm);
 				for (int k=0; k<mstr.size(); ++k) {
 					mitposMtx.lock();
-					map<string, FFJSON*>::iterator it=
+					map<string, Txj*>::iterator it=
 						nameints->find(mstr[k]);
 					if (it==nameints->end()) {
 						(*fnameints)[mstr[k]]= 1;
@@ -1498,8 +1486,8 @@ int ffUpdThn (Txo& ffHttp, Txo& reply, Txo& user, Txo& payload,
 	setSavMtx.unlock();
 	return mkHttpRes(ffHttp, reply);
 }
-int ffupload (Txo& ffHttp, Txo& reply, Txo& user, long& lepoch,
-				  Txo& users, Txo& query, int& cfgMaxThings,
+int ffupload (Txj& ffHttp, Txj& reply, Txj& user, long& lepoch,
+				  Txj& users, Txj& query, int& cfgMaxThings,
 				  int& cfgMaxThingPics, ccp cpld) {
 	int uMaxThings = user["maxThings"];
 	int uMaxThingPics = user["maxThingPics"];
@@ -1511,7 +1499,7 @@ int ffupload (Txo& ffHttp, Txo& reply, Txo& user, long& lepoch,
 	int chnkSz= atoi(query["chunkSize"]);
 	int ttlSz = atoi(query["totalSize"]);
 	int thngi = -1;
-	FFJSON& uthings = user["things"];
+	Txj& uthings = user["things"];
 	if (thingId < 0) {
 		if (uthings && uthings.size>=maxThings) {
 			flNtc (
@@ -1557,7 +1545,7 @@ int ffupload (Txo& ffHttp, Txo& reply, Txo& user, long& lepoch,
 		if (!uthings[thngi]["user"]) {
 			uthings[thngi]["user"].addLink(users, lusrnm);
 		}
-		FFJSON& ups= uthings[thngi]["pics"];
+		Txj& ups= uthings[thngi]["pics"];
 		ups[picId]["partial"]= true;
 		ofmode= std::ios::trunc;
 	} else {
@@ -1589,8 +1577,8 @@ int ffupload (Txo& ffHttp, Txo& reply, Txo& user, long& lepoch,
 	reply["picId"]= picId;
 	return mkHttpRes(ffHttp, reply);
 }
-int ffSignUp (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
-				  FFJSON& users, string& bid, long& lepoch, Txo& rbs, ccp username, ccp password, ccp proto, auto& now) {
+int ffSignUp (Txj& payload, Txj& rbsid, Txj& reply, Txj& ffHttp,
+				  Txj& users, string& bid, long& lepoch, Txj& rbs, ccp username, ccp password, ccp proto, auto& now) {
 	//signup
 	bool recovery= false;
 	flNtc(FL, "Signup");
@@ -1615,7 +1603,7 @@ int ffSignUp (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 							  "{\"actEmailSent\":-4,\"msg\":\"Captcha mismatch, hmm!\"}",
 							  jsonMime);
 	}
-	FFJSON& user= username?users[(ccp)lusrnm]:email?users[email]:nullFFJSON;
+	Txj& user= username?users[(ccp)lusrnm]:email?users[email]:nullTxj;
 	if (email) {
 		recovery=true;
 		if (!user) {
@@ -1642,7 +1630,7 @@ int ffSignUp (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 		curl_easy_cleanup(curl);
 
 		if (res != CURLE_OK) return mkHttpRes(ffHttp, "{\"error\":4}", jsonMime);
-		FFJSON fres(readBuffer);
+		Txj fres(readBuffer);
 		if (!fres["aud"])
 			return mkHttpRes(ffHttp, "{\"signin\":\"false\"}", jsonMime);
 		email= fres["email"];
@@ -1719,8 +1707,8 @@ int ffSignUp (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 	}
 		
 	if (!recovery) {
-		FFJSON::FeaturedMember fm,pfm;
-		pfm = users.getFeaturedMember(FFJSON::FM_FILE);
+		Txj::FeaturedMember fm,pfm;
+		pfm = users.getFeaturedMember(Txj::FM_FILE);
 		int pfnl=strlen(pfm.m_sFileName)-1;
 		while (pfm.m_sFileName[pfnl]!='/' && pfnl>=0) {
 			--pfnl;
@@ -1742,9 +1730,9 @@ int ffSignUp (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 			rbsid["ip"]= (ccp)ffHttp["ip"];
 			rbsid["urts"]= lepoch;
 		}
-		(*user).setEFlag(FFJSON::CASTFILE);
-		(*user).setEFlag(FFJSON::FILE);
-		(*user).insertFeaturedMember(fm, FFJSON::FM_FILE);
+		(*user).setEFlag(Txj::CASTFILE);
+		(*user).setEFlag(Txj::FILE);
+		(*user).insertFeaturedMember(fm, Txj::FM_FILE);
 		setSavMtx.lock();
 		pFSetToSave.insert(&users);
 		setSavMtx.unlock();
@@ -1764,21 +1752,20 @@ int ffSignUp (FFJSON& payload, FFJSON& rbsid, FFJSON& reply, FFJSON& ffHttp,
 		"{\"actEmailSent\":2,\"msg\":\"Activation mail sent to ur email :D\"}", jsonMime);
 }
 
-int ferryfair (FFJSON& ffHttp) {
+int ferryfair (Txj& ffHttp) {
 	MkHttpArgs& mhArgs= ffHttp["resArgs"];
-	FFJSON reply;
-	static FFJSON& ffcfg= *pffcfg;
-	static FFJSON& rbs= *prbs;
-	static FFJSON& users= *pusers;
+	Txj reply;
+	static Txj& ffcfg= *pffcfg;
+	static Txj& rbs= *prbs;
+	static Txj& users= *pusers;
 	static int cfgMaxThings= ffcfg["maxThings"];
 	static int cfgMaxThingPics= ffcfg["maxThingPics"];
-	static shared_mutex& rbsmtx= ffFileMtx[prbs];
 	ccp referer= nullptr;char proto[8]= "https"; int protolen;
 	ccp username= nullptr, password= nullptr, cpld= nullptr;
 	ccp path;
 	string bid;
-	FFJSON& cookie= ffHttp["cookie"];
-	FFJSON payload;
+	Txj& cookie= ffHttp["cookie"];
+	Txj payload;
 	size_t req= 0;
 	flNtc(FL, "cookie[bid]: %s", (ccp)cookie["bid"]);
 	if (cookie["bid"]) {
@@ -1811,19 +1798,19 @@ int ferryfair (FFJSON& ffHttp) {
 	if (!strncasecmp(path, "users/", 6)) {
 		return ffUsers(ffHttp, users);
 	}
-	FFJSON& query = ffHttp["query"];
+	Txj& query = ffHttp["query"];
 	if ((ccp)query["req"]) {
 		req = fnv1a((ccp)query["req"]);
 		flDbg(FL, "req: %zu", req);
 	}
-	FFJSON& tUsr= (path && path[0]!='\0' && strcpy(lusrnm, path) &&
-						tolower(lusrnm))? users[(ccp)lusrnm] : nullFFJSON;
+	Txj& tUsr= (path && path[0]!='\0' && strcpy(lusrnm, path) &&
+						tolower(lusrnm))? users[(ccp)lusrnm] : nullTxj;
 	cpld= ffHttp["payload"];
 	ccp ctype= ffHttp["content-type"];
 	if (cpld && ctype && strstr(ctype, "json")) {
 		payload.init(cpld);
 	}
-	int defRet= ffDefault(bid, rbs, rbsmtx, ffHttp, reply, mhArgs, now);
+	int defRet= ffDefault(bid, rbs, ffHttp, reply, mhArgs, now);
 	if (defRet>1) {
 		return defRet;
 	}
@@ -1838,7 +1825,7 @@ int ferryfair (FFJSON& ffHttp) {
 		break;
 	}
 
-	FFJSON& rbsid= rbs[bid];
+	Txj& rbsid= rbs[bid];
 	bool noJs= cookie["js"]? false : true; 
 	if (!rbsid) {
 		if (tUsr) {
@@ -1856,7 +1843,7 @@ int ferryfair (FFJSON& ffHttp) {
 		cap randcap(randstr, tempPath, 7, 288, 68, 40, 80, 48);
 		rbsid["captcha"]= randstr;
 		randcap.save();
-		rbs.clearEFlag(FFJSON::FILE);
+		rbs.clearEFlag(Txj::FILE);
 		setSavMtx.lock();
 		pFSetToSave.insert(&rbs);
 		setSavMtx.unlock();
@@ -1892,7 +1879,7 @@ int ferryfair (FFJSON& ffHttp) {
 			else return 1;
 		else return 0;
 	
-	FFJSON& user= users[lusrnm];
+	Txj& user= users[lusrnm];
 
 	switch (req) {
 	case "signOut"_hash: {
@@ -1918,32 +1905,32 @@ int ferryfair (FFJSON& ffHttp) {
 	return 0;
 }
 
-void makeThngsTree (Txo& cfg) {
+void makeThngsTree (Txj& cfg) {
 	fnameints= &cfg["nameints"];
 	nameints= fnameints->val.pairs;
-	map<string, FFJSON*>::iterator nit= nameints->begin();
-	multiset<map<string, FFJSON*>::iterator, CompNameWt> namewtset(cmpNmWt);
+	map<string, Txj*>::iterator nit= nameints->begin();
+	multiset<map<string, Txj*>::iterator, CompNameWt> namewtset(cmpNmWt);
 	while (nit!=nameints->end()) {
 		namewtset.insert(nit);
 		++nit;
 	}
 	uint i=0;
-	multiset<map<string, FFJSON*>::iterator, CompNameWt>::iterator mit
+	multiset<map<string, Txj*>::iterator, CompNameWt>::iterator mit
 		= namewtset.begin();
 	while (mit!=namewtset.end()) {
 		mitpos[&((*mit)->first)]= i;
 		++i;
 		++mit;
 	}
-	FFJSON& users= cfg["users"];
-	FFJSON::Iterator it= users.begin();
-	FFJSON::Iterator tit;
+	Txj& users= cfg["users"];
+	Txj::Iterator it= users.begin();
+	Txj::Iterator tit;
 	int ic= 0;
 	vector<string> bmstr= metaname("flat gowtham");
 	vector<uint> bina= nametouint(bmstr);
 					
 	while (it!= users.end()) {
-		if (it->isType(FFJSON::LINK)) {
+		if (it->isType(Txj::LINK)) {
 			++it;
 			continue;
 		}
@@ -1955,16 +1942,16 @@ void makeThngsTree (Txo& cfg) {
 		usersId[id]= &(*it);
 		//adds users to nameints
 		//vector<string> musr = metaname(user);
-		FFJSON& uthings= (*it)["things"];
+		Txj& uthings= (*it)["things"];
 		//(*fnameints)[musr[0]]=uthings.size+(int)(*fnameints)[musr[0]];
 		tit= uthings.begin();
 		while (tit!=uthings.end()) {
-			if (!((*tit)["name"].isType(FFJSON::UNDEFINED) ||
-					(*tit)["location"].isType(FFJSON::UNDEFINED))) {
-				FFJSON* pF= &*tit;
+			if (!((*tit)["name"].isType(Txj::UNDEFINED) ||
+					(*tit)["location"].isType(Txj::UNDEFINED))) {
+				Txj* pF= &*tit;
 				//flDbg(FL, "inserting %d", ic);
 				//tpoolPtr->enqueue([pF, ic] (int tid) {
-					FFJSON& rF= *pF;
+					Txj& rF= *pF;
 					string tname((ccp)rF["name"]);
 					tname+= " ";
 					tname+= (ccp)rF["user"]["name"];
@@ -1980,7 +1967,7 @@ void makeThngsTree (Txo& cfg) {
 					thnsTree.insert(fq);
 					//flDbg(FL, "%d inserted %d", tid, ic);
 				//});
-				// FFJSON& rF = *pF;
+				// Txj& rF = *pF;
 				// string tname((ccp)rF["name"]);
 				// tname += (ccp)rF["user"]["name"];
 				// vector<string> mstr = metaname(tname);
@@ -2002,7 +1989,7 @@ void makeThngsTree (Txo& cfg) {
 				++ic;
 			}
 			// Circle c;
-			// c.nf=(FFJSON*)1;
+			// c.nf=(Txj*)1;
 			// printf("%s\n", (*tit)["location"].stringify().c_str());
 			// thnsTree.print(c);
 			++tit;

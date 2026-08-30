@@ -8,8 +8,8 @@
 
 std::map<std::string, unsigned int> path_id_map;
 std::map<int, std::string> id_path_map;
-std::map<int, std::list<FFJSON*>*> path_packs_map;
-std::map<FFJSON*, std::string*> pack_string_map;
+std::map<int, std::list<Txj*>*> path_packs_map;
+std::map<Txj*, std::string*> pack_string_map;
 std::map<int, bool> packs_to_send;
 #ifdef LIBWEBSOCKETS
 std::map<lws*, int> wsi_path_map;
@@ -37,7 +37,7 @@ int init_path(std::string path) {
 	if (path_id_map.find(path) == path_id_map.end()) {
 		path_id_map[path] = ++init_path_id;
 		id_path_map[init_path_id] = path;
-		path_packs_map[init_path_id] = new std::list<FFJSON*>();
+		path_packs_map[init_path_id] = new std::list<Txj*>();
 #ifdef LIBWEBSOCKETS
       path_wsi_map[init_path_id] = new std::list<lws*>();
 #endif
@@ -50,11 +50,11 @@ void terminate_path(int path) {
 	ipMutex.lock();
 	std::map<int, std::string>::iterator i = id_path_map.find(path);
 	if (i != id_path_map.end()) {
-		std::map<int, std::list<FFJSON*>*>::iterator j =
+		std::map<int, std::list<Txj*>*>::iterator j =
 				path_packs_map.find(i->first);
-		std::list<FFJSON*>::iterator k = j->second->begin();
+		std::list<Txj*>::iterator k = j->second->begin();
 		while (k != j->second->end()) {
-			std::map<FFJSON*, std::string*>::iterator l =
+			std::map<Txj*, std::string*>::iterator l =
 					pack_string_map.find(*k);
 			delete l->second;
 			pack_string_map.erase(l);
@@ -78,10 +78,10 @@ void terminate_all_paths() {
 	std::map<int, std::string>::iterator i = id_path_map.begin();
 	while (i != id_path_map.end()) {
 		std::map<int, std::string>::iterator l = i;
-		std::map<int, std::list<FFJSON*>*>::iterator j = path_packs_map.find(i->first);
-		std::list<FFJSON*>::iterator k = j->second->begin();
+		std::map<int, std::list<Txj*>*>::iterator j = path_packs_map.find(i->first);
+		std::list<Txj*>::iterator k = j->second->begin();
 		while (k != j->second->end()) {
-			std::map<FFJSON*, std::string*>::iterator l = pack_string_map.find(*k);
+			std::map<Txj*, std::string*>::iterator l = pack_string_map.find(*k);
 			delete l->second;
 			pack_string_map.erase(l);
 			delete *k;

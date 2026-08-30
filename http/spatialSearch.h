@@ -19,8 +19,8 @@ struct Circle {
    float x;
    float y;
    float r;
-   FFJSON* nf;
-   bool grabIfNearest (FFJSON& f);
+   Txj* nf;
+   bool grabIfNearest (Txj& f);
 };
 union QuadHldr;
 struct WholeQuadNode;
@@ -83,13 +83,13 @@ struct CntMut_ {
    int count= 0;
 };
 struct FFQuad_ {
-   FFJSON& rF;
+   Txj& rF;
    vector<uint>& ina;
    float lx= 0;
    float ly= 0;
    bool deleteLeaf= false;
 	bool isS= false;
-   FFQuad_ (FFJSON& rF, vector<uint>& ina, float lx= 0, float ly= 0,
+   FFQuad_ (Txj& rF, vector<uint>& ina, float lx= 0, float ly= 0,
             bool deleteLeaf = false) : rF(rF), ina(ina), lx(lx), ly(ly),
                                        deleteLeaf(deleteLeaf) {}
 };
@@ -100,17 +100,17 @@ union QuadHldr {
 	~QuadHldr ();
 	void destroy (QuadNode* pQN= nullptr, QuadNode* tQN= nullptr);
 	struct InitInsArgs_ {
-      FFJSON& rF;
+      Txj& rF;
       const vector<uint>& ina;
       float lx;
       float ly;
-      InitInsArgs_ (FFJSON& rF, const vector<uint>& ina, float lx, float ly):
+      InitInsArgs_ (Txj& rF, const vector<uint>& ina, float lx, float ly):
          rF(rF), ina(ina), lx(lx), ly(ly) {};
    };
    //QHMut_ mtx;
    QuadNode* qp;
-   FFJSON* fp;
-   set<FFJSON*>* sp;
+   Txj* fp;
+   set<Txj*>* sp;
    QuadNode* qn ();
    uint insert (
       FFQuad_& fq, float x= 0.0, float y= 0.0, uint level= 0,
@@ -123,10 +123,10 @@ union QuadHldr {
 		int8_t ind= 0
    );
    // uint getPointsFromRadius (
-   //    set<FFJSON*, CompareByDistanceToCenter>& pts, Circle& c, uint minPts=30,
+   //    set<Txj*, CompareByDistanceToCenter>& pts, Circle& c, uint minPts=30,
    //    uint level=0, float x=0, float y=0, QuadNode* pQN = nullptr
    // );
-   // uint addAllLeavesInRadius (set<FFJSON*,CompareByDistanceToCenter>& pts,
+   // uint addAllLeavesInRadius (set<Txj*,CompareByDistanceToCenter>& pts,
    //                            QuadNode* pQN);
    uint findNeighbours (Pts& pts, QuadNode* tQN= nullptr, uint8_t tind= 0,
                         QuadNode* pQN= nullptr, uint8_t ind= 0, float dx= 0.0,
@@ -148,9 +148,9 @@ union QuadHldr {
 };
 
 struct CompareByDistanceToCenter {
-   bool operator () (FFJSON* pf1, FFJSON* pf2) const {
-      FFJSON& f1= *pf1;
-      FFJSON& f2= *pf2;
+   bool operator () (Txj* pf1, Txj* pf2) const {
+      Txj& f1= *pf1;
+      Txj& f2= *pf2;
       float x1= f1["location"][0];
       float y1= f1["location"][1];
       float x2= f2["location"][0];
@@ -200,16 +200,16 @@ tuple<void*,int8_t> getNode (NdNPrn n);
 // tuple<void*, int8_t> bpxor (T* a, U* b);
 vector<string> metaname (string name);
 vector<uint> nametouint (vector<string>& mstr);
-int getIdChildInd (FFJSON& arr, int id);
-extern map<string, FFJSON*>* nameints;
-extern FFJSON* fnameints;
+int getIdChildInd (Txj& arr, int id);
+extern map<string, Txj*>* nameints;
+extern Txj* fnameints;
 extern map<const string*, uint> mitpos;
 extern mutex mitposMtx;
 extern QuadHldr thnsTree;
 struct CompNameWt {
-   bool operator () (const map<string, FFJSON*>::iterator it1,
-                     const map<string, FFJSON*>::iterator it2) const;
+   bool operator () (const map<string, Txj*>::iterator it1,
+                     const map<string, Txj*>::iterator it2) const;
 };
 extern CompNameWt cmpNmWt;
-int8_t ffHasName (FFJSON& ff, vector<uint>& ina, bool allIna= false);
+int8_t ffHasName (Txj& ff, vector<uint>& ina, bool allIna= false);
 #endif

@@ -49,11 +49,11 @@ FerryStream::FerryStream(
 		throw Exception("Unable to receive a initial packet.");
 	}
 	initPack = this->buffer.substr(0, this->buffer.find('}') + 1);
-	FFJSON* init_ffjson;
+	Txj* init_ffjson;
 	try {
-		init_ffjson = new FFJSON(initPack);
-	} catch (FFJSON::Exception e) {
-		throw Exception("Unable parse initial packet. FFJSON::Exception:" + string(e.what()));
+		init_ffjson = new Txj(initPack);
+	} catch (Txj::Exception e) {
+		throw Exception("Unable parse initial packet. Txj::Exception:" + string(e.what()));
 	}
 	string path;
 	try {
@@ -66,8 +66,8 @@ FerryStream::FerryStream(
 			throw Exception("Max packet size didn't met required value");
 			delete init_ffjson;
 		};
-	} catch (FFJSON::Exception e) {
-		throw Exception("Illegal initial packet. FFJSON::Exception:" + string(e.what()));
+	} catch (Txj::Exception e) {
+		throw Exception("Illegal initial packet. Txj::Exception:" + string(e.what()));
 		delete init_ffjson;
 	}
 	ffl_notice(FPL_FSTREAM_HEART, "new connection received with path :%s", path.c_str());
@@ -181,16 +181,16 @@ void FerryStream::heart(FerryStream* fs) {
 				packStartIndex = 0;
 			}
 			try {
-				FFJSON* media_pack = new FFJSON(truebuffer);
-				if (media_pack ->isType (FFJSON::OBJ_TYPE::OBJECT) &&
+				Txj* media_pack = new Txj(truebuffer);
+				if (media_pack ->isType (Txj::OBJ_TYPE::OBJECT) &&
                (*media_pack)["ferryframes"]
             ) {
 					ofstream offpmpack;
 					offpmpack.open("offpmpack.json");
 					offpmpack << truebuffer;
 					offpmpack.close();
-					vector<FFJSON*>* frames = (*media_pack)["ferryframes"].val.array;
-					//vector<FFJSON*>* sizes = (*media_pack)["framesizes"].val.array;
+					vector<Txj*>* frames = (*media_pack)["ferryframes"].val.array;
+					//vector<Txj*>* sizes = (*media_pack)["framesizes"].val.array;
 					char* ferrymp3 = (*media_pack)["ferrymp3"].val.string;
 					int i = frames->size();
 					const char* frame;
@@ -219,14 +219,14 @@ void FerryStream::heart(FerryStream* fs) {
 					ofstream mp3segment(fn_b + ".mp3", std::ios_base::out | std::ios_base::binary);
 					mp3segment.write(ferrymp3, (*media_pack)["ferrymp3"].size);
 					mp3segment.close();
-					(*media_pack)["ferryframes"].setEFlag(FFJSON::B64ENCODE);
-					(*media_pack)["ferrymp3"].setEFlag(FFJSON::B64ENCODE);
+					(*media_pack)["ferryframes"].setEFlag(Txj::B64ENCODE);
+					(*media_pack)["ferrymp3"].setEFlag(Txj::B64ENCODE);
 					pack_string_map[media_pack] = new string(media_pack->stringify());
 					packs_to_send[fs->path] = true;
 					new_pck_chk = true;
-					std::list<FFJSON*>* packsbuf = path_packs_map[fs->path];
+					std::list<Txj*>* packsbuf = path_packs_map[fs->path];
 					if (packsbuf->size() >= packBufSize) {
-						FFJSON* head = *packsbuf->begin();
+						Txj* head = *packsbuf->begin();
 						delete pack_string_map[head];
 						pack_string_map.erase(head);
 						ffl_debug(FPL_FSTREAM_HEART, "Bye %d :) Kicking him out (;",
@@ -238,9 +238,9 @@ void FerryStream::heart(FerryStream* fs) {
 				} else {
 					delete media_pack;
 				}
-			} catch (FFJSON::Exception e) {
+			} catch (Txj::Exception e) {
 				ffl_err(FPL_FPORT, "Illegal meadia pack received on %s", id_path_map[fs->path].c_str());
-				ffl_debug(FPL_FPORT, "FFJSON::Exception: %s", e.what());
+				ffl_debug(FPL_FPORT, "Txj::Exception: %s", e.what());
 			}
 
 		} catch (SocketException e) {

@@ -76,8 +76,8 @@ struct Circle {
    float x;
    float y;
    float r;
-   FFJSON* nf;
-   bool grabIfNearest (FFJSON& f);
+   Txj* nf;
+   bool grabIfNearest (Txj& f);
 };
 union QuadHldr;
 struct WholeQuadNode;
@@ -130,11 +130,11 @@ union QuadHldr {
       qp=nullptr;
    };
    QuadNode* qp;
-   FFJSON* fp;
-   set<FFJSON*>* sp;
+   Txj* fp;
+   set<Txj*>* sp;
    QuadNode* qn ();
    uint insert (
-      FFJSON& rF, vector<uint>& ina, bool deleteLeaf = false,
+      Txj& rF, vector<uint>& ina, bool deleteLeaf = false,
       float lx= 0.0, float ly=0.0, float x = 0.0, float y = 0.0,
       uint level = 0, QuadNode* tQN = nullptr, int8_t tind=0,
       QuadNode* pQN = nullptr, int8_t ind=0, int8_t sn = 0
@@ -144,10 +144,10 @@ union QuadHldr {
       QuadNode* tQN=nullptr, int8_t tind=0, QuadNode* pQN=nullptr, int8_t ind=0
    );
    // uint getPointsFromRadius (
-   //    set<FFJSON*, CompareByDistanceToCenter>& pts, Circle& c, uint minPts=30,
+   //    set<Txj*, CompareByDistanceToCenter>& pts, Circle& c, uint minPts=30,
    //    uint level=0, float x=0, float y=0, QuadNode* pQN = nullptr
    // );
-   // uint addAllLeavesInRadius (set<FFJSON*,CompareByDistanceToCenter>& pts,
+   // uint addAllLeavesInRadius (set<Txj*,CompareByDistanceToCenter>& pts,
    //                            QuadNode* pQN);
    uint findNeighbours (Pts& pts, QuadNode* tQN=nullptr, uint8_t tind=0,
                         QuadNode* pQN=nullptr, uint8_t ind=0, float dx =0.0,
@@ -166,9 +166,9 @@ union QuadHldr {
 };
 
 struct CompareByDistanceToCenter {
-   bool operator () (FFJSON* pf1, FFJSON* pf2) const {
-      FFJSON& f1 = *pf1;
-      FFJSON& f2 = *pf2;
+   bool operator () (Txj* pf1, Txj* pf2) const {
+      Txj& f1 = *pf1;
+      Txj& f2 = *pf2;
       float x1 = f1["location"][0];
       float y1 = f1["location"][1];
       float x2 = f2["location"][0];
@@ -190,7 +190,7 @@ struct QuadNode {
    QuadHldr ws;
    QuadNode ();
    uint insert (
-      FFJSON& rF, vector<uint>& ina, float lx, float ly, float x = 0.0,
+      Txj& rF, vector<uint>& ina, float lx, float ly, float x = 0.0,
       float y = 0.0, uint level = 0, QuadNode* pQN = nullptr, int8_t ind=0,
       bool deleteLeaf = false, int8_t sn = 0
    );

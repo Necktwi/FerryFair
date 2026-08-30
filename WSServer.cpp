@@ -73,18 +73,18 @@ bool sendMail = false;
 const uint thnsPrSrch = 25;
 QuadHldr thnsTree;
 Metaphone3Encoder m3e;
-map<string, FFJSON*>* nameints;
-FFJSON* fnameints=nullptr;
+map<string, Txj*>* nameints;
+Txj* fnameints=nullptr;
 vector<map<QuadNode*, uint>> qpmapvec;
-map<set<FFJSON*>*, vector<uint>> mapffset;
+map<set<Txj*>*, vector<uint>> mapffset;
 
 struct UintName {
    vector<uint> vu;
    vector<string> mwd;
 };
 struct CompNameWt {
-   bool operator () (const map<string, FFJSON*>::iterator it1,
-                     const map<string, FFJSON*>::iterator it2) const {
+   bool operator () (const map<string, Txj*>::iterator it1,
+                     const map<string, Txj*>::iterator it2) const {
       return it1->second->val.number > it2->second->val.number;
    }
 } cmpNmWt;
@@ -102,7 +102,7 @@ vector<uint> nametouint (vector<string>& mstr) {
    uint bitCode=0;
    vector<uint> r;
    for (int k=0;k<mstr.size();++k) {
-      map<string,FFJSON*>::iterator it = nameints->find(mstr[k]);
+      map<string,Txj*>::iterator it = nameints->find(mstr[k]);
       int d=0;   
       if (it==nameints->end()) {
          d=nameints->size();
@@ -169,7 +169,7 @@ bool isValidText (const char* s, int length) {
 }
 
 static void parseHTTPHeader (const char* uri, size_t len,
-                             FFJSON& sessionData) {
+                             Txj& sessionData) {
    unsigned int i=0;
    unsigned int pairStartPin=i;
    while(uri[i]!='\0') {
@@ -237,7 +237,7 @@ string get_subdomain (const char* host) {
       return portpos>1?hoststr.substr(0,portpos):hoststr;
 }
 
-void get_data_in_url (const char* url, FFJSON& data) {
+void get_data_in_url (const char* url, Txj& data) {
    unsigned i = 0;
    unsigned pairStartPin=i;
    string first,second;
@@ -256,7 +256,7 @@ void get_data_in_url (const char* url, FFJSON& data) {
    }
 }
 
-void get_cookies (const char* c, FFJSON& fc) {
+void get_cookies (const char* c, Txj& fc) {
    unsigned i = 0;
    unsigned pairStartPin=i;
    string first,second;
@@ -275,8 +275,8 @@ void get_cookies (const char* c, FFJSON& fc) {
 }
 
 struct CompThingNameMatch {
-   bool operator () (const tuple<FFJSON*,int8_t>& t1,
-                     const tuple<FFJSON*,int8_t>& t2) const {
+   bool operator () (const tuple<Txj*,int8_t>& t1,
+                     const tuple<Txj*,int8_t>& t2) const {
       return (get<1>(t1) < get<1>(t2));
    }
 };
@@ -342,8 +342,8 @@ void mailfn (struct mg_connection *c, int ev, void *ev_data) {
    (void) ev_data;
 }
 
-bool isValidEmail (FFJSON& tname) {
-   if (tname.isType(FFJSON::STRING) && tname.size<48) {
+bool isValidEmail (Txj& tname) {
+   if (tname.isType(Txj::STRING) && tname.size<48) {
       ccp ctname = tname;
       for (uint i=0; i<tname.size; ++i) {
          char c = ctname[i];
@@ -358,8 +358,8 @@ bool isValidEmail (FFJSON& tname) {
    }
    return true;
 }
-bool isValidThingName (FFJSON& tname) {
-   if (tname.isType(FFJSON::STRING) && tname.size>0 && tname.size<=64) {
+bool isValidThingName (Txj& tname) {
+   if (tname.isType(Txj::STRING) && tname.size>0 && tname.size<=64) {
       ccp ctname = tname;
       for (uint i=0; i<tname.size; ++i) {
          char c = ctname[i];
@@ -379,8 +379,8 @@ bool isValidThingName (FFJSON& tname) {
    return true;
 }
 
-bool isValidThingDetails (FFJSON& tname) {
-   if (tname.isType(FFJSON::STRING) && tname.size<=256) {
+bool isValidThingDetails (Txj& tname) {
+   if (tname.isType(Txj::STRING) && tname.size<=256) {
       ccp ctname = tname;
       for (uint i=0; i<tname.size; ++i) {
          char c = ctname[i];
@@ -395,9 +395,9 @@ bool isValidThingDetails (FFJSON& tname) {
    return true;
 }
 
-bool isValidLocation (FFJSON& cloc) {
-   if (cloc.isType(FFJSON::ARRAY) && cloc.size==2) {
-      if (cloc[0].isType(FFJSON::NUMBER) && cloc[1].isType(FFJSON::NUMBER)) {
+bool isValidLocation (Txj& cloc) {
+   if (cloc.isType(Txj::ARRAY) && cloc.size==2) {
+      if (cloc[0].isType(Txj::NUMBER) && cloc[1].isType(Txj::NUMBER)) {
          return true;
       }
    }
@@ -438,7 +438,7 @@ void quickSort (vector<NdNPrn>& pts, int start, int end) {
    }
 }
 
-int getIdChildInd (FFJSON& arr, int id) {
+int getIdChildInd (Txj& arr, int id) {
    int last = arr.size;
    last = id<last?id:last;
    for (int i=last-1;i>=0;++i) {
@@ -448,36 +448,36 @@ int getIdChildInd (FFJSON& arr, int id) {
    }
    return -1;
 }
-map<FFJSON*,set<FFJSON*>> bidThings; 
-int addSmtgsToReply (FFJSON& users, FFJSON& user, FFJSON& r,
-                     set<FFJSON*>& mdts) {
-   FFJSON q("{things:!}");
+map<Txj*,set<Txj*>> bidThings; 
+int addSmtgsToReply (Txj& users, Txj& user, Txj& r,
+                     set<Txj*>& mdts) {
+   Txj q("{things:!}");
    user.answerObject(&q, nullptr, FerryTimeStamp(), &r);
-   FFJSON& rts = r["things"];
-   FFJSON& uts = user["things"];
+   Txj& rts = r["things"];
+   Txj& uts = user["things"];
    int k=rts.size;
    int ik=k;
    for (uint i = 0; i<uts.size; ++i) {
-      FFJSON* f = &uts[i];
-      set<FFJSON*>::iterator it = mdts.find(f);
+      Txj* f = &uts[i];
+      set<Txj*>::iterator it = mdts.find(f);
       if (it==mdts.end()) {
          rts[k]=f;
          ++k;
          mdts.insert(f);
       }
    }
-   FFJSON::Iterator stit = user.find("smsgs");
+   Txj::Iterator stit = user.find("smsgs");
    if (stit!=user.end()) {
-      FFJSON& smsgs = *stit;
-      FFJSON& rsmsgs = r["smsgs"];
+      Txj& smsgs = *stit;
+      Txj& rsmsgs = r["smsgs"];
       for (int i=0; i<smsgs.size; ++i) {
-         FFJSON& s = smsgs[i];
+         Txj& s = smsgs[i];
          if (!s[0].size)
             continue;
-         FFJSON& uts = users[(ccp)s[0]]["things"];
+         Txj& uts = users[(ccp)s[0]]["things"];
          int tind = getIdChildInd(uts, (int)s[1]);
-         FFJSON* f = &uts[tind];
-         set<FFJSON*>::iterator it = mdts.find(f);
+         Txj* f = &uts[tind];
+         set<Txj*>::iterator it = mdts.find(f);
          if (it==mdts.end()) {
             rts[k]=f;
             ++k;
@@ -548,8 +548,8 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
       //ffl_notice(FPL_HTTPSERV, "Remote IP: %s-------------------", c->rem.ip);
       struct mg_http_message* hm = (struct mg_http_message*) ev_data;
       //ffl_notice(FPL_HTTPSERV, "hm->uri:\n%s", hm->uri.ptr);
-      FFJSON sessionData, cookie, payload, reply, user, rbsid;
-      FFJSON urlData;
+      Txj sessionData, cookie, payload, reply, user, rbsid;
+      Txj urlData;
       string subdomain;
       ccp referer=nullptr;char proto[8]="https"; int protolen;
       ccp username = nullptr, password = nullptr, cpld = nullptr;
@@ -560,10 +560,10 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
       if (!sessionData["host"]) return;
       subdomain=get_subdomain(sessionData["host"]);
       ffl_notice(FPL_HTTPSERV, "subdomain: %s",subdomain.c_str());
-      FFJSON& vhost = (bool)config["virtualWebHosts"][subdomain]?
+      Txj& vhost = (bool)config["virtualWebHosts"][subdomain]?
          config["virtualWebHosts"][subdomain]:config;
-      FFJSON& rbs=vhost["rbs"];
-      FFJSON& users=vhost["users"];
+      Txj& rbs=vhost["rbs"];
+      Txj& users=vhost["users"];
       if (vhost["rootdir"])
          opts.root_dir=vhost["rootdir"];
       if (sessionData["cookie"])get_cookies(sessionData["cookie"], cookie);
@@ -660,21 +660,21 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
          rbsid["ts"]=now;
          reply["bid"]=bid;
          get_data_in_url(path, urlData);
-         set<FFJSON*>& mdts = bidThings[&rbsid];
+         set<Txj*>& mdts = bidThings[&rbsid];
          Pts pts;
          if (urlData["user"] && urlData["thing"]) {
-            FFJSON& uthings = users[(ccp)urlData["user"]]["things"];
+            Txj& uthings = users[(ccp)urlData["user"]]["things"];
             int tind = getIdChildInd(uthings, atoi(urlData["thing"]));
-            FFJSON* thn = &uthings[tind];
+            Txj* thn = &uthings[tind];
             reply["things"][0]=thn;
             mdts.clear();
             mdts.insert(thn);
-            FFJSON q("{things:!}");
+            Txj q("{things:!}");
             user.answerObject(&q, nullptr, FerryTimeStamp(), &reply);
             goto cookieReply;
          }
          payload.init(cpld);
-         if (!payload["geoposition"].isType(FFJSON::UNDEFINED) &&
+         if (!payload["geoposition"].isType(Txj::UNDEFINED) &&
              payload["geoposition"].size==2
          ) {
             pts.c.x=(float)payload["geoposition"][1];
@@ -685,12 +685,12 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
          mdts.clear();
          for (uint i = 0; i<pts.pts.size(); ++i) {
             NdNPrn& nd = pts.pts[i];
-            FFJSON* f;
+            Txj* f;
             if (nd.prn==(QuadNode*)-1) {
-               f = (FFJSON*)nd.qh;
+               f = (Txj*)nd.qh;
             } else {
                auto aa = getNode(nd);
-               f = (FFJSON*)get<0>(aa);
+               f = (Txj*)get<0>(aa);
             }
             reply["things"][i]=f;
             mdts.insert(f);
@@ -772,11 +772,11 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
                       username, password, (ccp)payload["email"]);
          } else if (payload["email"]) {
             recovery=true;
-            std::map<string,FFJSON*>* emln = users.val.pairs;
+            std::map<string,Txj*>* emln = users.val.pairs;
             if (emln->find(string((ccp)payload["email"]))!=emln->end()) {
-               FFJSON* ffemln = (*emln)[string((ccp)payload["email"])];
-               FFJSON::Link* link =
-                  ffemln->getFeaturedMember(FFJSON::FM_LINK).link;
+               Txj* ffemln = (*emln)[string((ccp)payload["email"])];
+               Txj::Link* link =
+                  ffemln->getFeaturedMember(Txj::FM_LINK).link;
                username=(*link)[0].c_str();
                ffl_debug(FPL_HTTPSERV, "username: %s", username);
             } else {
@@ -877,7 +877,7 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
          vector<string> mstr = metaname(srchStr);
          pts.ina = nametouint(mstr);
          int k=0;
-         if (!payload["geoposition"].isType(FFJSON::UNDEFINED) &&
+         if (!payload["geoposition"].isType(Txj::UNDEFINED) &&
              payload["geoposition"].size==2
          ) {
             pts.c.x=(float)payload["geoposition"][1];
@@ -887,28 +887,28 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
          ffl_info(FPL_HTTPSERV, "searching %s at %s\n",srchStr,
                   payload["geoposition"].stringify().c_str());
          CompThingNameMatch cTNM;
-         multiset<tuple<FFJSON*, int8_t>, CompThingNameMatch> score(cTNM);
+         multiset<tuple<Txj*, int8_t>, CompThingNameMatch> score(cTNM);
          thnsTree.getPointsFromQuad(pts);
          for (int i=0;i<pts.pts.size();++i) {
             NdNPrn& nd = pts.pts[i];
-            FFJSON* f;
+            Txj* f;
             if (nd.prn==(QuadNode*)-1) {
-               f = (FFJSON*)nd.qh;
+               f = (Txj*)nd.qh;
             } else {
                auto aa = getNode(nd);
-               f = (FFJSON*)get<0>(aa);
+               f = (Txj*)get<0>(aa);
             }
             score.insert({f,nd.d.x});
          }
-         multiset<tuple<FFJSON*, int8_t>, CompThingNameMatch>::iterator it=
+         multiset<tuple<Txj*, int8_t>, CompThingNameMatch>::iterator it=
             score.begin();
          rbsid = &rbs[bid];
-         set<FFJSON*>& mdts = bidThings[&rbsid];
+         set<Txj*>& mdts = bidThings[&rbsid];
          while (it!=score.end()) {
-            FFJSON& f = *get<0>(*it);
+            Txj& f = *get<0>(*it);
             bool thingIsWithUser = mdts.find(&f)!=mdts.end();
             if (thingIsWithUser) {
-               FFJSON& rt = reply["things"][k];
+               Txj& rt = reply["things"][k];
                rt["id"]=f["id"];
                rt["user"]=&f["user"]["name"];
             } else {
@@ -945,7 +945,7 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
          int ttlSz = atoi((ccp)urlData["totalSize"]);
          int thngi = -1;
          // if (fofst!=0) {
-         //    FFJSON& ptgs=user["pendingThings"];
+         //    Txj& ptgs=user["pendingThings"];
          //    if(thingId!=(int)ptgs["thingId"]){
          //       mg_http_reply(c, 400, headers, "{%Q:%Q}", "error",
          //                     "noSuchThingId" );
@@ -955,7 +955,7 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
          //    thngi=ptgs["thngi"];
          //    goto gotThingId;
          // }
-         FFJSON& uthings = user["things"];
+         Txj& uthings = user["things"];
          if (thingId < 0) {
             if (uthings && uthings.size>=maxThings) {
                ffl_notice (
@@ -1014,10 +1014,10 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
             if (!uthings[thngi]["user"]) {
                uthings[thngi]["user"].addLink(users, username);
             }
-            FFJSON& ups = uthings[thngi]["pics"];
+            Txj& ups = uthings[thngi]["pics"];
             ups[picId]["partial"] = true;
             // if (fofst+chnkSz<ttlSz) {
-            //    FFJSON& ptgs=user["pendingThings"];
+            //    Txj& ptgs=user["pendingThings"];
             //    ptgs["thingId"]=thingId;
             //    ptgs["picId"]=picId;
             //    ptgs["thngi"]=thngi;
@@ -1036,19 +1036,19 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
          }
       } else if (!strcmp(path, "/logout")) {
         logout:
-         rbsid["user"]=nullFFJSON;
+         rbsid["user"]=nullTxj;
          mg_http_reply(c, 200, headers, "{%Q:%s}", "logout","true");
          rbs.save();
       } else if (strstr(path, "/update")) {
-         FFJSON& user = users[username];
+         Txj& user = users[username];
          if (strcmp((ccp)user["bid"],bid.c_str())) {
             mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "bidmismatch");
             goto done;
          }
          payload.init(cpld);
          if (payload["things"]) {
-            FFJSON& cthings = payload["things"];
-            FFJSON& uthings = user["things"];
+            Txj& cthings = payload["things"];
+            Txj& uthings = user["things"];
             bool newthing=false;
             int id = 0;
             if (!(bool)uthings) {
@@ -1063,7 +1063,7 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
                                 "error", "sizeExceeded");
                   goto done;
                }
-               FFJSON& cfname = cthings[i]["name"];
+               Txj& cfname = cthings[i]["name"];
                string cname((ccp)cfname);
                if (!isValidThingName(cfname)) {
                   mg_http_reply(c, 400, headers, "{%Q:%Q}",
@@ -1079,12 +1079,12 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
                if (j<0) {
                   j=uthings.size;
                   uthings[j]["id"] = j?(int)uthings[j-1]["id"]+1:1;
-                  FFJSON& ln = uthings[j]["user"].addLink(users, username);
+                  Txj& ln = uthings[j]["user"].addLink(users, username);
                   if (!ln)
                      delete &ln;
                   uthings[j]["name"]=cthings[i]["name"];
                   nameChanged=true;
-                  FFJSON& cloc = cthings[i]["location"];
+                  Txj& cloc = cthings[i]["location"];
                   if (!isValidLocation(cloc)) {
                      mg_http_reply(c, 400, headers, "{%Q:%Q}",
                                 "error", "invalidLocation");
@@ -1100,7 +1100,7 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
                   if (strcmp(cname.c_str(),uname.c_str())) {
                      mstr = metaname(uname);
                      for (int k=0; k<mstr.size(); ++k) {
-                        map<string, FFJSON*>::iterator it =
+                        map<string, Txj*>::iterator it =
                            nameints->find(mstr[k]);
                         if (it->second->val.number==1) {
                            mitpos.erase(mitpos.find(&it->first));
@@ -1112,8 +1112,8 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
                      nameChanged=true;
                      uthings[j]["name"]=cthings[i]["name"];
                   }
-                  FFJSON& cloc = cthings[i]["location"];
-                  FFJSON& uloc = uthings[j]["location"];
+                  Txj& cloc = cthings[i]["location"];
+                  Txj& uloc = uthings[j]["location"];
                   if (!isValidLocation(cloc)) {
                      mg_http_reply(c, 400, headers, "{%Q:%Q}",
                                 "error", "invalidLocation");
@@ -1142,7 +1142,7 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
                if (nameChanged) {
                   mstr=metaname(cname);
                   for (int k=0; k<mstr.size(); ++k) {
-                     map<string, FFJSON*>::iterator it =
+                     map<string, Txj*>::iterator it =
                         nameints->find(mstr[k]);
                      if (it==nameints->end()) {
                         (*fnameints)[mstr[k]]=1;
@@ -1163,13 +1163,13 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
          mg_http_reply(c, 200, headers, "%s", reply.stringify(true).c_str());
          users.save();
       } else if (strstr(path, "/owl")) {
-         FFJSON& things = user["things"];
-         FFJSON& smsgs = user["smsgs"];
-         FFJSON& reps = user["reps"];
+         Txj& things = user["things"];
+         Txj& smsgs = user["smsgs"];
+         Txj& reps = user["reps"];
          int smind=smsgs.size;
          payload.init(cpld);
-         FFJSON& fQs = payload["Qs"];
-         FFJSON::Iterator it;
+         Txj& fQs = payload["Qs"];
+         Txj::Iterator it;
          long urts;
          long lmts;
          int i,j;
@@ -1183,7 +1183,7 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
                mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
                goto done;
             }
-            FFJSON::Iterator tit;
+            Txj::Iterator tit;
             if (tuser) {
                tit  = users.find(tuser);
             }
@@ -1191,8 +1191,8 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
                mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
                goto done;
             }
-            FFJSON& tfuser = users[tuser];
-            FFJSON& tfthings = tfuser["things"];
+            Txj& tfuser = users[tuser];
+            Txj& tfthings = tfuser["things"];
             tit = it->begin();
             while (tit!=it->end()) {
                ccp ctid = (ccp)tit;
@@ -1206,7 +1206,7 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
                   mg_http_reply(c, 400, headers, "{%Q:%Q}", "error", "yay!");
                   goto done;
                }
-               FFJSON& rmsgs = tfthings[tind]["rmsgs"];
+               Txj& rmsgs = tfthings[tind]["rmsgs"];
                if (!rmsgs) {
                   rmsgs.init("[]");
                }
@@ -1234,7 +1234,7 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
          }
          payload["status"]=1;
         rqs:
-         FFJSON& fRs = payload["Rs"];
+         Txj& fRs = payload["Rs"];
          if (!fRs) {
             goto rrs;
          }
@@ -1252,8 +1252,8 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
                              "yay!");
                goto done;                     
             }
-            FFJSON& rmsgs = things[tind]["rmsgs"];
-            FFJSON::Iterator tit = it->begin();
+            Txj& rmsgs = things[tind]["rmsgs"];
+            Txj::Iterator tit = it->begin();
             while (tit!=it->end()) {
                int mid = (int)*tit;
                mid = getIdChildInd(rmsgs, mid);
@@ -1268,7 +1268,7 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
          }
          payload["status"]=1;
         rrs:
-         FFJSON& frrs = payload["rrs"];
+         Txj& frrs = payload["rrs"];
          if (!frrs) {
             goto news;
          }
@@ -1292,9 +1292,9 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
             goto rnews;
          }
          for (int i=0; i<things.size; ++i) {
-            FFJSON& rmsgs = things[i]["rmsgs"];
+            Txj& rmsgs = things[i]["rmsgs"];
             for (int j=0;j<rmsgs.size;++j) {
-               FFJSON& msg = rmsgs[j];
+               Txj& msg = rmsgs[j];
                long mts = (long)msg["ts"];
                if (mts<urts) {
                   continue;
@@ -1317,12 +1317,12 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
          do {
             --i;
             int smind = reps[i];
-            FFJSON& smsg = smsgs[smind];
-            FFJSON& tusrts = users[(ccp)smsg[0]]["things"];
+            Txj& smsg = smsgs[smind];
+            Txj& tusrts = users[(ccp)smsg[0]]["things"];
             int tind = getIdChildInd(tusrts, (int)smsg[1]);
-            FFJSON& trmsgs = tusrts[tind]["rmsgs"];
+            Txj& trmsgs = tusrts[tind]["rmsgs"];
             int mind = getIdChildInd(trmsgs, (int)smsg[2]);
-            FFJSON& rep=payload["rnews"][j];
+            Txj& rep=payload["rnews"][j];
             rep=smsg;
             rep[3]=trmsgs[mind]["rep"];
             rep[4]=smind;
@@ -1333,7 +1333,7 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
             lmts=(long)reps[i];
          } while (urts<lmts);
         reps:
-         FFJSON& fRps = payload["Reps"];
+         Txj& fRps = payload["Reps"];
          if (!fRps) {
             goto owldone;
          }
@@ -1351,8 +1351,8 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
                              "yay!");
                goto done;                     
             }
-            FFJSON& rmsgs = things[tind]["rmsgs"];
-            FFJSON::Iterator tit = it->begin();
+            Txj& rmsgs = things[tind]["rmsgs"];
+            Txj::Iterator tit = it->begin();
             while (tit!=it->end()) {
                int mid = stoi((ccp)tit);
                int mind = getIdChildInd(rmsgs, mid);
@@ -1366,8 +1366,8 @@ void fn (struct mg_connection* c, int ev, void* ev_data) {
                smsgs[smind][0]="";
                smsgs[smind][1]=tid;
                smsgs[smind][2]=mid;
-               FFJSON& tusr = users[(ccp)rmsgs[mind]["user"]];
-               FFJSON& treps = tusr["reps"];
+               Txj& tusr = users[(ccp)rmsgs[mind]["user"]];
+               Txj& treps = tusr["reps"];
                if (!treps) {
                   treps.init("[]");
                }
@@ -1529,7 +1529,7 @@ vector<uint> qpIna (vector<map<QuadNode*,uint>::iterator> vit) {
    return ina;
 }
 
-int8_t ffHasName (FFJSON& ff, vector<uint>& ina) {
+int8_t ffHasName (Txj& ff, vector<uint>& ina) {
    if (!ina.size()) {
       return -1;
    }
@@ -1564,13 +1564,13 @@ vector<uint> QuadHldr::getIntNames (QuadNode* tQN, uint8_t tind,
       }
    }
    if (!a) {
-      set<FFJSON*>* ressfp = (set<FFJSON*>*)resfp;
-      map<set<FFJSON*>*, vector<uint>>::iterator sit = mapffset.find(ressfp);
+      set<Txj*>* ressfp = (set<Txj*>*)resfp;
+      map<set<Txj*>*, vector<uint>>::iterator sit = mapffset.find(ressfp);
       bool isS=sit != mapffset.end();
       if (isS) {
          r = sit->second;
       } else {
-         FFJSON& tfp = *(FFJSON*)resfp;
+         Txj& tfp = *(Txj*)resfp;
          vector<string> mstr = metaname((ccp)tfp["name"]);
          r=nametouint(mstr);
       }
@@ -1603,7 +1603,7 @@ QuadNode::~QuadNode () {
 }
 
 uint QuadNode::insert (
-   FFJSON& rF, vector<uint>& ina, float lx, float ly, float x, float y,
+   Txj& rF, vector<uint>& ina, float lx, float ly, float x, float y,
    uint level, QuadNode* pQN, int8_t ind, bool deleteLeaf, int8_t sn
 ) {
    if (!sn)
@@ -1619,7 +1619,7 @@ uint QuadNode::insert (
    //fflush(stdout);
    qh+=qind;
    if (qh->fp==nullptr) {
-      FFJSON* pxorrf = (FFJSON*)fpxor(&rF, pQN, ind);
+      Txj* pxorrf = (Txj*)fpxor(&rF, pQN, ind);
       qh->fp=pxorrf;
       returnv = 1;
    } else {
@@ -1633,20 +1633,20 @@ uint QuadNode::insert (
 }
 
 uint QuadHldr::insert (
-   FFJSON& rF, vector<uint>& ina, bool deleteLeaf, float lx, float ly,
+   Txj& rF, vector<uint>& ina, bool deleteLeaf, float lx, float ly,
    float x, float y, uint level, QuadNode* tQN, int8_t tind, QuadNode* pQN,
    int8_t ind,int8_t sn
 ) {
    //printf("x,y: %lf,%lf\n", x, y);
    if (fp==nullptr) {
-      fp = (FFJSON*)fpxor(&rF, pQN, ind);
+      fp = (Txj*)fpxor(&rF, pQN, ind);
       //printf("rF:%p,%s inserted\n", &rF,rF["location"].stringify().c_str());
       return level;
    }
    uint returnv=0;
    void* resfp = get<0>(bpxor(fp, pQN));
-   set<FFJSON*>* ressfp = (set<FFJSON*>*)resfp;
-   map<set<FFJSON*>*, vector<uint>>::iterator sit = mapffset.find(ressfp);
+   set<Txj*>* ressfp = (set<Txj*>*)resfp;
+   map<set<Txj*>*, vector<uint>>::iterator sit = mapffset.find(ressfp);
    vector<map<QuadNode*,uint>::iterator> qit = qpfind((QuadNode*)resfp);
    if (!qit.size()) {
       bool isS=sit != mapffset.end();
@@ -1655,7 +1655,7 @@ uint QuadHldr::insert (
             fp=nullptr;
             return 1;
          } else if (isS) {
-            set<FFJSON*>::iterator it = ressfp->find(&rF);
+            set<Txj*>::iterator it = ressfp->find(&rF);
             if (it!=ressfp->end()) {
                ressfp->erase(it);
             }
@@ -1671,18 +1671,18 @@ uint QuadHldr::insert (
       }
       if (resfp == (void*)&rF)
          return level;
-      FFJSON& tmp = isS ? **ressfp->begin() : *(FFJSON*)resfp;
+      Txj& tmp = isS ? **ressfp->begin() : *(Txj*)resfp;
       //printf("tfp: %p,%p,%p\n",tfp, fp, pQN);
       float llx = (float)tmp["location"][1];
       float lly = (float)tmp["location"][0];
       if (llx==lx && lly==ly) {
          if (!isS) {
             xorinaname(ina, (ccp)tmp["name"]);
-            sp = new set<FFJSON*>();
+            sp = new set<Txj*>();
             mapffset[sp]=ina;
             sp->insert(&tmp);
             sp->insert(&rF);
-            sp=(set<FFJSON*>*)fpxor(sp, pQN, ind);
+            sp=(set<Txj*>*)fpxor(sp, pQN, ind);
          } else {
             xorina(sit->second, ina);
             ressfp->insert(&rF);
@@ -1698,8 +1698,8 @@ uint QuadHldr::insert (
          }
       }
       qp->seti(ina);
-      qp->insert(*(FFJSON*)resfp,ina,llx,lly,x,y,level,tQN,tind,deleteLeaf,1);
-      // FFJSON* xorfp = (FFJSON*)fpxor(resfp,tQN,tind);
+      qp->insert(*(Txj*)resfp,ina,llx,lly,x,y,level,tQN,tind,deleteLeaf,1);
+      // Txj* xorfp = (Txj*)fpxor(resfp,tQN,tind);
       // //printf("%p,%p\n", resfp, xorfp);
       // if ((double)tmp["location"][1] >= x) {
       //    if ((double)tmp["location"][0] >= y) {
@@ -1744,7 +1744,7 @@ uint QuadHldr::insert (
       if (deleteLeaf) {
          if (returnv) {
             QuadHldr* qh = (QuadHldr*)qpres;
-            FFJSON* pxorrf = nullptr;
+            Txj* pxorrf = nullptr;
             if (returnv>1) {
                //qh = &qpres->en;
                int8_t qind = 0;
@@ -1755,12 +1755,12 @@ uint QuadHldr::insert (
                      if (xs>1) {
                         return 1;
                      }
-                     pxorrf=(FFJSON*)qh;
+                     pxorrf=(Txj*)qh;
                   }
                }
                if (xs) {
                   qh=(QuadHldr*)pxorrf;
-                  pxorrf=(FFJSON*)get<0>(bpxor(qh->fp, tQN));
+                  pxorrf=(Txj*)get<0>(bpxor(qh->fp, tQN));
                   delete qpres;
                   qp = (QuadNode*)fpxor(pxorrf, pQN,ind);
                } else {
@@ -1779,7 +1779,7 @@ uint QuadHldr::insert (
    }
    return level;
 }
-bool Circle::grabIfNearest (FFJSON& f) {
+bool Circle::grabIfNearest (Txj& f) {
    if (!nf) {
       nf=&f;
       return true;
@@ -1809,15 +1809,15 @@ void QuadHldr::print (Circle& c, uint level, QuadNode* tQN, uint8_t tind,
    QuadNode* resqp = (QuadNode*)get<0>(bpxor(fp,pQN));
    vector<map<QuadNode*,uint>::iterator> qit = qpfind((QuadNode*)resqp);
    if (!qit.size()) {
-      set<FFJSON*>* ressfp = (set<FFJSON*>*)resqp;
-      map<set<FFJSON*>*, vector<uint>>::iterator sit = mapffset.find(ressfp);
+      set<Txj*>* ressfp = (set<Txj*>*)resqp;
+      map<set<Txj*>*, vector<uint>>::iterator sit = mapffset.find(ressfp);
       bool isS=sit != mapffset.end();
       if (isS) {
-         set<FFJSON*>& sf = *sit->first;
+         set<Txj*>& sf = *sit->first;
          resqp=(QuadNode*)*sf.begin();
       }
-      FFJSON& f = *(FFJSON*)resqp;
-      if (c.nf!=(FFJSON*)1)
+      Txj& f = *(Txj*)resqp;
+      if (c.nf!=(Txj*)1)
          c.grabIfNearest(f);
       printf("%.*s%d: %p(%p(%d))%s\n",level,
              "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||",
@@ -2135,13 +2135,13 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
             vector<map<QuadNode*,uint>::iterator> qit =
                qpfind((QuadNode*)resqp);
             if (!qit.size()) {
-               set<FFJSON*>* ressfp = (set<FFJSON*>*)resqp;
-               map<set<FFJSON*>*, vector<uint>>::iterator sit =
+               set<Txj*>* ressfp = (set<Txj*>*)resqp;
+               map<set<Txj*>*, vector<uint>>::iterator sit =
                   mapffset.find(ressfp);
                bool isS=sit != mapffset.end();
                if (isS) {
-                  set<FFJSON*>& sf = *sit->first;
-                  set<FFJSON*>::iterator sfit = sf.begin();
+                  set<Txj*>& sf = *sit->first;
+                  set<Txj*>::iterator sfit = sf.begin();
                   int moreElms=sf.size();
                   while (sfit!=sf.end()) {
                      //break;
@@ -2162,7 +2162,7 @@ uint QuadHldr::findNeighbours (Pts& pts, QuadNode* tQN, uint8_t tind,
                   }
                } else {
                   uint8_t matchcount =
-                     (uint8_t)ffHasName((*(FFJSON*)resqp),pts.ina);
+                     (uint8_t)ffHasName((*(Txj*)resqp),pts.ina);
                   if (matchcount) {
                      pts.pts[pni] = pts.pts[pts.ni];
                      pts.pts[pni].d.x = matchcount;
@@ -2229,12 +2229,12 @@ uint QuadHldr::getPointsFromQuad (
    void* resfp = get<0>(bpxor(fp,pQN));
    vector<map<QuadNode*,uint>::iterator> qit = qpfind((QuadNode*)resfp);
    if (!qit.size()) {
-      set<FFJSON*>* ressfp = (set<FFJSON*>*)resfp;
-      map<set<FFJSON*>*, vector<uint>>::iterator sit = mapffset.find(ressfp);
+      set<Txj*>* ressfp = (set<Txj*>*)resfp;
+      map<set<Txj*>*, vector<uint>>::iterator sit = mapffset.find(ressfp);
       bool isS = sit != mapffset.end();
       if (isS) {
-         set<FFJSON*>& sf = *sit->first;
-         set<FFJSON*>::iterator sfit = sf.begin();
+         set<Txj*>& sf = *sit->first;
+         set<Txj*>::iterator sfit = sf.begin();
          while (sfit!=sf.end()) {
             int8_t matchcount = ffHasName(**sfit, pts.ina);
             if (matchcount) {
@@ -2243,7 +2243,7 @@ uint QuadHldr::getPointsFromQuad (
             }
             ++sfit;
          }
-      } else if (ffHasName(*(FFJSON*)resfp, pts.ina)) {
+      } else if (ffHasName(*(Txj*)resfp, pts.ina)) {
          pts.pts.push_back({this,pQN});
       }
       return findNeighbours(pts, tQN, tind, pQN, ind, dx);
@@ -2282,34 +2282,34 @@ void makeThngsTree () {
    fnameints =
       &config["virtualWebHosts"]["underconstruction"]["nameints"];
    nameints = fnameints->val.pairs;
-   map<string, FFJSON*>::iterator nit = nameints->begin();
-   multiset<map<string, FFJSON*>::iterator, CompNameWt> namewtset(cmpNmWt);
+   map<string, Txj*>::iterator nit = nameints->begin();
+   multiset<map<string, Txj*>::iterator, CompNameWt> namewtset(cmpNmWt);
    while (nit!=nameints->end()) {
       namewtset.insert(nit);
       ++nit;
    }
    uint i=0;
-   multiset<map<string, FFJSON*>::iterator, CompNameWt>::iterator mit
+   multiset<map<string, Txj*>::iterator, CompNameWt>::iterator mit
       = namewtset.begin();
    while (mit!=namewtset.end()) {
       mitpos[&((*mit)->first)]=i;
       ++i;
       ++mit;
    }
-   FFJSON& users = config["virtualWebHosts"]["underconstruction"]["users"];
-   FFJSON::Iterator it = users.begin();
-   FFJSON::Iterator tit;
+   Txj& users = config["virtualWebHosts"]["underconstruction"]["users"];
+   Txj::Iterator it = users.begin();
+   Txj::Iterator tit;
    while (it!= users.end()) {
-      if (it->isType(FFJSON::LINK)) {
+      if (it->isType(Txj::LINK)) {
          ++it;
          continue;
       }
       string user = it.getIndex();
-      FFJSON& uthings = (*it)["things"];
+      Txj& uthings = (*it)["things"];
       tit = uthings.begin();
       while (tit!=uthings.end()) {
-         if (!((*tit)["name"].isType(FFJSON::UNDEFINED) ||
-               (*tit)["location"].isType(FFJSON::UNDEFINED))) {
+         if (!((*tit)["name"].isType(Txj::UNDEFINED) ||
+               (*tit)["location"].isType(Txj::UNDEFINED))) {
             vector<string> mstr = metaname((ccp)(*tit)["name"]);
             vector<uint> ina = nametouint(mstr);
             float lx = (*tit)["location"][1];
@@ -2317,7 +2317,7 @@ void makeThngsTree () {
             uint level=thnsTree.insert((*tit), ina,0,lx,ly);
          }
          // Circle c;
-         // c.nf=(FFJSON*)1;
+         // c.nf=(Txj*)1;
          // printf("%s\n", (*tit)["location"].stringify().c_str());
          // thnsTree.print(c);
          ++tit;
@@ -2343,10 +2343,10 @@ WSServer::WSServer (
    ffl_info(FPL_HTTPSERV, "Building quad tree..");
    ffl_debug(FPL_HTTPSERV, "malloc size: %d\n",
              malloc_usable_size(&config["virtualWebHosts"]));
-   set<FFJSON*>* pvc = new set<FFJSON*>();
+   set<Txj*>* pvc = new set<Txj*>();
    QuadNode* qp = new QuadNode();
    Qn2* qp2 = new Qn2();
-   FFJSON* fp = new FFJSON();
+   Txj* fp = new Txj();
    QuadHldr* qh = new QuadHldr();
    char* ppvc = (char*)&pvc;
    char a = (char)ppvc[7];
@@ -2386,11 +2386,11 @@ WSServer::WSServer (
    std::vector<NdNPrn>::iterator it = pts.pts.begin();
    it = pts.pts.begin();
    while (it!=pts.pts.end()) {
-      FFJSON* fp;
+      Txj* fp;
       if (it->prn==(QuadNode*)-1) {
-         fp = (FFJSON*)it->qh;
+         fp = (Txj*)it->qh;
       } else {
-         fp = (FFJSON*)get<0>(getNode(*it));
+         fp = (Txj*)get<0>(getNode(*it));
       }
       printf("%s\n",(*fp)["location"].stringify().c_str());
       ++it;

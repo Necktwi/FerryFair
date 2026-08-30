@@ -11,12 +11,12 @@
 #include <FFJSON.h>
 #include <FerryTimeStamp.h>
 
-#define Txo FFJSON
+#define Txj Txj
 #define let auto;
 
 namespace fs= std::filesystem;
 
-extern FFJSON cfg;
+extern Txj cfg;
 enum HTTPLOG {
    HL = 1<<11,
    FL = 1<<12,
@@ -65,11 +65,11 @@ struct MkHttpArgs {
 char* fileToStr (fs::path& fspath, char* buf= nullptr);
 int mkHttpRes (string& res, MkHttpArgs& args);
 int mkHttpRes (
-   FFJSON& ffHttp, ccp body= nullptr, ccp ctype= "text/plain", int bsz= -1,
+   Txj& ffHttp, ccp body= nullptr, ccp ctype= "text/plain", int bsz= -1,
    const int code= 200, ccp codeMsg= "OK", ccp addlHdrs= nullptr);
-int mkHttpRes (FFJSON& ffHttp, FFJSON& body);
+int mkHttpRes (Txj& ffHttp, Txj& body);
 inline int mkHttpRes (
-   FFJSON& ffHttp, string body, ccp ctype = "text/plain",
+   Txj& ffHttp, string body, ccp ctype = "text/plain",
    const int code = 200, ccp codeMsg = "OK", ccp addlHdrs = "") {
    return mkHttpRes(ffHttp, body.c_str(), ctype, body.length(), code, codeMsg,
                     addlHdrs);
@@ -100,16 +100,14 @@ private:
 };
 extern thread_local int tid;
 extern ThreadPool* tpoolPtr;
-extern set<FFJSON*> pFSetToSave;
+extern set<Txj*> pFSetToSave;
 extern mutex setSavMtx;
-extern map<Txo*, shared_mutex> TxoMtxMap;
-extern mutex TxoMtxMapMtx;
-extern atomic<bool> saveTxoStop;
+extern atomic<bool> saveTxjStop;
 constexpr uint32_t fnv1a (const char *s, uint32_t hash = 2166136261u) {
    return (*s == 0) ? hash : fnv1a(s + 1, (hash ^ uint32_t(*s)) * 16777619u);
 }
 constexpr uint32_t operator ""_hash (const char *s, size_t) {
    return fnv1a(s);
 }
-extern map<FFJSON*, shared_mutex> ffFileMtx;
+extern map<Txj*, shared_mutex> ffFileMtx;
 #endif

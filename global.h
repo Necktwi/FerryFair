@@ -21,8 +21,8 @@
 
 extern std::map<std::string, unsigned int> path_id_map;
 extern std::map<int, std::string> id_path_map;
-extern std::map<int, std::list<FFJSON*>*> path_packs_map;
-extern std::map<FFJSON*, std::string*> pack_string_map;
+extern std::map<int, std::list<Txj*>*> path_packs_map;
+extern std::map<Txj*, std::string*> pack_string_map;
 extern std::map<int, bool> packs_to_send;
 #ifdef LIBWEBSOCKETS
    extern std::map<lws*, int> wsi_path_map;
@@ -40,7 +40,7 @@ extern int debug;
 extern int stdinfd;
 extern int stderrfd;
 extern int stdoutfd;
-extern FFJSON config;
+extern Txj config;
 extern std::string hostname;
 extern std::string domainname;
 extern unsigned int duration;

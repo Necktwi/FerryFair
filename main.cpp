@@ -67,7 +67,7 @@ string runningProcessFile = "/var/tmp/" APP_NAME ".pid";
 string internetTestURL;
 string corpNWGW;
 string homeFolder;
-FFJSON config;
+Txj config;
 string hostname;
 string domainname;
 unsigned int duration = 0;
@@ -135,15 +135,15 @@ int readConfig() {
    corpNWGW.assign((const char*)config["corpNWGW"]);
    unsigned int ff_log_type = 0;
    unsigned int ff_log_blks = 0;
-   if (config["logType"].isType(FFJSON::ARRAY)) {
-      for (FFJSON::Iterator it = config["logType"].begin();
+   if (config["logType"].isType(Txj::ARRAY)) {
+      for (Txj::Iterator it = config["logType"].begin();
            it != config["logType"].end(); it++)
          ff_log_type |= 1 << (unsigned int)*it;
    } else {
       ff_log_type = config["logType"];
    }
-   if (config["logBlks"].isType(FFJSON::ARRAY)) {
-      for (FFJSON::Iterator it = config["logBlks"].begin();
+   if (config["logBlks"].isType(Txj::ARRAY)) {
+      for (Txj::Iterator it = config["logBlks"].begin();
            it != config["logBlks"].end(); it++)
          ff_log_blks |= 1 << (unsigned int)*it;
    } else {
@@ -164,7 +164,7 @@ int readConfig() {
    hfile .seekg (ios::beg);
    hostn .assign ((std ::istreambuf_iterator<char> (hfile)),
                   std::istreambuf_iterator<char>());
-   FFJSON::trimWhites(hostn);
+   Txj::trimWhites(hostn);
    int dnail = hostn.find('.');
    if (dnail != string::npos) {
       hostname = hostn.substr(0, dnail);
@@ -249,11 +249,11 @@ string readConfigValue(string name) {
       std::istreambuf_iterator<char>());
    std::string ret;
    try {
-      FFJSON config(str);
+      Txj config(str);
       ret.assign((const char*)config[name]);
       return ret;
    }
-   catch (FFJSON::Exception e) {
+   catch (Txj::Exception e) {
       return "";
    }
 }
